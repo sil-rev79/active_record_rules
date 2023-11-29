@@ -23,8 +23,8 @@ RSpec.describe ActiveRecordRules do
     end
   end
 
-  context "no constraints" do
-    let!(:rule) do
+  context "with no constraints" do
+    before do
       ActiveRecordRules::Rule.create_from_definition(<<~RULE)
         rule greet
           Salutation(greeting)
@@ -36,56 +36,58 @@ RSpec.describe ActiveRecordRules do
           # puts "deactivate \#{greeting}/\#{name}"
           TestHelper.activated -= [[greeting, name]]
       RULE
-    end
 
-    before do
       TestHelper.activated = []
     end
 
-    context "with a hello Salutation" do
-      let!(:salutation) { Salutation.create!(greeting: "hello") }
+    let!(:salutation) { Salutation.create!(greeting: "hello") }
 
-      context "with John as a person" do
-        let!(:john) { Person.create!(name: "John") }
+    context "with John as a person" do
+      let!(:john) { Person.create!(name: "John") }
 
-        it "activates for hello/John" do
-          expect(TestHelper.activated).to include(["hello", "John"])
-        end
+      it "activates for hello/John" do
+        expect(TestHelper.activated).to include(["hello", "John"])
+      end
 
-        it "deactivates when John is deleted" do
-          john.destroy!
-          expect(TestHelper.activated).not_to include(["hello", "John"])
-        end
+      it "deactivates when John is deleted" do
+        john.destroy!
+        expect(TestHelper.activated).not_to include(["hello", "John"])
+      end
 
-        it "deactivates and reactivates when John changes name" do
-          john.update!(name: "Johns")
-          expect(TestHelper.activated).not_to include(["hello", "John"])
-          expect(TestHelper.activated).to include(["hello", "Johns"])
-        end
+      it "deactivates when John changes name" do
+        john.update!(name: "Johns")
+        expect(TestHelper.activated).not_to include(["hello", "John"])
+      end
 
-        it "does nothing when an unrelated attributes changes" do
-          salutation.update!(farewell: "goodbye")
-          expect(TestHelper.activated).to include(["hello", "John"])
-        end
+      it "activates for the new value when John changes name" do
+        john.update!(name: "Johns")
+        expect(TestHelper.activated).to include(["hello", "Johns"])
+      end
 
-        context "with Jane as a person" do
-          let!(:jane) { Person.create!(name: "Jane") }
+      it "does nothing when an unrelated attributes changes" do
+        salutation.update!(farewell: "goodbye")
+        expect(TestHelper.activated).to include(["hello", "John"])
+      end
+    end
 
-          it "activates for hello/Jane" do
-            expect(TestHelper.activated).to include(["hello", "Jane"])
-          end
+    context "with John and Jane as people" do
+      before { Person.create!(name: "John") }
 
-          it "deactivates when Jane is deleted" do
-            jane.destroy!
-            expect(TestHelper.activated).not_to include(["hello", "Jane"])
-          end
-        end
+      let!(:jane) { Person.create!(name: "Jane") }
+
+      it "activates for hello/Jane" do
+        expect(TestHelper.activated).to include(["hello", "Jane"])
+      end
+
+      it "deactivates when Jane is deleted" do
+        jane.destroy!
+        expect(TestHelper.activated).not_to include(["hello", "Jane"])
       end
     end
   end
 
-  context "constraints between three conditions" do
-    let!(:rule) do
+  context "with constraints between three conditions" do
+    before do
       ActiveRecordRules::Rule.create_from_definition(<<~RULE)
         rule greet
           Salutation(greeting)
@@ -98,16 +100,17 @@ RSpec.describe ActiveRecordRules do
           # puts "deactivate \#{greeting}/\#{name1}/\#{name2}"
           TestHelper.activated -= [[greeting, name1, name2]]
       RULE
-    end
 
-    before do
       TestHelper.activated = []
     end
 
-    context "adding two people, then a salutation" do
-      let!(:jane) { Person.create!(name: "Jane") }
+    describe "adding two people, then a salutation" do
       let!(:john) { Person.create!(name: "John") }
-      let!(:salutation) { Salutation.create!(greeting: "hello") }
+
+      before do
+        Person.create!(name: "Jane")
+        Salutation.create!(greeting: "hello")
+      end
 
       it "does not activate twice" do
         expect(TestHelper.activated).to contain_exactly(["hello", "Jane", "John"])

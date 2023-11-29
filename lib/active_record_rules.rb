@@ -246,7 +246,7 @@ module ActiveRecordRules
         end
       end
 
-      names.values.each do |fields|
+      names.each_value do |fields|
         fields[1..].zip(fields).each do |lhs, rhs|
           constraints << ["==", lhs, rhs]
         end

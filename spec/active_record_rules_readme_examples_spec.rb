@@ -11,8 +11,8 @@ module TestHelper
   cattr_accessor :activated
 end
 
-RSpec.describe "examples from README.md" do
-  subject { TestHelper.activated }
+RSpec.describe ActiveRecordRules do
+  subject(:activations) { TestHelper.activated }
 
   before do
     define_tables do |schema|
@@ -41,7 +41,7 @@ RSpec.describe "examples from README.md" do
     end
   end
 
-  describe "first example" do
+  describe "example rule activations" do
     before do
       ActiveRecordRules::Rule.create_from_definition(<<~RULE)
         rule Email users when new post is created
@@ -59,73 +59,85 @@ RSpec.describe "examples from README.md" do
       TestHelper.activated = []
     end
 
-    context "pre-existing user" do
+    context "with user John" do
       before do
         user = User.create!(name: "John", email: "john@example.com")
         TagSubscription.create!(user_id: user.id, tag_id: 1)
       end
 
-      context "new post" do
+      context 'with new post "Hello World!"' do
         before do
           post = Post.create!(title: "Hello, world!")
           PostTag.create(post_id: post.id, tag_id: 1)
         end
 
-        it "activates" do
-          expect(subject).to include(["John", "john@example.com", "Hello, world!"])
-        end
+        it { is_expected.to include(["John", "john@example.com", "Hello, world!"]) }
       end
 
-      context "old post" do
+      context 'with old post "Hello World!"' do
         before do
           post = Post.create!(title: "Hello, world!", created_at: 10.days.ago)
           PostTag.create(post_id: post.id, tag_id: 1)
         end
 
-        it "does not activate" do
-          expect(subject).not_to include(["John", "john@example.com", "Hello, world!"])
+        it { is_expected.not_to include(["John", "john@example.com", "Hello, world!"]) }
+      end
+
+      context 'with new post "Wassup!" on irrelevant tag' do
+        before do
+          post = Post.create!(title: "Hello, world!")
+          PostTag.create(post_id: post.id, tag_id: 2)
         end
+
+        it { is_expected.not_to include(["John", "john@example.com", "Hello, world!"]) }
       end
     end
 
-    context "pre-existing new post" do
+    context 'with new post "Hello World!"' do
       before do
         post = Post.create!(title: "Hello, world!")
         PostTag.create(post_id: post.id, tag_id: 1)
       end
 
-      context "user subscription" do
+      context "with user John, subscribed to relevant tag" do
         before do
           user = User.create!(name: "John", email: "john@example.com")
           TagSubscription.create!(user_id: user.id, tag_id: 1)
         end
 
-        it "does not activate" do
-          expect(subject).to include(["John", "john@example.com", "Hello, world!"])
+        it { is_expected.to include(["John", "john@example.com", "Hello, world!"]) }
+      end
+
+      context "with user John, subscribed to irrelevant tag" do
+        before do
+          user = User.create!(name: "John", email: "john@example.com")
+          TagSubscription.create!(user_id: user.id, tag_id: 2)
         end
+
+        it { is_expected.not_to include(["John", "john@example.com", "Hello, world!"]) }
       end
     end
 
-    context "pre-existing old post" do
+    context 'with old post "Hello World!"' do
       before do
         post = Post.create!(title: "Hello, world!", created_at: 10.days.ago)
         PostTag.create(post_id: post.id, tag_id: 1)
       end
 
-      context "user subscription" do
+      context "with user John, subscribed to relevant tag" do
         before do
           user = User.create!(name: "John", email: "john@example.com")
           TagSubscription.create!(user_id: user.id, tag_id: 1)
         end
 
-        it "does not activate" do
-          expect(subject).not_to include(["John", "john@example.com", "Hello, world!"])
-        end
+        it { is_expected.not_to include(["John", "john@example.com", "Hello, world!"]) }
       end
     end
   end
 
-  describe "post count" do
+  describe "user post count" do
+    subject { user.reload.post_count }
+
     before do
       ActiveRecordRules::Rule.create_from_definition(<<~RULE)
         rule Update number of posts for user
@@ -138,7 +150,6 @@ RSpec.describe "examples from README.md" do
       RULE
     end
 
-    subject { user.reload.post_count }
     let(:user) { User.create!(name: "John") }
 
     context "with no posts" do
@@ -147,11 +158,13 @@ RSpec.describe "examples from README.md" do
 
     context "with one unpublished post" do
       before { Post.create!(author_id: user.id, status: "unpublished") }
+
       it { is_expected.to eq(0) }
     end
 
-    context "with one unpublished post" do
+    context "with one published post" do
       before { Post.create!(author_id: user.id, status: "published") }
+
       it { is_expected.to eq(1) }
     end
 
@@ -173,15 +186,17 @@ RSpec.describe "examples from README.md" do
       it { is_expected.to eq(0) }
     end
 
-    context "moving a published post between two users" do
+    describe "moving a published post between two users" do
       let!(:post) { Post.create!(author_id: user.id, status: "published") }
       let(:user2) { User.create!(name: "Jane") }
 
-      it "updates both post counts" do
-        expect(user.reload.post_count).to eq(1)
-        expect(user2.reload.post_count).to eq(0)
-        post.update!(author_id: user2.id)
+      before { post.update!(author_id: user2.id) }
+
+      it "decrements the old user count" do
         expect(user.reload.post_count).to eq(0)
+      end
+
+      it "increments the new user count" do
         expect(user2.reload.post_count).to eq(1)
       end
     end
