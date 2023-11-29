@@ -7,10 +7,11 @@ Gem::Specification.new do |spec|
   spec.email = ["carlo@zancanaro.id.au"]
   spec.license = "GPL-3.0-only"
 
-  spec.summary = "Property-based testing in Ruby, with RSpec integration"
+  spec.summary = "Database-driven production rules in Ruby"
   spec.description = <<~TEXT
-    A property-based testing library, in the spirit of Proper in
-    Erlang, with tight integration with RSpec.
+    A production rule library that uses database records as facts in
+    its working memory. Rules are database objects which get activated
+    and deactivated via ActiveRecord callbacks as records are updated.
   TEXT
 
   spec.homepage = "https://sr.ht/~czan/active_record_rules/"

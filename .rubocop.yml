@@ -1,6 +1,14 @@
+require:
+  - 'rubocop-rspec'
+
 AllCops:
   TargetRubyVersion: 3.0
   NewCops: enable
+
+# Disable all the cops about length/complexity, because they're pretty
+# noisy.
+Metrics:
+  Enabled: false
 
 Style/StringLiterals:
   Enabled: true
@@ -19,9 +27,6 @@ Style/SymbolArray:
 Style/NumberedParametersLimit:
   Enabled: true
   Max: 2
-
-Metrics/BlockLength:
-  Enabled: false
 
 Layout/LineLength:
   Max: 120

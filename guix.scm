@@ -69,10 +69,11 @@ very flexible.")
  (inputs (list ruby
                ruby-activerecord
                ruby-parslet))
- (native-inputs (list bundler ruby-rake ruby-rspec ruby-rubocop ruby-solargraph))
- (synopsis "Property-based testing in Ruby, with RSpec integration")
+ (native-inputs (list bundler ruby-rake ruby-rspec ruby-rubocop ruby-rubocop-rspec ruby-solargraph))
+ (synopsis "Database-driven production rules in Ruby")
  (description
-  "A property-based testing library, in the spirit of Proper in Erlang,
-with tight integration with RSpec.")
+  "A production rule library that uses database records as facts in its
+working memory. Rules are database objects which get activated and
+deactivated via ActiveRecord callbacks as records are updated.")
  (license license:gpl3)
  (home-page "https://sr.ht/~czan/active_record_rules/"))
