@@ -46,11 +46,9 @@ ActiveRecordRules::Rule.create_from_definition(<<~RULE)
     Post(author_id, status = "published")
     User(id = author_id)
   on activation
-    user = User.find(author_id)
-    user.update!(post_count: user.post_count + 1)
+    User.find(author_id).increment!(:post_count)
   on deactivation
-    user = User.find(author_id)
-    user.update!(post_count: user.post_count - 1)
+    User.find(author_id).decrement!(:post_count)
 RULE
 ```
 

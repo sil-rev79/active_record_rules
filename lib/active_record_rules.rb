@@ -126,19 +126,26 @@ module ActiveRecordRules
 
         join_key = join.key
 
-        constraints.each do |op, lhs, rhs|
-          case [lhs, rhs]
-          in [[^key, left_field], [^join_key, right_field]]
-            where << ["? #{op} #{right_field}", object[left_field]]
-          in [[^join_key, left_field], [^key, right_field]]
-            where << ["#{left_field} #{op} ?", object[right_field]]
-          else
-            # If the constraint doesn't match one of the above, then
-            # just ignore it. It's either a constant (and thus has
-            # been done by the Condition node), or it's not relevant
-            # to this specific table.
-          end
-        end
+        # TODO: reinstate this filtering. This is important for
+        # improving performance (pulling less from the database), but
+        # it currently filters too much. In particular, if you change
+        # one object such that it matches against a different paired
+        # objects this causes issues. See the "moving a published post
+        # between two users" test in readme_examples_spec.rb.
+        #
+        # constraints.each do |op, lhs, rhs|
+        #   case [lhs, rhs]
+        #   in [[^key, left_field], [^join_key, right_field]]
+        #     where << ["? #{op} #{right_field}", object[left_field]]
+        #   in [[^join_key, left_field], [^key, right_field]]
+        #     where << ["#{left_field} #{op} ?", object[right_field]]
+        #   else
+        #     # If the constraint doesn't match one of the above, then
+        #     # just ignore it. It's either a constant (and thus has
+        #     # been done by the Condition node), or it's not relevant
+        #     # to this specific table.
+        #   end
+        # end
 
         [join.key,
          where.reduce(join.condition.match_class.constantize, &:where)]
@@ -153,7 +160,7 @@ module ActiveRecordRules
         # Re-check constraints here, because the above only applied
         # filters for current object to each query table.
         # TODO: don't re-apply constraints that we already know hold
-        next unless constraints.all? do |op, lhs, rhs|
+        matches = constraints.all? do |op, lhs, rhs|
           case [lhs, rhs]
           in [[lkey, lfield], [rkey, rfield]]
             vals[lkey][lfield].send(op, vals[rkey][rfield])
@@ -165,24 +172,31 @@ module ActiveRecordRules
           end
         end
 
-        begin
-          rule_memories.create!(
-            cached: ids.to_json,
-            arguments: arguments.to_json # TODO: serialize better?
-          )
-
-          Object.new.instance_exec(*arguments, &activation_code)
-        rescue ActiveRecord::RecordNotUnique => e
-          # TODO: expand beyond just SQLite
-          raise e unless e.message.start_with?("SQLite3::ConstraintException: UNIQUE constraint failed")
-
-          memory = rule_memories.find_by(cached: ids.to_json)
-          memory_arguments = JSON.parse(memory.arguments)
-          if arguments != memory_arguments
-            Object.new.instance_exec(*memory_arguments, &deactivation_code)
-            memory.update!(arguments: arguments.to_json)
+        if matches
+          begin
+            rule_memories.create!(
+              cached: ids.to_json,
+              arguments: arguments.to_json # TODO: serialize better?
+            )
 
             Object.new.instance_exec(*arguments, &activation_code)
+          rescue ActiveRecord::RecordNotUnique => e
+            # TODO: expand beyond just SQLite
+            raise e unless e.message.start_with?("SQLite3::ConstraintException: UNIQUE constraint failed")
+
+            memory = rule_memories.find_by(cached: ids.to_json)
+            memory_arguments = JSON.parse(memory.arguments)
+            if arguments != memory_arguments
+              Object.new.instance_exec(*memory_arguments, &deactivation_code)
+              memory.update!(arguments: arguments.to_json)
+
+              Object.new.instance_exec(*arguments, &activation_code)
+            end
+          end
+        else
+          destroyed = rule_memories.destroy_by(cached: ids.to_json)
+          destroyed.each do |record|
+            Object.new.instance_exec(*JSON.parse(record.arguments), &deactivation_code)
           end
         end
       end
@@ -230,6 +244,12 @@ module ActiveRecordRules
           else
             raise "Unknown constraint format: #{cond}"
           end
+        end
+      end
+
+      names.values.each do |fields|
+        fields[1..].zip(fields).each do |lhs, rhs|
+          constraints << ["==", lhs, rhs]
         end
       end
 

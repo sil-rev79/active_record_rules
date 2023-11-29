@@ -131,14 +131,12 @@ RSpec.describe "examples from README.md" do
     before do
       ActiveRecordRules::Rule.create_from_definition(<<~RULE)
         rule Update number of posts for user
-          Post(author_id, status = "published")
+          Post(id = post_id, author_id, status = "published")
           User(id = author_id)
         on activation
-          user = User.find(author_id)
-          user.update!(post_count: user.post_count + 1)
+          User.find(author_id).increment!(:post_count)
         on deactivation
-          user = User.find(author_id)
-          user.update!(post_count: user.post_count - 1)
+          User.find(author_id).decrement!(:post_count)
       RULE
     end
 
@@ -175,6 +173,19 @@ RSpec.describe "examples from README.md" do
       end
 
       it { is_expected.to eq(0) }
+    end
+
+    context "moving a published post between two users" do
+      let!(:post) { Post.create!(author_id: user.id, status: "published") }
+      let(:user2) { User.create!(name: "Jane") }
+
+      it "updates both post counts" do
+        expect(user.reload.post_count).to eq(1)
+        expect(user2.reload.post_count).to eq(0)
+        post.update!(author_id: user2.id)
+        expect(user.reload.post_count).to eq(0)
+        expect(user2.reload.post_count).to eq(1)
+      end
     end
   end
 end
