@@ -12,6 +12,8 @@ module TestHelper
 end
 
 RSpec.describe "examples from README.md" do
+  subject { TestHelper.activated }
+
   before do
     define_tables do |schema|
       schema.create_table :users do |t|
@@ -53,12 +55,12 @@ RSpec.describe "examples from README.md" do
             TestHelper.activated << [name, email, title] # keep track of activations
           end
       RULE
+
+      TestHelper.activated = []
     end
 
     context "pre-existing user" do
       before do
-        TestHelper.activated = []
-
         user = User.create!(name: "John", email: "john@example.com")
         TagSubscription.create!(user_id: user.id, tag_id: 1)
       end
@@ -70,7 +72,7 @@ RSpec.describe "examples from README.md" do
         end
 
         it "activates" do
-          expect(TestHelper.activated).to include(["John", "john@example.com", "Hello, world!"])
+          expect(subject).to include(["John", "john@example.com", "Hello, world!"])
         end
       end
 
@@ -81,15 +83,13 @@ RSpec.describe "examples from README.md" do
         end
 
         it "does not activate" do
-          expect(TestHelper.activated).not_to include(["John", "john@example.com", "Hello, world!"])
+          expect(subject).not_to include(["John", "john@example.com", "Hello, world!"])
         end
       end
     end
 
     context "pre-existing new post" do
       before do
-        TestHelper.activated = []
-
         post = Post.create!(title: "Hello, world!")
         PostTag.create(post_id: post.id, tag_id: 1)
       end
@@ -101,15 +101,13 @@ RSpec.describe "examples from README.md" do
         end
 
         it "does not activate" do
-          expect(TestHelper.activated).to include(["John", "john@example.com", "Hello, world!"])
+          expect(subject).to include(["John", "john@example.com", "Hello, world!"])
         end
       end
     end
 
     context "pre-existing old post" do
       before do
-        TestHelper.activated = []
-
         post = Post.create!(title: "Hello, world!", created_at: 10.days.ago)
         PostTag.create(post_id: post.id, tag_id: 1)
       end
@@ -121,7 +119,7 @@ RSpec.describe "examples from README.md" do
         end
 
         it "does not activate" do
-          expect(TestHelper.activated).not_to include(["John", "john@example.com", "Hello, world!"])
+          expect(subject).not_to include(["John", "john@example.com", "Hello, world!"])
         end
       end
     end
