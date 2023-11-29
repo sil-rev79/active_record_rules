@@ -1,0 +1,15 @@
+include:
+- '**/*.rb'
+
+exclude:
+- 'vendor/**/*'
+
+reporters:
+- rubocop
+- require_not_found
+# - typecheck:typed
+- update_errors
+
+formatter:
+  rubocop:
+    cops: safe
