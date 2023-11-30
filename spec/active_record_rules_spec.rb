@@ -25,7 +25,7 @@ RSpec.describe ActiveRecordRules do
 
   context "with no constraints" do
     before do
-      ActiveRecordRules::Rule.create_from_definition(<<~RULE)
+      ActiveRecordRules::Rule.define_rule(<<~RULE)
         rule greet
           Salutation(greeting)
           Person(name)
@@ -88,7 +88,7 @@ RSpec.describe ActiveRecordRules do
 
   context "with constraints between three conditions" do
     before do
-      ActiveRecordRules::Rule.create_from_definition(<<~RULE)
+      ActiveRecordRules::Rule.define_rule(<<~RULE)
         rule greet
           Salutation(greeting)
           Person(name = name1)

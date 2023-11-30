@@ -6,7 +6,9 @@ module ActiveRecordRules
     has_many :conditions, through: :condition_rules
     has_many :rule_memories
 
-    def self.create_from_definition(definition_string)
+    class RuleSyntaxError < StandardError; end
+
+    def self.define_rule(definition_string)
       definition = Parser.new.definition.parse(definition_string, reporter: Parslet::ErrorReporter::Deepest.new)
 
       condition_rules = definition[:conditions].each_with_index.map do |condition_definition, index|
@@ -36,7 +38,7 @@ module ActiveRecordRules
         definition: definition_string
       )
     rescue Parslet::ParseFailed => e
-      raise e.parse_failure_cause.ascii_tree
+      raise RuleSyntaxError, e.parse_failure_cause.ascii_tree
     end
 
     def activate(key, object)

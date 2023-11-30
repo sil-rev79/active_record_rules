@@ -9,6 +9,10 @@ require "active_record_rules/rule"
 require "active_record_rules/rule_memory"
 
 module ActiveRecordRules
+  def self.define_rule(string)
+    ActiveRecordRules::Rule.define_rule(string)
+  end
+
   def self.trigger_rule_updates(object)
     klass = object.class
     classes = []

@@ -22,7 +22,7 @@ class TagSubscription < ApplicationRecord; include Fact; end
 Then, you can define rules matching those tags, and what should happen when those rules fire:
 
 ```ruby
-ActiveRecordRules::Rule.create_from_definition(<<~RULE)
+ActiveRecordRules.define_rule(<<~RULE)
   rule Email users when new post is created
     Post(id = post_id, title, created_at)
     User(id = user_id, name, email)
@@ -41,7 +41,7 @@ Rule executions are remembered by object id and variable bindings, so they will 
 It's also possible to perform some action when a rule ceases to match. This can be done by adding an `on deactivate` section:
 
 ```ruby
-ActiveRecordRules::Rule.create_from_definition(<<~RULE)
+ActiveRecordRules.define_rule(<<~RULE)
   rule Update number of posts for user
     Post(author_id, status = "published")
     User(id = author_id)
