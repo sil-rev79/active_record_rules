@@ -16,10 +16,12 @@ module ActiveRecordRules
       condition_rules = definition[:conditions].each_with_index.map do |condition_definition, index|
         constant_conditions = condition_definition[:parts].map do |cond|
           case cond
-          in { name:, op:, rhs: { number: } }
-            "#{name} = #{number}"
           in { name:, op:, rhs: { string: } }
             "#{name} = #{string.to_s.to_json}"
+          in { name:, op:, rhs: { number: } }
+            "#{name} = #{number}"
+          in { name:, op:, rhs: { boolean: } }
+            "#{name} = #{boolean}"
           else
             nil
           end
@@ -29,7 +31,11 @@ module ActiveRecordRules
           key: "cond#{index + 1}",
           condition: Condition.find_or_initialize_by(
             match_class: condition_definition[:class_name].to_s,
-            match_conditions: constant_conditions
+            # We have to wrap the conditions in this fake object
+            # because querying with an array at the toplevel turns
+            # into an ActiveRecord IN query, which ruins everything.
+            # Using an object here simplifies things a lot.
+            match_conditions: { "clauses" => constant_conditions }
           )
         )
       end
@@ -95,18 +101,29 @@ module ActiveRecordRules
         next unless matches
 
         begin
-          memory = rule_memories.create!(cached: ids, arguments: arguments)
+          memory = rule_memories.create!(ids: ids, arguments: arguments)
           current_matches.add(memory.id)
+          logger&.info do
+            "Rule(#{id}): #{object.class}(#{object.id}) activating for #{ids}"
+          end
 
           Object.new.instance_exec(*arguments, &activation_code)
         rescue ActiveRecord::RecordNotUnique => e
           # TODO: expand beyond just SQLite
           raise e unless e.message.start_with?("SQLite3::ConstraintException: UNIQUE constraint failed")
 
-          memory = rule_memories.find_by(cached: ids)
+          memory = rule_memories.find_by(ids: ids)
           current_matches.add(memory.id)
           memory_arguments = memory.arguments
-          if arguments != memory_arguments
+          if arguments == memory_arguments
+            logger&.debug do
+              "Rule(#{id}): #{object.class}(#{object.id}) still matches for #{ids}"
+            end
+          else
+            logger&.info do
+              "Rule(#{id}): #{object.class}(#{object.id}) reactivating for #{ids}"
+            end
+
             Object.new.instance_exec(*memory_arguments, &deactivation_code)
             memory.update!(arguments: arguments)
 
@@ -118,7 +135,10 @@ module ActiveRecordRules
       # Clean up any existing memories that are no longer current.
       # Essentially: if we didn't see it on our most recent pass
       # through then it needs to be destroyed.
-      rule_memories.where.not(id: current_matches).destroy_all.each do |record|
+      rule_memories.where("ids->>? = ?", key, object.id).where.not(id: current_matches).destroy_all.each do |record|
+        logger&.info do
+          "Rule(#{id}): #{object.class}(#{object.id}) deactivating for #{record.ids} (not found in activation set)"
+        end
         Object.new.instance_exec(*record.arguments, &deactivation_code)
       end
     rescue Parslet::ParseFailed => e
@@ -126,16 +146,24 @@ module ActiveRecordRules
     end
 
     def deactivate(key, object)
-      destroyed = rule_memories.destroy_by("cached->>? = ?", key, object.id)
+      destroyed = rule_memories.destroy_by("ids->>? = ?", key, object.id)
 
       _, _, _, deactivation_code = parse_definition
 
       destroyed.each do |record|
+        logger&.info do
+          "Rule(#{id}): #{object.class}(#{object.id}) deactivating for #{record.ids} (explicitly removed)"
+        end
+
         Object.new.instance_exec(*record.arguments, &deactivation_code)
       end
     end
 
     private
+
+    def logger
+      ActiveRecordRules.logger
+    end
 
     def parse_definition
       parsed = Parser.new.definition.parse(definition, reporter: Parslet::ErrorReporter::Deepest.new)
@@ -149,10 +177,12 @@ module ActiveRecordRules
           case cond
           in { name:, op: "=", rhs: { name: rhs } }
             names[rhs.to_s] << ["cond#{index + 1}", name.to_s]
-          in { name:, op:, rhs: { string: rhs } }
-            constraints << [op, ["cond#{index + 1}", name.to_s], rhs.to_s]
           in { name:, op:, rhs: { number: rhs } }
             constraints << [op, ["cond#{index + 1}", name.to_s], rhs.to_i]
+          in { name:, op:, rhs: { string: rhs } }
+            constraints << [op, ["cond#{index + 1}", name.to_s], rhs.to_s]
+          in { name:, op:, rhs: { boolean: rhs } }
+            constraints << [op, ["cond#{index + 1}", name.to_s], rhs.to_s == "true"]
           in { name:, op:, rhs: { name: rhs } }
             fields = names[rhs.to_s]
             raise "Right-hand side name does not have a value in constraint: #{name} #{op} #{fields}" if fields.empty?

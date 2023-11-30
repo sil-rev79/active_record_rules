@@ -24,9 +24,9 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
 
     create_table :arr__rule_memories do |t|
       t.references :rule, foreign_key: { to_table: :arr__rules }
-      t.json :cached
+      t.json :ids
       t.json :arguments
-      t.index [:rule_id, :cached], unique: true # Note that arguments is *not* included in the uniqueness constraints
+      t.index [:rule_id, :ids], unique: true # Note that arguments is *not* included in the uniqueness constraints
     end
   end
 end

@@ -19,6 +19,8 @@ RSpec.describe ActiveRecordRules do
 
       schema.create_table :people do |t|
         t.string :name
+        t.boolean :greetable
+        t.boolean :farewellable
       end
     end
   end
@@ -79,9 +81,67 @@ RSpec.describe ActiveRecordRules do
         expect(TestHelper.activated).to include(["hello", "Jane"])
       end
 
-      it "deactivates when Jane is deleted" do
+      it "deactivates only Jane when Jane is deleted" do
         jane.destroy!
         expect(TestHelper.activated).not_to include(["hello", "Jane"])
+        expect(TestHelper.activated).to include(["hello", "John"])
+      end
+    end
+  end
+
+  describe "rules with constant constraints" do
+    before do
+      ActiveRecordRules::Rule.define_rule(<<~RULE)
+        rule greet
+          Salutation(greeting)
+          Person(name, greetable = true)
+        on activation
+          TestHelper.activated += [[greeting, name]]
+        on deactivation
+          TestHelper.activated -= [[greeting, name]]
+      RULE
+
+      ActiveRecordRules::Rule.define_rule(<<~RULE)
+        rule farewell
+          Salutation(greeting, farewell)
+          Person(name, greetable = true)
+          Person(name, farewellable = true)
+        on activation
+          TestHelper.activated += [[greeting, name]]
+          TestHelper.activated += [[farewell, name]]
+        on deactivation
+          TestHelper.activated -= [[greeting, name]]
+          TestHelper.activated -= [[farewell, name]]
+      RULE
+
+      TestHelper.activated = []
+    end
+
+    it "shares a Condition node" do
+      expect(ActiveRecordRules::Condition.all.size).to eq(3)
+    end
+
+    context "with ten people" do
+      before do
+        Salutation.create!(greeting: "What's up?")
+        10.times do |i|
+          Person.create!(name: "Person #{i}")
+        end
+        Person.create!(name: "John", greetable: true)
+      end
+
+      it "only processes a single Person when one is added" do
+        capturing_log do |output|
+          Person.create!(name: "Jane", greetable: true)
+          expect(output.string.scan(/Person\(([0-9]+)\)/).uniq).to contain_exactly(["12"])
+        end
+      end
+
+      it "doesn't process any people when a Salutation is added" do
+        capturing_log do |output|
+          Salutation.create!(greeting: "Yo")
+          expect(output.string).not_to include("Person(")
+        end
       end
     end
   end

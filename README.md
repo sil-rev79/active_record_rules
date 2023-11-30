@@ -13,6 +13,8 @@ rails generate active_record_rules:install --id_type=integer # or uuid if you're
 rails db:migrate
 ```
 
+If you'd like logging, you can set `ActiveRecordRules.logger` to a logger of your choosing (e.g. `Rails.logger`).
+
 ## Usage
 
 First, define the types of "facts" that your rules can match against. This is done by including `ActiveRecordRules::Fact` into your models:

@@ -9,6 +9,15 @@ module RSpecExtensions
   def define_tables(&block)
     block.call(ActiveRecord::Base.connection)
   end
+
+  def capturing_log(level = :debug, &block)
+    output = StringIO.new
+    old = ActiveRecordRules.logger
+    ActiveRecordRules.logger = Logger.new(output, level: level)
+    block.call(output)
+  ensure
+    ActiveRecordRules.logger = old
+  end
 end
 
 RSpec.configure do |config|
