@@ -6,17 +6,22 @@ A [production system][] within ActiveRecord to execute code when matching rule c
 
 ## Installation
 
-This Gem can't be installed into other projects yet. Check back later for installation instructions.
+Include `active_record_rules` in your `Gemfile`, then run:
+
+```shell
+rails generate active_record_rules:install --id_type=integer # or uuid if you're using UUIDs as your id columns
+rails db:migrate
+```
 
 ## Usage
 
-First, define the types of "facts" that your rules can match against. This is done by including `Fact` into your models:
+First, define the types of "facts" that your rules can match against. This is done by including `ActiveRecordRules::Fact` into your models:
 
 ```ruby
-class Post < ApplicationRecord; include Fact; end
-class User < ApplicationRecord; include Fact; end
-class PostTag < ApplicationRecord; include Fact; end
-class TagSubscription < ApplicationRecord; include Fact; end
+class Post < ApplicationRecord; include ActiveRecordRules::Fact; end
+class User < ApplicationRecord; include ActiveRecordRules::Fact; end
+class PostTag < ApplicationRecord; include ActiveRecordRules::Fact; end
+class TagSubscription < ApplicationRecord; include ActiveRecordRules::Fact; end
 ```
 
 Then, you can define rules matching those tags, and what should happen when those rules fire:

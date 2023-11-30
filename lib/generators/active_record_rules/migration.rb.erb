@@ -1,0 +1,32 @@
+class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_version %>
+  def change
+    create_table :arr__conditions do |t|
+      t.string :match_class
+      t.json :match_conditions
+    end
+
+    create_table :arr__rules do |t|
+      t.string :name, index: { unique: true }
+      t.string :definition
+    end
+
+    create_table :arr__condition_rules do |t|
+      t.references :condition, foreign_key: { to_table: :arr__conditions }
+      t.references :rule, foreign_key: { to_table: :arr__rules }
+      t.string :key
+    end
+
+    create_table :arr__condition_memories do |t|
+      t.references :condition, foreign_key: { to_table: :arr__conditions }
+      t.<%= @id_type %> :entry_id
+      t.index [:condition_id, :entry_id], unique: true
+    end
+
+    create_table :arr__rule_memories do |t|
+      t.references :rule, foreign_key: { to_table: :arr__rules }
+      t.json :cached
+      t.json :arguments
+      t.index [:rule_id, :cached], unique: true # Note that arguments is *not* included in the uniqueness constraints
+    end
+  end
+end

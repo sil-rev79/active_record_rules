@@ -2,6 +2,8 @@
 
 module ActiveRecordRules
   class Rule < ActiveRecord::Base
+    self.table_name = :arr__rules
+
     has_many :condition_rules
     has_many :conditions, through: :condition_rules
     has_many :rule_memories
@@ -27,7 +29,7 @@ module ActiveRecordRules
           key: "cond#{index + 1}",
           condition: Condition.find_or_initialize_by(
             match_class: condition_definition[:class_name].to_s,
-            match_conditions: constant_conditions.to_json
+            match_conditions: constant_conditions
           )
         )
       end
@@ -93,10 +95,7 @@ module ActiveRecordRules
         next unless matches
 
         begin
-          memory = rule_memories.create!(
-            cached: ids.to_json,
-            arguments: arguments.to_json # TODO: serialize better?
-          )
+          memory = rule_memories.create!(cached: ids, arguments: arguments)
           current_matches.add(memory.id)
 
           Object.new.instance_exec(*arguments, &activation_code)
@@ -104,12 +103,12 @@ module ActiveRecordRules
           # TODO: expand beyond just SQLite
           raise e unless e.message.start_with?("SQLite3::ConstraintException: UNIQUE constraint failed")
 
-          memory = rule_memories.find_by(cached: ids.to_json)
+          memory = rule_memories.find_by(cached: ids)
           current_matches.add(memory.id)
-          memory_arguments = JSON.parse(memory.arguments)
+          memory_arguments = memory.arguments
           if arguments != memory_arguments
             Object.new.instance_exec(*memory_arguments, &deactivation_code)
-            memory.update!(arguments: arguments.to_json)
+            memory.update!(arguments: arguments)
 
             Object.new.instance_exec(*arguments, &activation_code)
           end
@@ -120,7 +119,7 @@ module ActiveRecordRules
       # Essentially: if we didn't see it on our most recent pass
       # through then it needs to be destroyed.
       rule_memories.where.not(id: current_matches).destroy_all.each do |record|
-        Object.new.instance_exec(*JSON.parse(record.arguments), &deactivation_code)
+        Object.new.instance_exec(*record.arguments, &deactivation_code)
       end
     rescue Parslet::ParseFailed => e
       raise e.parse_failure_cause.ascii_tree
@@ -132,7 +131,7 @@ module ActiveRecordRules
       _, _, _, deactivation_code = parse_definition
 
       destroyed.each do |record|
-        Object.new.instance_exec(*JSON.parse(record.arguments), &deactivation_code)
+        Object.new.instance_exec(*record.arguments, &deactivation_code)
       end
     end
 

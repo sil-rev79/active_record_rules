@@ -69,7 +69,7 @@ very flexible.")
  (inputs (list ruby
                ruby-activerecord
                ruby-parslet))
- (native-inputs (list bundler ruby-rake ruby-rspec ruby-rubocop ruby-rubocop-rspec ruby-solargraph))
+ (native-inputs (list bundler ruby-rake ruby-rails ruby-rspec ruby-rubocop ruby-rubocop-rspec ruby-solargraph))
  (synopsis "Database-driven production rules in Ruby")
  (description
   "A production rule library that uses database records as facts in its

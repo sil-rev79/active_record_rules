@@ -2,6 +2,8 @@
 
 require "active_record"
 require "active_record_rules"
+require "generators/active_record_rules/install_generator"
+require "tmpdir"
 
 module RSpecExtensions
   def define_tables(&block)
@@ -25,36 +27,22 @@ RSpec.configure do |config|
       adapter: "sqlite3",
       database: ":memory:"
     )
-    schema = ActiveRecord::Base.connection
 
-    schema.create_table :conditions do |t|
-      t.string :match_class
-      t.string :match_conditions
+    Dir.mktmpdir do |dir|
+      Rails::Generators.invoke(
+        "active_record_rules:install",
+        ["--id_type=integer", "--quiet"],
+        destination_root: dir
+      )
+
+      ActiveRecord::Migration.suppress_messages do
+        ActiveRecord::MigrationContext.new(
+          "#{dir}/db/migrate",
+          ActiveRecord::Base.connection.schema_migration
+        ).migrate
+      end
     end
 
-    schema.create_table :rules do |t|
-      t.string :name
-      t.string :definition
-    end
-
-    schema.create_table :condition_rules do |t|
-      t.references :condition
-      t.references :rule
-      t.string :key
-    end
-
-    schema.create_table :condition_memories do |t|
-      t.references :condition
-      t.integer :entry_id # TODO: make id type depend on how people set up their database?
-      t.index [:condition_id, :entry_id], unique: true
-    end
-
-    schema.create_table :rule_memories do |t|
-      t.references :rule
-      t.string :cached # actually json
-      t.string :arguments # actually json
-      t.index [:rule_id, :cached], unique: true # Note that arguments is *not* included in the uniqueness constraints
-    end
     example.run
   end
 

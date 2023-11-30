@@ -2,6 +2,8 @@
 
 module ActiveRecordRules
   class ConditionRule < ActiveRecord::Base
+    self.table_name = :arr__condition_rules
+
     belongs_to :condition
     has_many :condition_memories, through: :condition
     belongs_to :rule

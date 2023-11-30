@@ -24,7 +24,7 @@ module ActiveRecordRules
       .where(match_class: classes.map(&:name))
       .includes(condition_rules: { rule: { condition_rules: {} } })
       .each do |condition|
-      clauses = JSON.parse(condition.match_conditions)
+      clauses = condition.match_conditions
       parser = Parser.new.condition_part
 
       matches = clauses.map { parser.parse(_1) }.all? do |clause|
