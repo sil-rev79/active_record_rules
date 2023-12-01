@@ -81,9 +81,13 @@ RSpec.describe ActiveRecordRules do
         expect(TestHelper.activated).to include(["hello", "Jane"])
       end
 
-      it "deactivates only Jane when Jane is deleted" do
+      it "deactivates Jane when Jane is deleted" do
         jane.destroy!
         expect(TestHelper.activated).not_to include(["hello", "Jane"])
+      end
+
+      it "leave John activated when Jane is deleted" do
+        jane.destroy!
         expect(TestHelper.activated).to include(["hello", "John"])
       end
     end
