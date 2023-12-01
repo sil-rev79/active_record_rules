@@ -3,7 +3,7 @@
 require "parslet"
 
 module ActiveRecordRules
-  class Parser < Parslet::Parser
+  class Parser < Parslet::Parser # :nodoc:
     rule(:whitespace) { match('[ \t]').repeat(1) }
 
     rule(:eol) do
@@ -72,6 +72,11 @@ module ActiveRecordRules
         (whitespace >> (eol.absent? >> any).repeat.as(:line) >> eol).repeat
     end
 
+    rule(:update) do
+      str("on") >> whitespace >> str("update") >> whitespace.maybe >> newline >>
+        (whitespace >> (eol.absent? >> any).repeat.as(:line) >> eol).repeat
+    end
+
     rule(:deactivation) do
       str("on") >> whitespace >> str("deactivation") >> whitespace.maybe >> newline >>
         (whitespace >> (eol.absent? >> any).repeat.as(:line) >> eol).repeat
@@ -82,6 +87,7 @@ module ActiveRecordRules
         (newline.absent? >> any).repeat.as(:name) >> newline >>
         conditions.as(:conditions) >>
         activation.as(:activation).maybe >>
+        update.as(:update).maybe >>
         deactivation.as(:deactivation).maybe
     end
 

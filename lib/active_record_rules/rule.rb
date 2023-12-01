@@ -1,6 +1,23 @@
 # frozen_string_literal: true
 
 module ActiveRecordRules
+  # A representation of a production rule which matches objects
+  # matching conditions and runs code when the rule begins to match or
+  # ceases to match.
+  #
+  # See +Condition+ for a depiction of how this class relates to the
+  # conditions. The broad idea is that Condition is responsible for
+  # "simple" things (i.e. checks against constant values) and the Rule
+  # is responsible for "complex" things (i.e. checks involving
+  # multiple objects).
+  #
+  # A Rule is provided updates by its related Condition nodes whenever
+  # an object passes, or ceases to pass, its test. This allows for
+  # incremental updates to the output.
+  #
+  # A Rule finds the other objects to process by looking into its
+  # conditions' ConditionActivation objects to find the objects which
+  # currently match the condition.
   class Rule < ActiveRecord::Base
     self.table_name = :arr__rules
 

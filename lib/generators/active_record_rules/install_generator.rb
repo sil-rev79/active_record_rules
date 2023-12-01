@@ -4,7 +4,7 @@ require "rails/generators"
 require "rails/generators/active_record"
 
 module ActiveRecordRules
-  class InstallGenerator < ActiveRecord::Generators::Base
+  class InstallGenerator < ActiveRecord::Generators::Base # :nodoc:
     argument :name, type: :string, default: "???"
 
     desc "Generates a migration for ActiveRecordRules models."
