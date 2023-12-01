@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
 require "active_record_rules/condition"
-require "active_record_rules/condition_memory"
+require "active_record_rules/condition_activation"
 require "active_record_rules/condition_rule"
 require "active_record_rules/fact"
 require "active_record_rules/parser"
 require "active_record_rules/rule"
-require "active_record_rules/rule_memory"
+require "active_record_rules/rule_activation"
 
 module ActiveRecordRules
   cattr_accessor :logger
@@ -59,7 +59,7 @@ module ActiveRecordRules
       if matches
         logger&.info { "Condition(#{condition.id}): activated by #{object.class}(#{object.id})" }
         begin
-          condition.condition_memories.create(entry_id: object.id)
+          condition.condition_activations.create(entry_id: object.id)
         rescue ActiveRecord::RecordNotUnique => e
           raise e unless e.message.start_with?("SQLite3::ConstraintException: UNIQUE constraint failed")
         end
@@ -67,7 +67,7 @@ module ActiveRecordRules
         condition.condition_rules.each do |join|
           join.rule.activate(join.key, object)
         end
-      elsif condition.condition_memories.destroy_by(entry_id: object.id).any?
+      elsif condition.condition_activations.destroy_by(entry_id: object.id).any?
         logger&.info do
           if object.persisted?
             "Condition(#{condition.id}): deactivated for #{object.class}(#{object.id}) - failed a condition check"

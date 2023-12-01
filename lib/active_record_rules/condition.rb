@@ -5,7 +5,7 @@ module ActiveRecordRules
     self.table_name = :arr__conditions
 
     has_many :condition_rules
-    has_many :condition_memories
+    has_many :condition_activations
     has_many :rules, through: :condition_rules
     validates :match_class, presence: true
   end

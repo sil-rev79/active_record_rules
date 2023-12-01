@@ -6,7 +6,7 @@ module ActiveRecordRules
 
     has_many :condition_rules
     has_many :conditions, through: :condition_rules
-    has_many :rule_memories
+    has_many :rule_activations
 
     class RuleSyntaxError < StandardError; end
 
@@ -53,7 +53,7 @@ module ActiveRecordRules
       names, constraints, activation_code, deactivation_code = parse_definition
 
       other_values = condition_rules.reject { _1.key == key }.to_h do |join|
-        where = [{ id: join.condition_memories.pluck(:entry_id) }]
+        where = [{ id: join.condition_activations.pluck(:entry_id) }]
 
         join_key = join.key
 
@@ -101,8 +101,8 @@ module ActiveRecordRules
         next unless matches
 
         begin
-          memory = rule_memories.create!(ids: ids, arguments: arguments)
-          current_matches.add(memory.id)
+          activation = rule_activations.create!(ids: ids, arguments: arguments)
+          current_matches.add(activation.id)
           logger&.info do
             "Rule(#{id}): #{object.class}(#{object.id}) activating for #{ids}"
           end
@@ -112,10 +112,10 @@ module ActiveRecordRules
           # TODO: expand beyond just SQLite
           raise e unless e.message.start_with?("SQLite3::ConstraintException: UNIQUE constraint failed")
 
-          memory = rule_memories.find_by(ids: ids)
-          current_matches.add(memory.id)
-          memory_arguments = memory.arguments
-          if arguments == memory_arguments
+          activation = rule_activations.find_by(ids: ids)
+          current_matches.add(activation.id)
+          activation_arguments = activation.arguments
+          if arguments == activation_arguments
             logger&.debug do
               "Rule(#{id}): #{object.class}(#{object.id}) still matches for #{ids}"
             end
@@ -124,18 +124,18 @@ module ActiveRecordRules
               "Rule(#{id}): #{object.class}(#{object.id}) reactivating for #{ids}"
             end
 
-            Object.new.instance_exec(*memory_arguments, &deactivation_code)
-            memory.update!(arguments: arguments)
+            Object.new.instance_exec(*activation_arguments, &deactivation_code)
+            activation.update!(arguments: arguments)
 
             Object.new.instance_exec(*arguments, &activation_code)
           end
         end
       end
 
-      # Clean up any existing memories that are no longer current.
+      # Clean up any existing activations that are no longer current.
       # Essentially: if we didn't see it on our most recent pass
       # through then it needs to be destroyed.
-      rule_memories.where("ids->>? = ?", key, object.id).where.not(id: current_matches).destroy_all.each do |record|
+      rule_activations.where("ids->>? = ?", key, object.id).where.not(id: current_matches).destroy_all.each do |record|
         logger&.info do
           "Rule(#{id}): #{object.class}(#{object.id}) deactivating for #{record.ids} (not found in activation set)"
         end
@@ -146,7 +146,7 @@ module ActiveRecordRules
     end
 
     def deactivate(key, object)
-      destroyed = rule_memories.destroy_by("ids->>? = ?", key, object.id)
+      destroyed = rule_activations.destroy_by("ids->>? = ?", key, object.id)
 
       _, _, _, deactivation_code = parse_definition
 
