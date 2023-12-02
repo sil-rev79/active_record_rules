@@ -31,7 +31,7 @@ module ActiveRecordRules
       definition = Parser.new.definition.parse(definition_string, reporter: Parslet::ErrorReporter::Deepest.new)
 
       condition_rules = definition[:conditions].each_with_index.map do |condition_definition, index|
-        constant_conditions = condition_definition[:parts].map do |cond|
+        constant_conditions = (condition_definition[:parts] || []).map do |cond|
           case cond
           in { name:, op:, rhs: { string: } }
             "#{name} #{op} #{string.to_s.to_json}"
