@@ -13,7 +13,7 @@ rails generate active_record_rules:install --id_type=integer # or uuid if you're
 rails db:migrate
 ```
 
-If you'd like logging, you can set `ActiveRecordRules.logger` to a logger of your choosing (e.g. `Rails.logger`).
+If you'd like logging, you can set `ActiveRecordRules.logger` to a logger of your choosing (e.g. `Rails.logger`). Messages about `Condition` and `Rule` activation/deactivation will be logged at `info` level, and detailed information about specific tests will be logged at `debug` level.
 
 ## Usage
 

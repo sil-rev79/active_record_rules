@@ -35,28 +35,27 @@ module ActiveRecordRules
       clauses = match_conditions["clauses"]
       parser = Parser.new.condition_part
 
+      logger&.debug do
+        "Condition(#{id}): checking #{object.class}(#{object.id})"
+      end
+
       matches = object.persisted? && clauses.all? do |clause|
-        result = case parser.parse(clause)
-                 in { name:, op: "=", rhs: { string: } }
-                   object[name] == string
-                 in { name:, op:, rhs: { string: } }
-                   object[name].public_send(op, string)
-                 in { name:, op: "=", rhs: { number: } }
-                   object[name] == number.to_i
-                 in { name:, op:, rhs: { number: } }
-                   object[name].public_send(op, number.to_i)
-                 in { name:, op: "=", rhs: { boolean: } }
-                   object[name] == (boolean.to_s == "true")
-                 in { name:, op:, rhs: { boolean: } }
-                   object[name].public_send(op, boolean.to_s == "true")
-                 else
-                   true
-                 end
-        logger&.info do
+        lhs, op, rhs = case parser.parse(clause)
+                       in { name:, op:, rhs: { string: } }
+                         [object[name], (op == "=" ? "==" : op), string.to_s]
+                       in { name:, op:, rhs: { number: } }
+                         [object[name], (op == "=" ? "==" : op), number.to_i]
+                       in { name:, op:, rhs: { boolean: } }
+                         [object[name], (op == "=" ? "==" : op), (boolean.to_s == "true")]
+                       else
+                         raise "Non-constant test in Condition(#{id}): #{clause}"
+                       end
+        result = lhs.public_send(op, rhs)
+        logger&.debug do
           if result
-            "Condition(#{id}): #{object.class}(#{object.id}) matches { #{clause} }"
+            "Condition(#{id}): #{lhs.inspect} #{op} #{rhs.inspect} (#{clause}) matches"
           else
-            "Condition(#{id}): #{object.class}(#{object.id}) does not match { #{clause} }"
+            "Condition(#{id}): #{lhs.inspect} #{op} #{rhs.inspect} (#{clause}) does not match"
           end
         end
         result
@@ -76,9 +75,9 @@ module ActiveRecordRules
       elsif condition_activations.destroy_by(entry_id: object.id).any?
         logger&.info do
           if object.persisted?
-            "Condition(#{id}): deactivated for #{object.class}(#{object.id}) - failed a condition check"
+            "Condition(#{id}): deactivated for #{object.class}(#{object.id}) (ceased to match)"
           else
-            "Condition(#{id}): deactivated for #{object.class}(#{object.id}) - was deleted"
+            "Condition(#{id}): deactivated for #{object.class}(#{object.id}) (deleted)"
           end
         end
 
@@ -86,6 +85,12 @@ module ActiveRecordRules
           join.rule.deactivate(join.key, object)
         end
       end
+    end
+
+    private
+
+    def logger
+      ActiveRecordRules.logger
     end
   end
 end

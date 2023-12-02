@@ -34,11 +34,11 @@ module ActiveRecordRules
         constant_conditions = condition_definition[:parts].map do |cond|
           case cond
           in { name:, op:, rhs: { string: } }
-            "#{name} = #{string.to_s.to_json}"
+            "#{name} #{op} #{string.to_s.to_json}"
           in { name:, op:, rhs: { number: } }
-            "#{name} = #{number}"
+            "#{name} #{op} #{number}"
           in { name:, op:, rhs: { boolean: } }
-            "#{name} = #{boolean}"
+            "#{name} #{op} #{boolean}"
           else
             nil
           end
@@ -100,13 +100,26 @@ module ActiveRecordRules
         ids = vals.transform_values(&:id)
         arguments = names.values.map(&:first).map { vals[_1][_2] }
 
+        logger&.debug do
+          "Rule(#{id}): checking constraints for #{ids.to_json}"
+        end
+
         # Re-check constraints here, because the above only applied
         # filters for current object to each query table.
         # TODO: don't re-apply constraints that we already know hold
         matches = constraints.all? do |op, lhs, rhs|
           case [lhs, rhs]
           in [[lkey, lfield], [rkey, rfield]]
-            vals[lkey][lfield].send(op, vals[rkey][rfield])
+            lvalue = vals[lkey][lfield]
+            rvalue = vals[rkey][rfield]
+            result = lvalue.send(op, rvalue)
+            logger&.debug do
+              suffix = result ? "matches" : "does not match"
+              real_values = "#{lvalue.inspect} #{op} #{rvalue.inspect}"
+              symbolic_values = "#{lkey}.#{lfield} #{op} #{rkey}.#{rfield}"
+              "Rule(#{id}): #{real_values} (#{symbolic_values}) #{suffix}"
+            end
+            result
           else
             # If the constraint doesn't match one of the above, then
             # just ignore it. It's a constant constraint, and thus has
@@ -120,9 +133,8 @@ module ActiveRecordRules
         begin
           activation = rule_activations.create!(ids: ids, arguments: arguments)
           current_matches.add(activation.id)
-          logger&.info do
-            "Rule(#{id}): #{object.class}(#{object.id}) activating for #{ids}"
-          end
+          logger&.info { "Rule(#{id}): activated for #{ids.to_json}" }
+          logger&.debug { "Rule(#{id}): activated with arguments #{arguments.to_json}" }
 
           Object.new.instance_exec(*arguments, &activation_code)
         rescue ActiveRecord::RecordNotUnique => e
@@ -134,12 +146,11 @@ module ActiveRecordRules
           activation_arguments = activation.arguments
           if arguments == activation_arguments
             logger&.debug do
-              "Rule(#{id}): #{object.class}(#{object.id}) still matches for #{ids}"
+              "Rule(#{id}): still matches for #{ids.to_json}"
             end
           else
-            logger&.info do
-              "Rule(#{id}): #{object.class}(#{object.id}) reactivating for #{ids}"
-            end
+            logger&.info { "Rule(#{id}): reactivated for #{ids.to_json}" }
+            logger&.debug { "Rule(#{id}): reactivated with arguments #{arguments.to_json}" }
 
             Object.new.instance_exec(*activation_arguments, &deactivation_code)
             activation.update!(arguments: arguments)
@@ -154,7 +165,7 @@ module ActiveRecordRules
       # through then it needs to be destroyed.
       rule_activations.where("ids->>? = ?", key, object.id).where.not(id: current_matches).destroy_all.each do |record|
         logger&.info do
-          "Rule(#{id}): #{object.class}(#{object.id}) deactivating for #{record.ids} (not found in activation set)"
+          "Rule(#{id}): deactivated for #{record.ids.to_json} (set no longer matches rule)"
         end
         Object.new.instance_exec(*record.arguments, &deactivation_code)
       end
@@ -169,7 +180,7 @@ module ActiveRecordRules
 
       destroyed.each do |record|
         logger&.info do
-          "Rule(#{id}): #{object.class}(#{object.id}) deactivating for #{record.ids} (explicitly removed)"
+          "Rule(#{id}): deactivated for #{record.ids.to_json} (entry removed by condition)"
         end
 
         Object.new.instance_exec(*record.arguments, &deactivation_code)
