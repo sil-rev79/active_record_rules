@@ -5,10 +5,6 @@ require "parslet/convenience"
 class Salutation < ActiveRecord::Base; include ActiveRecordRules::Fact; end
 class Person < ActiveRecord::Base; include ActiveRecordRules::Fact; end
 
-module TestHelper
-  cattr_accessor :activated
-end
-
 RSpec.describe ActiveRecordRules do
   before do
     define_tables do |schema|
@@ -25,7 +21,7 @@ RSpec.describe ActiveRecordRules do
     end
   end
 
-  context "with no constraints" do
+  describe "rules with no constraints" do
     before do
       ActiveRecordRules::Rule.define_rule(<<~RULE)
         rule greet
@@ -122,7 +118,7 @@ RSpec.describe ActiveRecordRules do
     end
 
     it "shares a Condition node" do
-      expect(ActiveRecordRules::Condition.all.size).to eq(3)
+      expect(ActiveRecordRules::Condition.all.size).to be == 3
     end
 
     context "with ten people" do
@@ -135,14 +131,14 @@ RSpec.describe ActiveRecordRules do
       end
 
       it "only processes a single Person when one is added" do
-        capturing_log do |output|
+        capturing_logs do |output|
           Person.create!(name: "Jane", greetable: true)
           expect(output.string.scan(/Person\(([0-9]+)\)/).uniq).to contain_exactly(["12"])
         end
       end
 
       it "doesn't process any people when a Salutation is added" do
-        capturing_log do |output|
+        capturing_logs do |output|
           Salutation.create!(greeting: "Yo")
           expect(output.string).not_to include("Person(")
         end
@@ -150,7 +146,7 @@ RSpec.describe ActiveRecordRules do
     end
   end
 
-  context "with constraints between three conditions" do
+  describe "rules with constraints between three conditions" do
     before do
       ActiveRecordRules::Rule.define_rule(<<~RULE)
         rule greet
@@ -183,6 +179,42 @@ RSpec.describe ActiveRecordRules do
       it "deactivates properly" do
         john.destroy!
         expect(TestHelper.activated).to be_empty
+      end
+    end
+  end
+
+  describe "rules which only match a subset of records" do
+    before do
+      ActiveRecordRules::Rule.define_rule(<<~RULE)
+        rule greet
+          Salutation(greeting)
+          Person(name = name1, greetable = true)
+          Person(name = name2, name > name1)
+        on activation
+          # puts "activate \#{greeting}/\#{name1}/\#{name2}"
+          TestHelper.activated += [[greeting, name1, name2]]
+        on deactivation
+          # puts "deactivate \#{greeting}/\#{name1}/\#{name2}"
+          TestHelper.activated -= [[greeting, name1, name2]]
+      RULE
+
+      TestHelper.activated = []
+    end
+
+    context "with ten people and a salutation" do
+      before do
+        10.times { Person.create!(name: "Person #{_1}") }
+        Salutation.create!(greeting: "hi")
+      end
+
+      it "does not re-process every existing person when adding a new person" do
+        # This test is checking that we do some initial filtering in
+        # the database query before we do anything in Ruby. We use the
+        # logs as a proxy for Ruby-side evaluation.
+        capturing_logs(:info) do |output|
+          Person.create!(name: "Person 5.5", greetable: true)
+          expect(output.string.scan(/Rule\(([0-9]+)\)/).size).to be < 10
+        end
       end
     end
   end

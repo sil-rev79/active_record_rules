@@ -10,7 +10,7 @@ module RSpecExtensions
     block.call(ActiveRecord::Base.connection)
   end
 
-  def capturing_log(level = :debug, &block)
+  def capturing_logs(level = :debug, &block)
     output = StringIO.new
     old = ActiveRecordRules.logger
     ActiveRecordRules.logger = Logger.new(output, level: level)
@@ -18,6 +18,12 @@ module RSpecExtensions
   ensure
     ActiveRecordRules.logger = old
   end
+end
+
+module TestHelper
+  # This is just a global place to put information about rule
+  # activations, to simplify tests.
+  cattr_accessor :activated
 end
 
 RSpec.configure do |config|
