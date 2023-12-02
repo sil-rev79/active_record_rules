@@ -44,16 +44,19 @@ module ActiveRecordRules
           end
         end.compact
 
+        condition = Condition.find_or_initialize_by(
+          match_class: condition_definition[:class_name].to_s,
+          # We have to wrap the conditions in this fake object
+          # because querying with an array at the toplevel turns
+          # into an ActiveRecord IN query, which ruins everything.
+          # Using an object here simplifies things a lot.
+          match_conditions: { "clauses" => constant_conditions }
+        )
+        condition.validate!
+
         ConditionRule.new(
           key: "cond#{index + 1}",
-          condition: Condition.find_or_initialize_by(
-            match_class: condition_definition[:class_name].to_s,
-            # We have to wrap the conditions in this fake object
-            # because querying with an array at the toplevel turns
-            # into an ActiveRecord IN query, which ruins everything.
-            # Using an object here simplifies things a lot.
-            match_conditions: { "clauses" => constant_conditions }
-          )
+          condition: condition
         )
       end
 

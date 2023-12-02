@@ -30,6 +30,7 @@ module ActiveRecordRules
     has_many :condition_activations
     has_many :rules, through: :condition_rules
     validates :match_class, presence: true
+    validate :validate_fact_class
 
     def activate(object)
       clauses = match_conditions["clauses"]
@@ -91,6 +92,10 @@ module ActiveRecordRules
 
     def logger
       ActiveRecordRules.logger
+    end
+
+    def validate_fact_class
+      errors.add(:match_class, "must be a subclass of ActiveRecordRules::Fact") unless match_class.constantize < Fact
     end
   end
 end

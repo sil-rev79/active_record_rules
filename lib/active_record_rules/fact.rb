@@ -8,6 +8,8 @@ module ActiveRecordRules
   # their own transaction.
   module Fact
     def self.included(klass)
+      raise "Only subclasses of ActiveRecord::Base can be declared to be Facts" unless klass < ActiveRecord::Base
+
       klass.instance_eval do
         after_commit do |object|
           transaction do

@@ -5,6 +5,8 @@ require "parslet/convenience"
 class Salutation < ActiveRecord::Base; include ActiveRecordRules::Fact; end
 class Person < ActiveRecord::Base; include ActiveRecordRules::Fact; end
 
+class NonFact < ActiveRecord::Base; end
+
 RSpec.describe ActiveRecordRules do
   before do
     define_tables do |schema|
@@ -216,6 +218,15 @@ RSpec.describe ActiveRecordRules do
           expect(output.string.scan(/Rule\(([0-9]+)\)/).size).to be < 10
         end
       end
+    end
+  end
+
+  describe "rules referencing non-Fact classes" do
+    it "fails if the class is not a Fact" do
+      expect { ActiveRecordRules::Rule.define_rule(<<~RULE) }.to raise_error(ActiveRecord::RecordInvalid)
+        rule fail at defining
+          NonFact()
+      RULE
     end
   end
 end
