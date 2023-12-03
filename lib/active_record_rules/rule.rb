@@ -169,9 +169,8 @@ module ActiveRecordRules
       # Essentially: if we didn't see it on our most recent pass
       # through then it needs to be destroyed.
       rule_matches.where("ids->>? = ?", key, object.id).where.not(id: current_matches).destroy_all.each do |record|
-        logger&.info do
-          "Rule(#{id}): unmatched for #{record.ids.to_json} (set no longer matches rule)"
-        end
+        logger&.info { "Rule(#{id}): unmatched for #{record.ids.to_json} (set no longer matches rule)" }
+        logger&.debug { "Rule(#{id}): unmatched with arguments #{names.keys.zip(record.arguments).to_h.to_json}" }
         Object.new.instance_exec(*record.arguments, &on_unmatch_code)
       end
     rescue Parslet::ParseFailed => e
@@ -181,12 +180,11 @@ module ActiveRecordRules
     def deactivate(key, object)
       destroyed = rule_matches.destroy_by("ids->>? = ?", key, object.id)
 
-      _, _, _, on_unmatch_code = parse_definition
+      names, _, _, on_unmatch_code = parse_definition
 
       destroyed.each do |record|
-        logger&.info do
-          "Rule(#{id}): unmatched for #{record.ids.to_json} (entry removed by condition)"
-        end
+        logger&.info { "Rule(#{id}): unmatched for #{record.ids.to_json} (entry removed by condition)" }
+        logger&.debug { "Rule(#{id}): unmatched with arguments #{names.keys.zip(record.arguments).to_h.to_json}" }
 
         Object.new.instance_exec(*record.arguments, &on_unmatch_code)
       end

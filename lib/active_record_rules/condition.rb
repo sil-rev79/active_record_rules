@@ -71,7 +71,7 @@ module ActiveRecordRules
         if condition_matches.exists?(entry_id: object.id)
           logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (updated)" }
         else
-          logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (first match)" }
+          logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (matched)" }
           condition_matches.create!(entry_id: object.id)
         end
 
