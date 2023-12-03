@@ -148,7 +148,7 @@ module ActiveRecordRules
             end
           else
             logger&.info { "Rule(#{id}): re-matched for #{ids.to_json}" }
-            logger&.debug { "Rule(#{id}): re-matched with arguments #{arguments.to_json}" }
+            logger&.debug { "Rule(#{id}): re-matched with arguments #{names.keys.zip(arguments).to_h.to_json}" }
 
             Object.new.instance_exec(*previous_arguments, &on_unmatch_code)
             match_record.update!(arguments: arguments)
@@ -159,7 +159,7 @@ module ActiveRecordRules
           match_record = rule_matches.create!(ids: ids, arguments: arguments)
           current_matches.add(match_record.id)
           logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
-          logger&.debug { "Rule(#{id}): matched with arguments #{arguments.to_json}" }
+          logger&.debug { "Rule(#{id}): matched with arguments #{names.keys.zip(arguments).to_h.to_json}" }
 
           Object.new.instance_exec(*arguments, &on_match_code)
         end
