@@ -24,6 +24,8 @@ Style/WordArray:
 Style/SymbolArray:
   Enabled: false
 
+# This is particularly useful for mapping over hashes. I don't think
+# _1 and _2 is too confusing, but adding _3 starts to push it.
 Style/NumberedParametersLimit:
   Enabled: true
   Max: 2
