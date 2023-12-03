@@ -64,7 +64,7 @@ RSpec.describe ActiveRecordRules do
       context 'with new post "Hello World!"' do
         before do
           post = Post.create!(title: "Hello, world!")
-          PostTag.create(post_id: post.id, tag_id: 1)
+          PostTag.create!(post_id: post.id, tag_id: 1)
         end
 
         it { is_expected.to include(["John", "john@example.com", "Hello, world!"]) }
@@ -73,7 +73,7 @@ RSpec.describe ActiveRecordRules do
       context 'with old post "Hello World!"' do
         before do
           post = Post.create!(title: "Hello, world!", created_at: 10.days.ago)
-          PostTag.create(post_id: post.id, tag_id: 1)
+          PostTag.create!(post_id: post.id, tag_id: 1)
         end
 
         it { is_expected.not_to include(["John", "john@example.com", "Hello, world!"]) }
@@ -82,7 +82,7 @@ RSpec.describe ActiveRecordRules do
       context 'with new post "Wassup!" on irrelevant tag' do
         before do
           post = Post.create!(title: "Hello, world!")
-          PostTag.create(post_id: post.id, tag_id: 2)
+          PostTag.create!(post_id: post.id, tag_id: 2)
         end
 
         it { is_expected.not_to include(["John", "john@example.com", "Hello, world!"]) }
@@ -92,7 +92,7 @@ RSpec.describe ActiveRecordRules do
     context 'with new post "Hello World!"' do
       before do
         post = Post.create!(title: "Hello, world!")
-        PostTag.create(post_id: post.id, tag_id: 1)
+        PostTag.create!(post_id: post.id, tag_id: 1)
       end
 
       context "with user John, subscribed to relevant tag" do
@@ -117,7 +117,7 @@ RSpec.describe ActiveRecordRules do
     context 'with old post "Hello World!"' do
       before do
         post = Post.create!(title: "Hello, world!", created_at: 10.days.ago)
-        PostTag.create(post_id: post.id, tag_id: 1)
+        PostTag.create!(post_id: post.id, tag_id: 1)
       end
 
       context "with user John, subscribed to relevant tag" do
