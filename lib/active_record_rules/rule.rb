@@ -78,6 +78,7 @@ module ActiveRecordRules
         join_key = join.key
 
         constraints.each do |op, lhs, rhs|
+          op = (op == "==" ? "=" : op)
           case [lhs, rhs]
           in [[^key, left_field], [^join_key, right_field]]
             where << ["? #{op} #{right_field}", object[left_field]]
