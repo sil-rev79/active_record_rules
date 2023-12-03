@@ -51,6 +51,8 @@ module ActiveRecordRules
                          [object[name], (op == "=" ? "==" : op), number.to_i]
                        in { name:, op:, rhs: { boolean: } }
                          [object[name], (op == "=" ? "==" : op), (boolean.to_s == "true")]
+                       in { name:, op:, rhs: { nil: _ } }
+                         [object[name], (op == "=" ? "==" : op), nil]
                        else
                          raise "Non-constant test in Condition(#{id}): #{clause}"
                        end

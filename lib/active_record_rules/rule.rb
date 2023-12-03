@@ -39,6 +39,8 @@ module ActiveRecordRules
             "#{name} #{op} #{number}"
           in { name:, op:, rhs: { boolean: } }
             "#{name} #{op} #{boolean}"
+          in { name:, op:, rhs: { nil: _ } }
+            "#{name} #{op} nil"
           else
             nil
           end
@@ -78,7 +80,6 @@ module ActiveRecordRules
         join_key = join.key
 
         constraints.each do |op, lhs, rhs|
-          op = (op == "==" ? "=" : op)
           case [lhs, rhs]
           in [[^key, left_field], [^join_key, right_field]]
             where << ["? #{op} #{right_field}", object[left_field]]
@@ -116,7 +117,11 @@ module ActiveRecordRules
           in [[lkey, lfield], [rkey, rfield]]
             lvalue = vals[lkey][lfield]
             rvalue = vals[rkey][rfield]
-            result = lvalue.send(op, rvalue)
+            result = if op == "="
+                       lvalue.send("==", rvalue)
+                     else
+                       lvalue.send(op, rvalue)
+                     end
             logger&.debug do
               suffix = result ? "matches" : "does not match"
               real_values = "#{lvalue.inspect} #{op} #{rvalue.inspect}"
@@ -211,6 +216,8 @@ module ActiveRecordRules
             constraints << [op, ["cond#{index + 1}", name.to_s], rhs.to_s]
           in { name:, op:, rhs: { boolean: rhs } }
             constraints << [op, ["cond#{index + 1}", name.to_s], rhs.to_s == "true"]
+          in { name:, op:, rhs: { nil: _ } }
+            constraints << [op, ["cond#{index + 1}", name.to_s], nil]
           in { name:, op:, rhs: { name: rhs } }
             fields = names[rhs.to_s]
             raise "Right-hand side name does not have a value in constraint: #{name} #{op} #{fields}" if fields.empty?
@@ -228,7 +235,7 @@ module ActiveRecordRules
 
       names.each_value do |fields|
         fields[1..].zip(fields).each do |lhs, rhs|
-          constraints << ["==", lhs, rhs]
+          constraints << ["=", lhs, rhs]
         end
       end
 

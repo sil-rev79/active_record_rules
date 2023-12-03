@@ -34,12 +34,16 @@ module ActiveRecordRules
       (str("true") | str("false")).as(:boolean) >> match("[a-zA-Z0-9]_!?").absent?
     end
 
+    rule(:nil_expr) do
+      str("nil").as(:nil) >> match("[a-zA-Z0-9]_!?").absent?
+    end
+
     rule(:name) do
       (match("[a-zA-Z_]") >> match("[a-zA-Z_0-9!?]").repeat)
     end
 
     rule(:expression) do
-      boolean | string | number | name.as(:name)
+      boolean | string | number | nil_expr | name.as(:name)
     end
 
     rule(:operation) do
