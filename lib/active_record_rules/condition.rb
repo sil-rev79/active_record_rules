@@ -19,15 +19,15 @@ module ActiveRecordRules
   #  +-------------------------------------+
   #  | [Rule]                              |
   #  | cond1.id = cond2.author_id          |
-  #  | activate: decrement post count      |
-  #  | deactivate: increment post count    |
+  #  | on_match: decrement post count      |
+  #  | on_unmatch: increment post count    |
   #  +---------------+---------------------+
   #
   class Condition < ActiveRecord::Base
     self.table_name = :arr__conditions
 
     has_many :condition_rules
-    has_many :condition_activations
+    has_many :condition_matches
     has_many :rules, through: :condition_rules
     validates :match_class, presence: true
     validate :validate_fact_class
@@ -66,9 +66,9 @@ module ActiveRecordRules
       end
 
       if matches
-        logger&.info { "Condition(#{id}): activated by #{object.class}(#{object.id})" }
+        logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id})" }
         begin
-          condition_activations.create(entry_id: object.id)
+          condition_matches.create(entry_id: object.id)
         rescue ActiveRecord::RecordNotUnique => e
           raise e unless e.message.start_with?("SQLite3::ConstraintException: UNIQUE constraint failed")
         end
@@ -76,12 +76,12 @@ module ActiveRecordRules
         condition_rules.each do |join|
           join.rule.activate(join.key, object)
         end
-      elsif condition_activations.destroy_by(entry_id: object.id).any?
+      elsif condition_matches.destroy_by(entry_id: object.id).any?
         logger&.info do
           if object.persisted?
-            "Condition(#{id}): deactivated for #{object.class}(#{object.id}) (ceased to match)"
+            "Condition(#{id}): unmatched for #{object.class}(#{object.id}) (ceased to match)"
           else
-            "Condition(#{id}): deactivated for #{object.class}(#{object.id}) (deleted)"
+            "Condition(#{id}): unmatched for #{object.class}(#{object.id}) (deleted)"
           end
         end
 

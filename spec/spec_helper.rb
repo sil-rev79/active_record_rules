@@ -22,8 +22,8 @@ end
 
 module TestHelper
   # This is just a global place to put information about rule
-  # activations, to simplify tests.
-  cattr_accessor :activated
+  # matches, to simplify tests.
+  cattr_accessor :matches
 end
 
 RSpec.configure do |config|

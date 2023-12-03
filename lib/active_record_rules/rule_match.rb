@@ -15,8 +15,8 @@ module ActiveRecordRules
   #    arguments are also used to detect when a rule needs to be
   #    "updated" (i.e. deactivated and immediately reactivated with
   #    new values).
-  class RuleActivation < ActiveRecord::Base
-    self.table_name = :arr__rule_activations
+  class RuleMatch < ActiveRecord::Base
+    self.table_name = :arr__rule_matches
 
     belongs_to :rule
   end

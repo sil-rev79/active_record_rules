@@ -8,7 +8,7 @@ module ActiveRecordRules
     self.table_name = :arr__condition_rules
 
     belongs_to :condition
-    has_many :condition_activations, through: :condition
+    has_many :condition_matches, through: :condition
     belongs_to :rule
     validates :key, uniqueness: { scope: :rule }
   end

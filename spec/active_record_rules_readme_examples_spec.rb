@@ -8,7 +8,7 @@ class PostTag < ActiveRecord::Base; include ActiveRecordRules::Fact; end
 class TagSubscription < ActiveRecord::Base; include ActiveRecordRules::Fact; end
 
 RSpec.describe ActiveRecordRules do
-  subject(:activations) { TestHelper.activated }
+  subject(:matches) { TestHelper.matches }
 
   before do
     define_tables do |schema|
@@ -37,7 +37,7 @@ RSpec.describe ActiveRecordRules do
     end
   end
 
-  describe "example rule activations" do
+  describe "example rule matches" do
     before do
       ActiveRecordRules::Rule.define_rule(<<~RULE)
         rule Email users when new post is created
@@ -45,14 +45,14 @@ RSpec.describe ActiveRecordRules do
           User(id = user_id, name, email)
           PostTag(post_id, tag_id)
           TagSubscription(user_id, tag_id)
-        on activation
+        on match
           # This is just Ruby code
-          if created_at > 5.minutes.ago                  # if the post is new
-            TestHelper.activated << [name, email, title] # keep track of activations
+          if created_at > 5.minutes.ago                # if the post is new
+            TestHelper.matches << [name, email, title] # keep track of matches
           end
       RULE
 
-      TestHelper.activated = []
+      TestHelper.matches = []
     end
 
     context "with user John" do
@@ -139,9 +139,9 @@ RSpec.describe ActiveRecordRules do
         rule Update number of posts for user
           Post(id = post_id, author_id, status = "published")
           User(id = author_id)
-        on activation
+        on match
           User.find(author_id).increment!(:post_count)
-        on deactivation
+        on unmatch
           User.find(author_id).decrement!(:post_count)
       RULE
     end

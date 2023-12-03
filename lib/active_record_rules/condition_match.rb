@@ -2,8 +2,8 @@
 
 module ActiveRecordRules
   # A record indicating an entry that meets a condition.
-  class ConditionActivation < ActiveRecord::Base
-    self.table_name = :arr__condition_activations
+  class ConditionMatch < ActiveRecord::Base
+    self.table_name = :arr__condition_matches
 
     belongs_to :condition
   end

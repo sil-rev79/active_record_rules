@@ -13,7 +13,7 @@ rails generate active_record_rules:install --id_type=integer # or uuid if you're
 rails db:migrate
 ```
 
-If you'd like logging, you can set `ActiveRecordRules.logger` to a logger of your choosing (e.g. `Rails.logger`). Messages about `Condition` and `Rule` activation/deactivation will be logged at `info` level, and detailed information about specific tests will be logged at `debug` level.
+If you'd like logging, you can set `ActiveRecordRules.logger` to a logger of your choosing (e.g. `Rails.logger`). Messages about `Condition` and `Rule` matching/unmatching will be logged at `info` level, and detailed information about specific tests will be logged at `debug` level.
 
 ## Usage
 
@@ -35,7 +35,7 @@ ActiveRecordRules.define_rule(<<~RULE)
     User(id = user_id, name, email)
     PostTag(post_id, tag_id)
     TagSubscription(user_id, tag_id)
-  on activation
+  on match
     # This is just Ruby code
     if created_at > 5.minutes.ago                 # if the post is new
       PostNotifier.send_email(name, email, title) # notify the users
@@ -45,21 +45,21 @@ RULE
 
 Rule executions are remembered by object id and variable bindings, so they will only fire once.
 
-It's also possible to perform some action when a rule ceases to match. This can be done by adding an `on deactivate` section:
+It's also possible to perform some action when a rule ceases to match. This can be done by adding an `on unmatch` section:
 
 ```ruby
 ActiveRecordRules.define_rule(<<~RULE)
   rule Update number of posts for user
     Post(author_id, status = "published")
     User(id = author_id)
-  on activation
+  on match
     User.find(author_id).increment!(:post_count)
-  on deactivation
+  on unmatch
     User.find(author_id).decrement!(:post_count)
 RULE
 ```
 
-This rule will activate when a post is put in the `published` state, and deactivate when it is removed from the `published` state.
+This rule will match when a post is put in the `published` state, and unmatch when it is removed from the `published` state.
 
 ## Development
 

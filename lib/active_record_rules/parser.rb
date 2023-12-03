@@ -67,18 +67,18 @@ module ActiveRecordRules
       (newline | (whitespace >> condition.maybe >> whitespace.maybe >> newline)).repeat
     end
 
-    rule(:activation) do
-      str("on") >> whitespace >> str("activation") >> whitespace.maybe >> newline >>
+    rule(:on_match) do
+      str("on") >> whitespace >> str("match") >> whitespace.maybe >> newline >>
         (whitespace >> (eol.absent? >> any).repeat.as(:line) >> eol).repeat
     end
 
-    rule(:update) do
+    rule(:on_update) do
       str("on") >> whitespace >> str("update") >> whitespace.maybe >> newline >>
         (whitespace >> (eol.absent? >> any).repeat.as(:line) >> eol).repeat
     end
 
-    rule(:deactivation) do
-      str("on") >> whitespace >> str("deactivation") >> whitespace.maybe >> newline >>
+    rule(:on_unmatch) do
+      str("on") >> whitespace >> str("unmatch") >> whitespace.maybe >> newline >>
         (whitespace >> (eol.absent? >> any).repeat.as(:line) >> eol).repeat
     end
 
@@ -86,9 +86,9 @@ module ActiveRecordRules
       str("rule") >> whitespace >>
         (newline.absent? >> any).repeat.as(:name) >> newline >>
         conditions.as(:conditions) >>
-        activation.as(:activation).maybe >>
-        update.as(:update).maybe >>
-        deactivation.as(:deactivation).maybe
+        on_match.as(:on_match).maybe >>
+        on_update.as(:on_update).maybe >>
+        on_unmatch.as(:on_unmatch).maybe
     end
 
     root :definition

@@ -16,14 +16,14 @@ module ActiveRecordRules
   # incremental updates to the output.
   #
   # A Rule finds the other objects to process by looking into its
-  # conditions' ConditionActivation objects to find the objects which
+  # conditions' ConditionMatch objects to find the objects which
   # currently match the condition.
   class Rule < ActiveRecord::Base
     self.table_name = :arr__rules
 
     has_many :condition_rules
     has_many :conditions, through: :condition_rules
-    has_many :rule_activations
+    has_many :rule_matches
 
     class RuleSyntaxError < StandardError; end
 
@@ -70,10 +70,10 @@ module ActiveRecordRules
     end
 
     def activate(key, object)
-      names, constraints, activation_code, deactivation_code = parse_definition
+      names, constraints, on_match_code, on_unmatch_code = parse_definition
 
       other_values = condition_rules.reject { _1.key == key }.to_h do |join|
-        where = [{ id: join.condition_activations.pluck(:entry_id) }]
+        where = [{ id: join.condition_matches.pluck(:entry_id) }]
 
         join_key = join.key
 
@@ -134,59 +134,59 @@ module ActiveRecordRules
         next unless matches
 
         begin
-          activation = rule_activations.create!(ids: ids, arguments: arguments)
-          current_matches.add(activation.id)
-          logger&.info { "Rule(#{id}): activated for #{ids.to_json}" }
-          logger&.debug { "Rule(#{id}): activated with arguments #{arguments.to_json}" }
+          match_record = rule_matches.create!(ids: ids, arguments: arguments)
+          current_matches.add(match_record.id)
+          logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
+          logger&.debug { "Rule(#{id}): matched with arguments #{arguments.to_json}" }
 
-          Object.new.instance_exec(*arguments, &activation_code)
+          Object.new.instance_exec(*arguments, &on_match_code)
         rescue ActiveRecord::RecordNotUnique => e
           # TODO: expand beyond just SQLite
           raise e unless e.message.start_with?("SQLite3::ConstraintException: UNIQUE constraint failed")
 
-          activation = rule_activations.find_by(ids: ids)
-          current_matches.add(activation.id)
-          activation_arguments = activation.arguments
-          if arguments == activation_arguments
+          match_record = rule_matches.find_by(ids: ids)
+          current_matches.add(match_record.id)
+          previous_arguments = match_record.arguments
+          if arguments == previous_arguments
             logger&.debug do
               "Rule(#{id}): still matches for #{ids.to_json}"
             end
           else
-            logger&.info { "Rule(#{id}): reactivated for #{ids.to_json}" }
-            logger&.debug { "Rule(#{id}): reactivated with arguments #{arguments.to_json}" }
+            logger&.info { "Rule(#{id}): re-matched for #{ids.to_json}" }
+            logger&.debug { "Rule(#{id}): re-matched with arguments #{arguments.to_json}" }
 
-            Object.new.instance_exec(*activation_arguments, &deactivation_code)
-            activation.update!(arguments: arguments)
+            Object.new.instance_exec(*previous_arguments, &on_unmatch_code)
+            match_record.update!(arguments: arguments)
 
-            Object.new.instance_exec(*arguments, &activation_code)
+            Object.new.instance_exec(*arguments, &on_match_code)
           end
         end
       end
 
-      # Clean up any existing activations that are no longer current.
+      # Clean up any existing matches that are no longer current.
       # Essentially: if we didn't see it on our most recent pass
       # through then it needs to be destroyed.
-      rule_activations.where("ids->>? = ?", key, object.id).where.not(id: current_matches).destroy_all.each do |record|
+      rule_matches.where("ids->>? = ?", key, object.id).where.not(id: current_matches).destroy_all.each do |record|
         logger&.info do
-          "Rule(#{id}): deactivated for #{record.ids.to_json} (set no longer matches rule)"
+          "Rule(#{id}): unmatched for #{record.ids.to_json} (set no longer matches rule)"
         end
-        Object.new.instance_exec(*record.arguments, &deactivation_code)
+        Object.new.instance_exec(*record.arguments, &on_unmatch_code)
       end
     rescue Parslet::ParseFailed => e
       raise e.parse_failure_cause.ascii_tree
     end
 
     def deactivate(key, object)
-      destroyed = rule_activations.destroy_by("ids->>? = ?", key, object.id)
+      destroyed = rule_matches.destroy_by("ids->>? = ?", key, object.id)
 
-      _, _, _, deactivation_code = parse_definition
+      _, _, _, on_unmatch_code = parse_definition
 
       destroyed.each do |record|
         logger&.info do
-          "Rule(#{id}): deactivated for #{record.ids.to_json} (entry removed by condition)"
+          "Rule(#{id}): unmatched for #{record.ids.to_json} (entry removed by condition)"
         end
 
-        Object.new.instance_exec(*record.arguments, &deactivation_code)
+        Object.new.instance_exec(*record.arguments, &on_unmatch_code)
       end
     end
 
@@ -235,27 +235,27 @@ module ActiveRecordRules
         end
       end
 
-      activation_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
+      on_match_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
         # ->(in1, in2) {
-        #   puts "Activating for \#{in1} \#{in2}"
+        #   puts "Matching for \#{in1} \#{in2}"
         # }
 
         ->(#{names.keys.join(", ")}) {
-          #{parsed[:activation]&.pluck(:line)&.join("\n  ")}
+          #{parsed[:on_match]&.pluck(:line)&.join("\n  ")}
         }
       RUBY
 
-      deactivation_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
+      on_unmatch_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
         # ->(in1, in2) {
-        #   puts "Deactivating for \#{in1} \#{in2}"
+        #   puts "Unmatching for \#{in1} \#{in2}"
         # }
 
         ->(#{names.keys.join(", ")}) {
-          #{parsed[:deactivation]&.pluck(:line)&.join("\n  ")}
+          #{parsed[:on_unmatch]&.pluck(:line)&.join("\n  ")}
         }
       RUBY
 
-      [names, constraints, activation_code, deactivation_code]
+      [names, constraints, on_match_code, on_unmatch_code]
     end
   end
 end

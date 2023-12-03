@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
 require "active_record_rules/condition"
-require "active_record_rules/condition_activation"
+require "active_record_rules/condition_match"
 require "active_record_rules/condition_rule"
 require "active_record_rules/fact"
 require "active_record_rules/parser"
 require "active_record_rules/rule"
-require "active_record_rules/rule_activation"
+require "active_record_rules/rule_match"
 
 # A production rule system for ActiveRecord objects.
 #
@@ -22,9 +22,9 @@ require "active_record_rules/rule_activation"
 #     rule Update number of posts for user
 #       Post(author_id, status = "published")
 #       User(id = author_id)
-#     on activation
+#     on match
 #       User.find(author_id).increment!(:post_count)
-#     on deactivation
+#     on unmatch
 #       User.find(author_id).decrement!(:post_count)
 #   RULE
 #

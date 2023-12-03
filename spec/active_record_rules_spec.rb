@@ -29,15 +29,15 @@ RSpec.describe ActiveRecordRules do
         rule greet
           Salutation(greeting)
           Person(name)
-        on activation
-          # puts "activate \#{greeting}/\#{name}"
-          TestHelper.activated += [[greeting, name]]
-        on deactivation
-          # puts "deactivate \#{greeting}/\#{name}"
-          TestHelper.activated -= [[greeting, name]]
+        on match
+          # puts "match \#{greeting}/\#{name}"
+          TestHelper.matches += [[greeting, name]]
+        on unmatch
+          # puts "unmatch \#{greeting}/\#{name}"
+          TestHelper.matches -= [[greeting, name]]
       RULE
 
-      TestHelper.activated = []
+      TestHelper.matches = []
     end
 
     let!(:salutation) { Salutation.create!(greeting: "hello") }
@@ -45,28 +45,28 @@ RSpec.describe ActiveRecordRules do
     context "with John as a person" do
       let!(:john) { Person.create!(name: "John") }
 
-      it "activates for hello/John" do
-        expect(TestHelper.activated).to include(["hello", "John"])
+      it "matches for hello/John" do
+        expect(TestHelper.matches).to include(["hello", "John"])
       end
 
-      it "deactivates when John is deleted" do
+      it "unmatches when John is deleted" do
         john.destroy!
-        expect(TestHelper.activated).not_to include(["hello", "John"])
+        expect(TestHelper.matches).not_to include(["hello", "John"])
       end
 
-      it "deactivates when John changes name" do
+      it "unmatches when John changes name" do
         john.update!(name: "Johns")
-        expect(TestHelper.activated).not_to include(["hello", "John"])
+        expect(TestHelper.matches).not_to include(["hello", "John"])
       end
 
-      it "activates for the new value when John changes name" do
+      it "matches for the new value when John changes name" do
         john.update!(name: "Johns")
-        expect(TestHelper.activated).to include(["hello", "Johns"])
+        expect(TestHelper.matches).to include(["hello", "Johns"])
       end
 
       it "does nothing when an unrelated attributes changes" do
         salutation.update!(farewell: "goodbye")
-        expect(TestHelper.activated).to include(["hello", "John"])
+        expect(TestHelper.matches).to include(["hello", "John"])
       end
     end
 
@@ -75,18 +75,18 @@ RSpec.describe ActiveRecordRules do
 
       let!(:jane) { Person.create!(name: "Jane") }
 
-      it "activates for hello/Jane" do
-        expect(TestHelper.activated).to include(["hello", "Jane"])
+      it "matches for hello/Jane" do
+        expect(TestHelper.matches).to include(["hello", "Jane"])
       end
 
-      it "deactivates Jane when Jane is deleted" do
+      it "unmatches Jane when Jane is deleted" do
         jane.destroy!
-        expect(TestHelper.activated).not_to include(["hello", "Jane"])
+        expect(TestHelper.matches).not_to include(["hello", "Jane"])
       end
 
-      it "leave John activated when Jane is deleted" do
+      it "leave John matched when Jane is deleted" do
         jane.destroy!
-        expect(TestHelper.activated).to include(["hello", "John"])
+        expect(TestHelper.matches).to include(["hello", "John"])
       end
     end
   end
@@ -97,10 +97,10 @@ RSpec.describe ActiveRecordRules do
         rule greet
           Salutation(greeting)
           Person(name, greetable = true)
-        on activation
-          TestHelper.activated += [[greeting, name]]
-        on deactivation
-          TestHelper.activated -= [[greeting, name]]
+        on match
+          TestHelper.matches += [[greeting, name]]
+        on unmatch
+          TestHelper.matches -= [[greeting, name]]
       RULE
 
       ActiveRecordRules::Rule.define_rule(<<~RULE)
@@ -108,15 +108,15 @@ RSpec.describe ActiveRecordRules do
           Salutation(greeting, farewell)
           Person(name, greetable = true)
           Person(name, farewellable = true)
-        on activation
-          TestHelper.activated += [[greeting, name]]
-          TestHelper.activated += [[farewell, name]]
-        on deactivation
-          TestHelper.activated -= [[greeting, name]]
-          TestHelper.activated -= [[farewell, name]]
+        on match
+          TestHelper.matches += [[greeting, name]]
+          TestHelper.matches += [[farewell, name]]
+        on unmatch
+          TestHelper.matches -= [[greeting, name]]
+          TestHelper.matches -= [[farewell, name]]
       RULE
 
-      TestHelper.activated = []
+      TestHelper.matches = []
     end
 
     it "shares a Condition node" do
@@ -155,15 +155,15 @@ RSpec.describe ActiveRecordRules do
           Salutation(greeting)
           Person(name = name1)
           Person(name = name2, name > name1)
-        on activation
-          # puts "activate \#{greeting}/\#{name1}/\#{name2}"
-          TestHelper.activated += [[greeting, name1, name2]]
-        on deactivation
-          # puts "deactivate \#{greeting}/\#{name1}/\#{name2}"
-          TestHelper.activated -= [[greeting, name1, name2]]
+        on match
+          # puts "match \#{greeting}/\#{name1}/\#{name2}"
+          TestHelper.matches += [[greeting, name1, name2]]
+        on unmatch
+          # puts "unmatch \#{greeting}/\#{name1}/\#{name2}"
+          TestHelper.matches -= [[greeting, name1, name2]]
       RULE
 
-      TestHelper.activated = []
+      TestHelper.matches = []
     end
 
     describe "adding two people, then a salutation" do
@@ -174,13 +174,13 @@ RSpec.describe ActiveRecordRules do
         Salutation.create!(greeting: "hello")
       end
 
-      it "does not activate twice" do
-        expect(TestHelper.activated).to contain_exactly(["hello", "Jane", "John"])
+      it "does not match twice" do
+        expect(TestHelper.matches).to contain_exactly(["hello", "Jane", "John"])
       end
 
-      it "deactivates properly" do
+      it "unmatches properly" do
         john.destroy!
-        expect(TestHelper.activated).to be_empty
+        expect(TestHelper.matches).to be_empty
       end
     end
   end
@@ -192,15 +192,15 @@ RSpec.describe ActiveRecordRules do
           Salutation(greeting)
           Person(name = name1, greetable = true)
           Person(name = name2, name > name1)
-        on activation
-          # puts "activate \#{greeting}/\#{name1}/\#{name2}"
-          TestHelper.activated += [[greeting, name1, name2]]
-        on deactivation
-          # puts "deactivate \#{greeting}/\#{name1}/\#{name2}"
-          TestHelper.activated -= [[greeting, name1, name2]]
+        on match
+          # puts "match \#{greeting}/\#{name1}/\#{name2}"
+          TestHelper.matches += [[greeting, name1, name2]]
+        on unmatch
+          # puts "unmatch \#{greeting}/\#{name1}/\#{name2}"
+          TestHelper.matches -= [[greeting, name1, name2]]
       RULE
 
-      TestHelper.activated = []
+      TestHelper.matches = []
     end
 
     context "with ten people and a salutation" do
