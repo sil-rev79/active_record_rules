@@ -134,18 +134,7 @@ module ActiveRecordRules
 
         next unless matches
 
-        begin
-          match_record = rule_matches.create!(ids: ids, arguments: arguments)
-          current_matches.add(match_record.id)
-          logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
-          logger&.debug { "Rule(#{id}): matched with arguments #{arguments.to_json}" }
-
-          Object.new.instance_exec(*arguments, &on_match_code)
-        rescue ActiveRecord::RecordNotUnique => e
-          # TODO: expand beyond just SQLite
-          raise e unless e.message.start_with?("SQLite3::ConstraintException: UNIQUE constraint failed")
-
-          match_record = rule_matches.find_by(ids: ids)
+        if (match_record = rule_matches.find_by(ids: ids))
           current_matches.add(match_record.id)
           previous_arguments = match_record.arguments
           if arguments == previous_arguments
@@ -161,6 +150,13 @@ module ActiveRecordRules
 
             Object.new.instance_exec(*arguments, &on_match_code)
           end
+        else
+          match_record = rule_matches.create!(ids: ids, arguments: arguments)
+          current_matches.add(match_record.id)
+          logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
+          logger&.debug { "Rule(#{id}): matched with arguments #{arguments.to_json}" }
+
+          Object.new.instance_exec(*arguments, &on_match_code)
         end
       end
 

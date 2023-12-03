@@ -66,13 +66,21 @@ module ActiveRecordRules
       end
 
       if matches
-        logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id})" }
-        begin
-          condition_matches.create(entry_id: object.id)
-        rescue ActiveRecord::RecordNotUnique => e
-          raise e unless e.message.start_with?("SQLite3::ConstraintException: UNIQUE constraint failed")
+        if condition_matches.exists?(entry_id: object.id)
+          logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (updated)" }
+        else
+          logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (first match)" }
+          condition_matches.create!(entry_id: object.id)
         end
 
+        # We trigger the rules, even if we already knew about the
+        # object, because the rule argument values might have
+        # changed. In principle we could lift the argument field
+        # information to the Condition to avoid this step, but that
+        # could reduce the amount of Condition sharing we can
+        # do. Another option would be to lift it to the ConditionRule
+        # join, but that would then require remembering matches at the
+        # ConditionRule level.
         condition_rules.each do |join|
           join.rule.activate(join.key, object)
         end
@@ -84,7 +92,6 @@ module ActiveRecordRules
             "Condition(#{id}): unmatched for #{object.class}(#{object.id}) (deleted)"
           end
         end
-
         condition_rules.each do |join|
           join.rule.deactivate(join.key, object)
         end
