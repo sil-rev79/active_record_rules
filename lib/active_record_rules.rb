@@ -39,15 +39,9 @@ module ActiveRecordRules
   end
 
   def self.trigger_rule_updates(object)
-    klass = object.class
-    classes = []
-    while klass < Fact
-      classes << klass
-      klass = klass.superclass
-    end
     Condition
-      .where(match_class: classes.map(&:name))
-      .includes(condition_rules: { rule: { condition_rules: {} } })
+      .for_object(object)
+      .includes_for_activate
       .each { _1.activate(object) }
   end
 end
