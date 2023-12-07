@@ -32,7 +32,9 @@ module ActiveRecordRules
     validates :match_class, presence: true
     validate :validate_fact_class
 
-    scope :for_object, ->(o) { where(match_class: o.class.ancestors.select { _1.is_a?(Class) }.map(&:name)) }
+    scope :for_class, lambda { |c|
+      where(match_class: c.ancestors.select { _1.included_modules.include?(ActiveRecordRules::Fact) }.map(&:name))
+    }
     scope :includes_for_activate, -> { includes(condition_rules: { rule: { condition_rules: {} } }) }
 
     def activate(object)

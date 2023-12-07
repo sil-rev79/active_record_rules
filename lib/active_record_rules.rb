@@ -40,7 +40,7 @@ module ActiveRecordRules
 
   def self.trigger_rule_updates(object)
     Condition
-      .for_object(object)
+      .for_class(object.class)
       .includes_for_activate
       .each { _1.activate(object) }
   end
