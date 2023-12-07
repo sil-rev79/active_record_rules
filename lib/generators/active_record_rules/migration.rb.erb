@@ -2,7 +2,7 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
   def change
     create_table :arr__conditions do |t|
       t.string :match_class
-      t.json :match_conditions
+      t.<%= @json_type %> :match_conditions
     end
 
     create_table :arr__rules do |t|
@@ -24,8 +24,8 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
 
     create_table :arr__rule_matches do |t|
       t.references :rule, foreign_key: { to_table: :arr__rules }
-      t.json :ids
-      t.json :arguments
+      t.<%= @json_type %> :ids
+      t.<%= @json_type %> :arguments
       t.index [:rule_id, :ids], unique: true # Note that arguments is *not* included in the uniqueness constraints
     end
   end

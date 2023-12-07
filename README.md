@@ -9,7 +9,9 @@ A [production system][] within ActiveRecord to execute code when matching rule c
 Include `active_record_rules` in your `Gemfile`, then run:
 
 ```shell
-rails generate active_record_rules:install --id_type=integer # or uuid if you're using UUIDs as your id columns
+# "jsonb" is the most appropriate Postgres JSON type, use "json" for SQLite
+# "integer" is the default Rails id type, but your application might customise this
+rails generate active_record_rules:install --json_type=jsonb --id_type=integer
 rails db:migrate
 ```
 
