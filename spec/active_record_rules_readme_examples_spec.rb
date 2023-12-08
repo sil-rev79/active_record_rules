@@ -149,19 +149,19 @@ RSpec.describe ActiveRecordRules do
     let(:user) { User.create!(name: "John") }
 
     context "with no posts" do
-      it { is_expected.to be == 0 }
+      it { is_expected.to eq 0 }
     end
 
     context "with one unpublished post" do
       before { Post.create!(author_id: user.id, status: "unpublished") }
 
-      it { is_expected.to be == 0 }
+      it { is_expected.to eq 0 }
     end
 
     context "with one published post" do
       before { Post.create!(author_id: user.id, status: "published") }
 
-      it { is_expected.to be == 1 }
+      it { is_expected.to eq 1 }
     end
 
     context "with one post that starts unpublished, but is then published" do
@@ -170,7 +170,7 @@ RSpec.describe ActiveRecordRules do
         post.update!(status: "published")
       end
 
-      it { is_expected.to be == 1 }
+      it { is_expected.to eq 1 }
     end
 
     context "with one post that starts published, but is then unpublished" do
@@ -179,7 +179,7 @@ RSpec.describe ActiveRecordRules do
         post.update!(status: "unpublished")
       end
 
-      it { is_expected.to be == 0 }
+      it { is_expected.to eq 0 }
     end
 
     describe "moving a published post between two users" do
@@ -189,11 +189,11 @@ RSpec.describe ActiveRecordRules do
       before { post.update!(author_id: user2.id) }
 
       it "decrements the old user count" do
-        expect(user.reload.post_count).to be == 0
+        expect(user.reload.post_count).to eq 0
       end
 
       it "increments the new user count" do
-        expect(user2.reload.post_count).to be == 1
+        expect(user2.reload.post_count).to eq 1
       end
     end
   end
