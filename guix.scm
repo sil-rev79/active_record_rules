@@ -55,9 +55,33 @@ very flexible.")
    (home-page "http://kschiess.github.io/parslet")
    (license license:expat)))
 
+(define-public ruby-properb
+  (package
+   (name "ruby-properb")
+   (version "0.0.1")
+   (source
+    (origin
+     (method git-fetch)
+     (uri (git-reference
+           (url "https://git.sr.ht/~czan/properb")
+           (commit "065ef67288f19fea34461621f59a9510003b3754")))
+     (sha256
+      (base32 "110r4dpzza761r4rrv0xm7by97za1230raz0h2can8p2ap9j5hrj"))))
+   (build-system ruby-build-system)
+   (arguments
+    `(#:test-target "spec"))
+   (inputs (list ruby ruby-rspec))
+   (native-inputs (list bundler ruby-rake ruby-rubocop ruby-solargraph))
+   (synopsis "Property-based testing in Ruby, with RSpec integration")
+   (description
+    "A property-based testing library, in the spirit of Proper in Erlang,
+with tight integration with RSpec.")
+   (license license:gpl3)
+   (home-page "https://sr.ht/~czan/properb/")))
+
 (package
  (name "ruby-active_record_rules")
- (version "0.0.1") ; for gemspec
+ (version "0.0.1")                      ; for gemspec
  (source
   (local-file "."
               "ruby-active_record_rules-checkout"
@@ -69,7 +93,7 @@ very flexible.")
  (inputs (list ruby
                ruby-activerecord
                ruby-parslet))
- (native-inputs (list bundler ruby-rake ruby-rails ruby-rspec ruby-rubocop ruby-rubocop-rspec ruby-solargraph))
+ (native-inputs (list bundler ruby-rake ruby-rails ruby-rspec ruby-rubocop ruby-rubocop-rspec ruby-solargraph ruby-properb))
  (synopsis "Database-driven production rules in Ruby")
  (description
   "A production rule library that uses database records as facts in its

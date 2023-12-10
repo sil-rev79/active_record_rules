@@ -14,3 +14,5 @@ gem "rspec", "~> 3"
 gem "rails", "~> 6"
 
 gem "sqlite3"
+
+gem "properb", git: "https://git.sr.ht/~czan/properb"

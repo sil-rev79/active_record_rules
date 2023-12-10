@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |spec|
   spec.name = "active_record_rules"
-  spec.version = File.open("guix.scm") { _1.read.match(/\(version "(.*)"\) ; for gemspec/)[1] }
+  spec.version = File.open("guix.scm") { _1.read.match(/\(version "(.*)"\) *; for gemspec/)[1] }
   spec.authors = ["Carlo Zancanaro"]
   spec.email = ["carlo@zancanaro.id.au"]
   spec.license = "GPL-3.0-only"
