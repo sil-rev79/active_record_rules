@@ -4,6 +4,7 @@ require "active_record"
 require "active_record_rules"
 require "generators/active_record_rules/install_generator"
 require "tmpdir"
+require "properb"
 
 module RSpecExtensions
   def define_tables(&block)
@@ -62,4 +63,6 @@ RSpec.configure do |config|
   end
 
   config.include RSpecExtensions
+
+  Properb.rspec_install(config)
 end
