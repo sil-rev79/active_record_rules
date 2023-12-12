@@ -1,4 +1,4 @@
-# ActiveRecordRules
+# ActiveRecordRules [![builds.sr.ht status](https://builds.sr.ht/~czan/active_record_rules.svg)](https://builds.sr.ht/~czan/active_record_rules)
 
 A [production system][] within ActiveRecord to execute code when matching rule conditions.
 
