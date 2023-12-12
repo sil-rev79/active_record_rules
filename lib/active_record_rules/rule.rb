@@ -76,130 +76,65 @@ module ActiveRecordRules
     end
 
     def activate(key, object, values)
-      names, constraints, on_match_code, on_unmatch_code = parsed_definition
+      names, _, on_match_code = parsed_definition
 
-      matches = extractors.to_h { [_1.key, _1.extractor_matches] }
+      fetch_ids_and_arguments_for(key, object, values).map do |ids, (arguments, _)|
+        rule_matches.create!(ids: ids)
+        logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
+        logger&.debug { "Rule(#{id}): matched with arguments #{names.keys.zip(arguments).to_h.to_json}" }
 
-      binds = []
-      clauses = constraints.map do |op, lhs, rhs|
-        case [lhs, rhs]
-        in [[^key, left_field], [join_key, right_field]]
-          binds << values[left_field]
-          binds << right_field
-          "? #{op} #{join_key}.\"values\"->>?"
-        in [[join_key, left_field], [^key, right_field]]
-          binds << left_field
-          binds << values[right_field]
-          "#{join_key}.\"values\"->>? #{op} ?"
-        in [[left_key, left_field], [right_key, right_field]]
-          binds << left_field
-          binds << right_field
-          "#{left_key}.\"values\"->>? #{op} #{right_key}.\"values\"->>?"
-        in [[^key, _], _] | [_, [^key, _]]
-          # We can ignore constant conditions on ourselves because
-          # that gets checked by the Condition nodes much higher.
-          nil
-        in [[left_key, left_field], right_value]
-          binds << left_field
-          binds << right_value
-          "#{left_key}.\"values\"->>? #{op} ?"
-        in [left_value, [right_key, right_field]]
-          binds << left_value
-          binds << right_field
-          "? #{op} #{left_key}.\"values\"->>?"
-        else
-          raise "Unknown constraint format: #{lhs} #{op} #{rhs}"
-        end
-      end.compact
-
-      other_matches = matches.without(key)
-
-      our_values, other_names = names.map do |name, definitions|
-        if (definition = definitions.find { _1[0] == key })
-          [[name, values[definition[1]]], nil]
-        else
-          definition = definitions.first
-          [nil, [name, "#{definition[0]}.\"values\"->>'#{definition[1]}'"]]
-        end
-      end.transpose.map(&:compact)
-
-      query_result = ActiveRecord::Base.connection.select_all(<<~SQL.squish, nil, binds).rows
-        select #{other_matches.keys.map { "#{_1}.entry_id" }.join(", ")}
-               #{other_names.map(&:second).map { ", #{_1}" }.join}
-          from #{other_matches.map { "(#{_2.to_sql}) as #{_1}" }.join(", ")}
-         #{clauses.empty? ? "" : "where #{clauses.join(" and ")}"}
-      SQL
-
-      current_matches = Set.new
-
-      query_result.each do |row|
-        ids = [
-          [key, object.id],
-          *other_matches.keys.zip(row[..other_matches.size])
-        ].sort_by(&:first).to_h
-
-        values = (
-          our_values +
-          other_names.map(&:first).zip(row[other_matches.size..])
-        ).to_h
-
-        arguments = names.keys.map { values[_1] }
-
-        if (match_record = rule_matches.find_by(ids: ids))
-          current_matches.add(match_record.id)
-          previous_arguments = match_record.arguments
-          if arguments == previous_arguments
-            logger&.debug do
-              "Rule(#{id}): still matches for #{ids.to_json}"
-            end
-          else
-            logger&.info { "Rule(#{id}): re-matched for #{ids.to_json}" }
-            logger&.debug { "Rule(#{id}): re-matched with arguments #{names.keys.zip(arguments).to_h.to_json}" }
-
-            Object.new.instance_exec(*previous_arguments, &on_unmatch_code)
-            match_record.update!(arguments: arguments)
-
-            Object.new.instance_exec(*arguments, &on_match_code)
-          end
-        else
-          match_record = rule_matches.create!(ids: ids, arguments: arguments)
-          current_matches.add(match_record.id)
-          logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
-          logger&.debug { "Rule(#{id}): matched with arguments #{names.keys.zip(arguments).to_h.to_json}" }
-
-          Object.new.instance_exec(*arguments, &on_match_code)
-        end
-      end
-
-      # Clean up any existing matches that are no longer current.
-      # Essentially: if we didn't see it on our most recent pass
-      # through then it needs to be destroyed.
-      rule_matches.where("ids->>? = ?", key, object.id).where.not(id: current_matches).destroy_all.each do |record|
-        logger&.info { "Rule(#{id}): unmatched for #{record.ids.to_json} (set no longer matches rule)" }
-        logger&.debug { "Rule(#{id}): unmatched with arguments #{names.keys.zip(record.arguments).to_h.to_json}" }
-        Object.new.instance_exec(*record.arguments, &on_unmatch_code)
+        Object.new.instance_exec(*arguments, &on_match_code)
       end
     end
 
     def update(key, object, old_values, new_values)
-      # This is inefficient. What we should do here is use the
-      # on_update proc if there is one. If there isn't one, then we
-      # should do this more efficiently (e.g. without destroying and
-      # recreating the rule match record).
-      deactivate(key, object, old_values)
-      activate(key, object, new_values)
+      names, _, on_match_code, on_unmatch_code = parsed_definition
+
+      current_matches = fetch_ids_and_arguments_for(key, object, new_values, old_values: old_values)
+                        .map do |ids, (arguments, old_arguments)|
+        if (match_record = rule_matches.find_by(ids: ids))
+          logger&.info { "Rule(#{id}): re-matched for #{ids.to_json}" }
+          logger&.debug { "Rule(#{id}): re-matched with arguments #{names.keys.zip(arguments).to_h.to_json}" }
+
+          Object.new.instance_exec(*old_arguments, &on_unmatch_code)
+        else
+          match_record = rule_matches.create!(ids: ids)
+          logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
+          logger&.debug { "Rule(#{id}): matched with arguments #{names.keys.zip(arguments).to_h.to_json}" }
+        end
+        Object.new.instance_exec(*arguments, &on_match_code)
+
+        # We return the match records, so update can know what to do with it.
+        match_record
+      end
+
+      fetch_ids_and_arguments_for(key, object, old_values, exclude: current_matches).each do |ids, (arguments, _)|
+        logger&.info { "Rule(#{id}): unmatched for #{ids.to_json} (set no longer matches rule)" }
+        logger&.debug { "Rule(#{id}): unmatched with arguments #{names.keys.zip(arguments).to_h.to_json}" }
+        Object.new.instance_exec(*arguments, &on_unmatch_code)
+      end
     end
 
-    def deactivate(key, object, _values)
-      destroyed = rule_matches.destroy_by("ids->>? = ?", key, object.id)
-
+    def deactivate(key, object, values)
       names, _, _, on_unmatch_code = parsed_definition
 
-      destroyed.each do |record|
-        logger&.info { "Rule(#{id}): unmatched for #{record.ids.to_json} (entry removed by condition)" }
-        logger&.debug { "Rule(#{id}): unmatched with arguments #{names.keys.zip(record.arguments).to_h.to_json}" }
+      destroyed = rule_matches.destroy_by("ids->>? = ?", key, object.id)
 
-        Object.new.instance_exec(*record.arguments, &on_unmatch_code)
+      # Convert an array of hashes like [{'cond' => id}] into a hash
+      # of arrays like {'cond'=>[id]}
+      object_ids = Hash.new { _1[_2] = [] }
+      destroyed.pluck(:ids).each do |ids|
+        ids.each { object_ids[_1] << _2 }
+      end
+
+      arguments_by_ids = fetch_ids_and_arguments_for(key, object, values)
+
+      destroyed.each do |record|
+        arguments, = arguments_by_ids[record.ids]
+        logger&.info { "Rule(#{id}): unmatched for #{record.ids.to_json} (entry removed by condition)" }
+        logger&.debug { "Rule(#{id}): unmatched with arguments #{names.keys.zip(arguments).to_h.to_json}" }
+
+        Object.new.instance_exec(*arguments, &on_unmatch_code)
       end
     end
 
@@ -286,6 +221,87 @@ module ActiveRecordRules
 
     def logger
       ActiveRecordRules.logger
+    end
+
+    def fetch_ids_and_arguments_for(key, object, values, exclude: nil, old_values: {})
+      names, constraints, = parsed_definition
+
+      matches = extractors.to_h { [_1.key, _1.extractor_matches] }.without(key)
+
+      binds = []
+      clauses = constraints.map do |op, lhs, rhs|
+        case [lhs, rhs]
+        in [[^key, left_field], [join_key, right_field]]
+          binds << values[left_field]
+          binds << right_field
+          "? #{op} #{join_key}.\"values\"->>?"
+        in [[join_key, left_field], [^key, right_field]]
+          binds << left_field
+          binds << values[right_field]
+          "#{join_key}.\"values\"->>? #{op} ?"
+        in [[left_key, left_field], [right_key, right_field]]
+          binds << left_field
+          binds << right_field
+          "#{left_key}.\"values\"->>? #{op} #{right_key}.\"values\"->>?"
+        in [[^key, _], _] | [_, [^key, _]]
+          # We can ignore constant conditions on ourselves because
+          # that gets checked by the Condition nodes much higher.
+          nil
+        in [[left_key, left_field], right_value]
+          binds << left_field
+          binds << right_value
+          "#{left_key}.\"values\"->>? #{op} ?"
+        in [left_value, [right_key, right_field]]
+          binds << left_value
+          binds << right_field
+          "? #{op} #{left_key}.\"values\"->>?"
+        else
+          raise "Unknown constraint format: #{lhs} #{op} #{rhs}"
+        end
+      end.compact
+
+      our_values, our_old_values, other_names = names.map do |name, definitions|
+        if (definition = definitions.find { _1[0] == key })
+          [[name, values[definition[1]]],
+           [name, old_values[definition[1]]],
+           nil]
+        else
+          definition = definitions.first
+          [nil,
+           nil,
+           [name, "#{definition[0]}.\"values\"->>'#{definition[1]}'"]]
+        end
+      end.transpose.map(&:compact)
+
+      query_result = ActiveRecord::Base.connection.select_all(<<~SQL.squish, nil, binds).rows
+        select #{matches.keys.map { "#{_1}.entry_id" }.join(", ")}
+               #{other_names.map(&:second).map { ", #{_1}" }.join}
+          from #{matches.map { "(#{_2.to_sql}) as #{_1}" }.join(", ")}
+         #{clauses.empty? ? "" : "where #{clauses.join(" and ")}"}
+      SQL
+
+      excluded_ids = exclude.pluck(:ids).to_set if exclude
+
+      query_result.to_h do |row|
+        ids = [
+          [key, object.id],
+          *matches.keys.zip(row[..matches.size])
+        ].sort_by(&:first).to_h
+
+        next if excluded_ids && excluded_ids.include?(ids)
+
+        final_values = (
+          our_values +
+          other_names.map(&:first).zip(row[matches.size..])
+        ).to_h
+
+        old_final_values = (
+          our_old_values +
+          other_names.map(&:first).zip(row[matches.size..])
+        ).to_h
+
+        [ids, [names.keys.map { final_values[_1] }, names.keys.map { old_final_values[_1] }]]
+      end
     end
   end
 end

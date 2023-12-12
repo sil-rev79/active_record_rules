@@ -33,7 +33,6 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
     create_table :arr__rule_matches do |t|
       t.references :rule, foreign_key: { to_table: :arr__rules }
       t.<%= @json_type %> :ids
-      t.<%= @json_type %> :arguments
       t.index [:rule_id, :ids], unique: true
     end
   end
