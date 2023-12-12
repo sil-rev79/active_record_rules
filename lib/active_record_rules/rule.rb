@@ -282,26 +282,20 @@ module ActiveRecordRules
 
       excluded_ids = exclude.pluck(:ids).to_set if exclude
 
-      query_result.to_h do |row|
+      query_result.map do |row|
         ids = [
           [key, object.id],
           *matches.keys.zip(row[..matches.size])
         ].sort_by(&:first).to_h
 
-        next if excluded_ids && excluded_ids.include?(ids)
+        next if excluded_ids&.include?(ids)
 
-        final_values = (
-          our_values +
-          other_names.map(&:first).zip(row[matches.size..])
-        ).to_h
-
-        old_final_values = (
-          our_old_values +
-          other_names.map(&:first).zip(row[matches.size..])
-        ).to_h
+        other_values = other_names.map(&:first).zip(row[matches.size..])
+        final_values = (our_values + other_values).to_h
+        old_final_values = (our_old_values + other_values).to_h
 
         [ids, [names.keys.map { final_values[_1] }, names.keys.map { old_final_values[_1] }]]
-      end
+      end.compact.to_h
     end
   end
 end
