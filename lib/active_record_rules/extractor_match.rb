@@ -2,9 +2,9 @@
 
 module ActiveRecordRules
   # A record indicating an entry that meets a condition/rule combo.
-  class ConditionRuleMatch < ActiveRecord::Base
-    self.table_name = :arr__condition_rule_matches
+  class ExtractorMatch < ActiveRecord::Base
+    self.table_name = :arr__extractor_matches
 
-    belongs_to :condition_rule
+    belongs_to :extractor
   end
 end

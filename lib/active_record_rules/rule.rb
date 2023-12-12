@@ -21,8 +21,8 @@ module ActiveRecordRules
   class Rule < ActiveRecord::Base
     self.table_name = :arr__rules
 
-    has_many :condition_rules
-    has_many :conditions, through: :condition_rules
+    has_many :extractors
+    has_many :conditions, through: :extractors
     has_many :rule_matches
 
     class RuleSyntaxError < StandardError; end
@@ -30,7 +30,7 @@ module ActiveRecordRules
     def self.define_rule(definition_string)
       definition = Parser.new.definition.parse(definition_string, reporter: Parslet::ErrorReporter::Deepest.new)
 
-      condition_rules = definition[:conditions].each_with_index.map do |condition_definition, index|
+      extractors = definition[:conditions].each_with_index.map do |condition_definition, index|
         constant_conditions = (condition_definition[:parts] || []).map do |cond|
           case cond
           in { name:, op:, rhs: { string: } }
@@ -61,7 +61,7 @@ module ActiveRecordRules
                  .map { _1[:name].to_s }
                  .uniq
 
-        ConditionRule.new(
+        Extractor.new(
           key: "cond#{index + 1}",
           condition: condition,
           fields: fields
@@ -69,7 +69,7 @@ module ActiveRecordRules
       end
 
       Rule.create!(
-        condition_rules: condition_rules,
+        extractors: extractors,
         name: definition[:name].to_s,
         definition: definition_string
       )
@@ -78,7 +78,7 @@ module ActiveRecordRules
     def activate(key, object, values)
       names, constraints, on_match_code, on_unmatch_code = parsed_definition
 
-      matches = condition_rules.to_h { [_1.key, _1.condition_rule_matches] }
+      matches = extractors.to_h { [_1.key, _1.extractor_matches] }
 
       binds = []
       clauses = constraints.map do |op, lhs, rhs|

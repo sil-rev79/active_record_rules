@@ -4,38 +4,43 @@ module ActiveRecordRules
   # A simple condition which matches records by basic attribute. These
   # records are used as the entry point to the matching system.
   #
-  # A single condition may be shared between multiple rules, through a
-  # ConditionRule join record. Similarly, a single rule may have
+  # A single condition may be shared between multiple rules, through
+  # different Extractor records. Similarly, a single rule may have
   # multiple conditions. A typical example might look like this:
   #
-  #  +---------------+  +------------------+
-  #  | [Condition]   |  | [Condition]      |
-  #  | class=User    |  | class=Post       |
-  #  | status=active |  | status=published |
-  #  +---------+-----+  +----+-------------+
-  #      key:  |             | key:
-  #      cond1 |             | cond2
+  #  +---------------+  +----------------- -+
+  #  | [Condition]   |  | [Condition]       |
+  #  | class=User    |  | class=Post        |
+  #  | status=active |  | status=published  |
+  #  +---------+-----+  +----+--------------+
+  #            |             |
+  #            v             v
+  #  +---------------+  +-------------------+
+  #  | [Extractor]   |  | [Extractor]       |
+  #  | key=cond1     |  | key=cond2         |
+  #  | fields=[id]   |  | fields=[author_id]|
+  #  +---------+-----+  +----+--------------+
+  #            |             |
   #            v             v
   #  +-------------------------------------+
   #  | [Rule]                              |
   #  | cond1.id = cond2.author_id          |
   #  | on_match: decrement post count      |
   #  | on_unmatch: increment post count    |
-  #  +---------------+---------------------+
+  #  +-------------------------------------+
   #
   class Condition < ActiveRecord::Base
     self.table_name = :arr__conditions
 
-    has_many :condition_rules
+    has_many :extractors
     has_many :condition_matches
-    has_many :rules, through: :condition_rules
     validates :match_class, presence: true
     validate :validate_fact_class
 
     scope :for_class, lambda { |c|
       where(match_class: c.ancestors.select { _1.included_modules.include?(ActiveRecordRules::Fact) }.map(&:name))
     }
-    scope :includes_for_activate, -> { includes(condition_rules: { rule: { condition_rules: {} } }) }
+    scope :includes_for_activate, -> { includes(extractors: { rule: { extractors: {} } }) }
 
     def activate(object)
       clauses = match_conditions["clauses"]
@@ -77,15 +82,7 @@ module ActiveRecordRules
           condition_matches.create!(entry_id: object.id)
         end
 
-        # We trigger the rules, even if we already knew about the
-        # object, because the rule argument values might have
-        # changed. In principle we could lift the argument field
-        # information to the Condition to avoid this step, but that
-        # could reduce the amount of Condition sharing we can
-        # do. Another option would be to lift it to the ConditionRule
-        # join, but that would then require remembering matches at the
-        # ConditionRule level.
-        condition_rules.each { _1.activate(object) }
+        extractors.each { _1.activate(object) }
       elsif condition_matches.destroy_by(entry_id: object.id).any?
         logger&.info do
           if object.persisted?
@@ -94,7 +91,7 @@ module ActiveRecordRules
             "Condition(#{id}): unmatched for #{object.class}(#{object.id}) (deleted)"
           end
         end
-        condition_rules.each { _1.deactivate(object) }
+        extractors.each { _1.deactivate(object) }
       end
     end
 
