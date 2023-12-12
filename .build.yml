@@ -1,0 +1,16 @@
+image: debian/stable
+packages:
+  - ruby
+  - ruby-bundler
+  - ruby-dev
+  - git
+sources:
+  - https://git.sr.ht/~czan/active_record_rules
+tasks:
+  - setup: |
+      cd active_record_rules
+      bundle config set --local path 'gems'
+      bundle install
+  - test: |
+      cd active_record_rules
+      bundle exec rake spec
