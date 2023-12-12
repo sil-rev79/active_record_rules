@@ -85,9 +85,7 @@ module ActiveRecordRules
         # do. Another option would be to lift it to the ConditionRule
         # join, but that would then require remembering matches at the
         # ConditionRule level.
-        condition_rules.each do |join|
-          join.rule.activate(join.key, object)
-        end
+        condition_rules.each { _1.activate(object) }
       elsif condition_matches.destroy_by(entry_id: object.id).any?
         logger&.info do
           if object.persisted?
@@ -96,9 +94,7 @@ module ActiveRecordRules
             "Condition(#{id}): unmatched for #{object.class}(#{object.id}) (deleted)"
           end
         end
-        condition_rules.each do |join|
-          join.rule.deactivate(join.key, object)
-        end
+        condition_rules.each { _1.deactivate(object) }
       end
     end
 

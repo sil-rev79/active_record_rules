@@ -62,19 +62,7 @@ RSpec.describe ActiveRecordRules do
     end
   end
 
-  describe "Card example" do # rubocop:disable RSpec/EmptyExampleGroup
-    generate(
-      cards: array(
-        tuple(
-          one_of("heart", "diamond", "club", "spade"),
-          one_of("2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king", "ace"),
-          boolean, # whether to retract this fact
-          boolean, # whether to re-assert this fact after it's retracted
-          maybe(one_of("heart", "diamond", "club", "spade")) # a new suit to update to
-        )
-      )
-    )
-
+  describe "Card example" do
     before do
       define_tables do |schema|
         schema.create_table :cards do |t|
@@ -99,74 +87,103 @@ RSpec.describe ActiveRecordRules do
       TestHelper.matches = []
     end
 
-    let!(:card_records) do
-      cards.map do |suit, rank|
-        Card.create!(suit: suit, rank: rank)
+    describe "properties" do # rubocop:disable RSpec/EmptyExampleGroup
+      generate(
+        cards: array(
+          tuple(
+            one_of("heart", "diamond", "club", "spade"),
+            one_of("2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king", "ace"),
+            boolean, # whether to retract this fact
+            boolean, # whether to re-assert this fact after it's retracted
+            maybe(one_of("heart", "diamond", "club", "spade")) # a new suit to update to
+          )
+        )
+      )
+      let!(:card_records) do
+        cards.map do |suit, rank|
+          Card.create!(suit: suit, rank: rank)
+        end
+      end
+
+      it_always "matches on groups of three" do
+        expected_matches = cards.group_by(&:first).flat_map do |suit, cards|
+          ranks = cards.map(&:second)
+          ranks.product(ranks, ranks).map do |rank1, rank2, rank3|
+            next unless rank1 < rank2 && rank2 < rank3
+
+            [suit, [rank1, rank2, rank3]]
+          end
+        end.compact
+        expect(TestHelper.matches.sort).to eq(expected_matches.sort)
+      end
+
+      it_always "matches on groups of three after deleting some records" do
+        cards.zip(card_records).each do |card, record|
+          record.destroy! if card[2]
+        end
+
+        expected_matches = cards.group_by(&:first).flat_map do |suit, cards|
+          ranks = cards.reject { _3 }.map(&:second)
+          ranks.product(ranks, ranks).map do |rank1, rank2, rank3|
+            next unless rank1 < rank2 && rank2 < rank3
+
+            [suit, [rank1, rank2, rank3]]
+          end
+        end.compact
+        expect(TestHelper.matches.sort).to eq(expected_matches.sort)
+      end
+
+      it_always "matches on groups of three after deleting and restoring some records" do
+        cards.zip(card_records).each do |card, record|
+          record.destroy! if card[2]
+        end
+
+        cards.each do |suit, rank, destroy, restore|
+          Card.create!(suit: suit, rank: rank) if destroy && restore
+        end
+
+        expected_matches = cards.group_by(&:first).flat_map do |suit, cards|
+          ranks = cards.reject { _3 && !_4 }.map(&:second)
+          ranks.product(ranks, ranks).map do |rank1, rank2, rank3|
+            next unless rank1 < rank2 && rank2 < rank3
+
+            [suit, [rank1, rank2, rank3]]
+          end
+        end.compact
+        expect(TestHelper.matches.sort).to eq(expected_matches.sort)
+      end
+
+      it_always "matches on groups of three after updating some records" do
+        cards.zip(card_records).each do |card, record|
+          record.update!(suit: card[4]) if card[4]
+        end
+
+        expected_matches = cards.group_by { _5 || _1 }.flat_map do |suit, cards|
+          ranks = cards.map(&:second)
+          ranks.product(ranks, ranks).map do |rank1, rank2, rank3|
+            next unless rank1 < rank2 && rank2 < rank3
+
+            [suit, [rank1, rank2, rank3]]
+          end
+        end.compact
+        expect(TestHelper.matches.sort).to eq(expected_matches.sort)
       end
     end
 
-    it_always "matches on groups of three" do
-      expected_matches = cards.group_by(&:first).flat_map do |suit, cards|
-        ranks = cards.map(&:second)
-        ranks.product(ranks, ranks).map do |rank1, rank2, rank3|
-          next unless rank1 < rank2 && rank2 < rank3
-
-          [suit, [rank1, rank2, rank3]]
+    describe "examples found by failing property tests" do
+      describe "multiple suit updates" do
+        before do
+          card1 = Card.create!(suit: "heart", rank: "2")
+          card2 = Card.create!(suit: "heart", rank: "3")
+          Card.create!(suit: "diamond", rank: "4")
+          card1.update!(suit: "diamond")
+          card2.update!(suit: "diamond")
         end
-      end.compact
-      expect(TestHelper.matches.sort).to eq(expected_matches.sort)
-    end
 
-    it_always "matches on groups of three after deleting some records" do
-      cards.zip(card_records).each do |card, record|
-        record.destroy! if card[2]
-      end
-
-      expected_matches = cards.group_by(&:first).flat_map do |suit, cards|
-        ranks = cards.reject { _3 }.map(&:second)
-        ranks.product(ranks, ranks).map do |rank1, rank2, rank3|
-          next unless rank1 < rank2 && rank2 < rank3
-
-          [suit, [rank1, rank2, rank3]]
+        it "picks up on multiple card updates" do
+          expect(TestHelper.matches.sort).to eq([["diamond", ["2", "3", "4"]]])
         end
-      end.compact
-      expect(TestHelper.matches.sort).to eq(expected_matches.sort)
-    end
-
-    it_always "matches on groups of three after deleting and restoring some records" do
-      cards.zip(card_records).each do |card, record|
-        record.destroy! if card[2]
       end
-
-      cards.each do |suit, rank, destroy, restore|
-        Card.create!(suit: suit, rank: rank) if destroy && restore
-      end
-
-      expected_matches = cards.group_by(&:first).flat_map do |suit, cards|
-        ranks = cards.reject { _3 && !_4 }.map(&:second)
-        ranks.product(ranks, ranks).map do |rank1, rank2, rank3|
-          next unless rank1 < rank2 && rank2 < rank3
-
-          [suit, [rank1, rank2, rank3]]
-        end
-      end.compact
-      expect(TestHelper.matches.sort).to eq(expected_matches.sort)
-    end
-
-    it_always "matches on groups of three after updating some records" do
-      cards.zip(card_records).each do |card, record|
-        record.update!(suit: card[4]) if card[4]
-      end
-
-      expected_matches = cards.group_by { _5 || _1 }.flat_map do |suit, cards|
-        ranks = cards.map(&:second)
-        ranks.product(ranks, ranks).map do |rank1, rank2, rank3|
-          next unless rank1 < rank2 && rank2 < rank3
-
-          [suit, [rank1, rank2, rank3]]
-        end
-      end.compact
-      expect(TestHelper.matches.sort).to eq(expected_matches.sort)
     end
   end
 end

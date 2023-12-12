@@ -14,6 +14,7 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
       t.references :condition, foreign_key: { to_table: :arr__conditions }
       t.references :rule, foreign_key: { to_table: :arr__rules }
       t.string :key
+      t.<%= @json_type %> :fields
     end
 
     create_table :arr__condition_matches do |t|
@@ -22,11 +23,18 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
       t.index [:condition_id, :entry_id], unique: true
     end
 
+    create_table :arr__condition_rule_matches do |t|
+      t.references :condition_rule, foreign_key: { to_table: :arr__condition_rules }
+      t.<%= @id_type %> :entry_id
+      t.<%= @json_type %> :values
+      t.index [:condition_rule_id, :entry_id], unique: true, name: 'uniqueness' # Note that named_values is *not* included in the uniqueness constraints
+    end
+
     create_table :arr__rule_matches do |t|
       t.references :rule, foreign_key: { to_table: :arr__rules }
       t.<%= @json_type %> :ids
       t.<%= @json_type %> :arguments
-      t.index [:rule_id, :ids], unique: true # Note that arguments is *not* included in the uniqueness constraints
+      t.index [:rule_id, :ids], unique: true
     end
   end
 end

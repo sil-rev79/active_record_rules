@@ -3,6 +3,7 @@
 require "active_record_rules/condition"
 require "active_record_rules/condition_match"
 require "active_record_rules/condition_rule"
+require "active_record_rules/condition_rule_match"
 require "active_record_rules/fact"
 require "active_record_rules/parser"
 require "active_record_rules/rule"

@@ -56,9 +56,15 @@ module ActiveRecordRules
         )
         condition.validate!
 
+        fields = (condition_definition[:parts] || [])
+                 .select { _1[:rhs].nil? || !_1[:rhs][:name].nil? } # remove the constant conditions
+                 .map { _1[:name].to_s }
+                 .uniq
+
         ConditionRule.new(
           key: "cond#{index + 1}",
-          condition: condition
+          condition: condition,
+          fields: fields
         )
       end
 
@@ -67,77 +73,77 @@ module ActiveRecordRules
         name: definition[:name].to_s,
         definition: definition_string
       )
-    rescue Parslet::ParseFailed => e
-      raise RuleSyntaxError, e.parse_failure_cause.ascii_tree
     end
 
-    def activate(key, object)
-      names, constraints, on_match_code, on_unmatch_code = parse_definition
+    def activate(key, object, values)
+      names, constraints, on_match_code, on_unmatch_code = parsed_definition
 
-      other_values = condition_rules.reject { _1.key == key }.to_h do |join|
-        where = [{ id: join.condition_matches.pluck(:entry_id) }]
+      matches = condition_rules.to_h { [_1.key, _1.condition_rule_matches] }
 
-        join_key = join.key
-
-        constraints.each do |op, lhs, rhs|
-          case [lhs, rhs]
-          in [[^key, left_field], [^join_key, right_field]]
-            where << ["? #{op} #{right_field}", object[left_field]]
-          in [[^join_key, left_field], [^key, right_field]]
-            where << ["#{left_field} #{op} ?", object[right_field]]
-          else
-            # If the constraint doesn't match one of the above, then
-            # just ignore it. It's either a constant (and thus has
-            # been done by the Condition node), or it's not relevant
-            # to this specific table.
-          end
+      binds = []
+      clauses = constraints.map do |op, lhs, rhs|
+        case [lhs, rhs]
+        in [[^key, left_field], [join_key, right_field]]
+          binds << values[left_field]
+          binds << right_field
+          "? #{op} #{join_key}.\"values\"->>?"
+        in [[join_key, left_field], [^key, right_field]]
+          binds << left_field
+          binds << values[right_field]
+          "#{join_key}.\"values\"->>? #{op} ?"
+        in [[left_key, left_field], [right_key, right_field]]
+          binds << left_field
+          binds << right_field
+          "#{left_key}.\"values\"->>? #{op} #{right_key}.\"values\"->>?"
+        in [[^key, _], _] | [_, [^key, _]]
+          # We can ignore constant conditions on ourselves because
+          # that gets checked by the Condition nodes much higher.
+          nil
+        in [[left_key, left_field], right_value]
+          binds << left_field
+          binds << right_value
+          "#{left_key}.\"values\"->>? #{op} ?"
+        in [left_value, [right_key, right_field]]
+          binds << left_value
+          binds << right_field
+          "? #{op} #{left_key}.\"values\"->>?"
+        else
+          raise "Unknown constraint format: #{lhs} #{op} #{rhs}"
         end
+      end.compact
 
-        [join.key,
-         where.reduce(join.condition.match_class.constantize, &:where)]
-      end
+      other_matches = matches.without(key)
+
+      our_values, other_names = names.map do |name, definitions|
+        if (definition = definitions.find { _1[0] == key })
+          [[name, values[definition[1]]], nil]
+        else
+          definition = definitions.first
+          [nil, [name, "#{definition[0]}.\"values\"->>'#{definition[1]}'"]]
+        end
+      end.transpose.map(&:compact)
+
+      query_result = ActiveRecord::Base.connection.select_all(<<~SQL.squish, nil, binds).rows
+        select #{other_matches.keys.map { "#{_1}.entry_id" }.join(", ")}
+               #{other_names.map(&:second).map { ", #{_1}" }.join}
+          from #{other_matches.map { "(#{_2.to_sql}) as #{_1}" }.join(", ")}
+         #{clauses.empty? ? "" : "where #{clauses.join(" and ")}"}
+      SQL
 
       current_matches = Set.new
 
-      keys = [key, *other_values.keys]
-      [object].product(*other_values.values).each do |objects|
-        vals = keys.zip(objects).sort_by(&:first).to_h
-        ids = vals.transform_values(&:id)
-        arguments = names.values.map(&:first).map { vals[_1][_2] }
+      query_result.each do |row|
+        ids = [
+          [key, object.id],
+          *other_matches.keys.zip(row[..other_matches.size])
+        ].sort_by(&:first).to_h
 
-        logger&.debug do
-          "Rule(#{id}): checking constraints for #{ids.to_json}"
-        end
+        values = (
+          our_values +
+          other_names.map(&:first).zip(row[other_matches.size..])
+        ).to_h
 
-        # Re-check constraints here, because the above only applied
-        # filters for current object to each query table.
-        # TODO: don't re-apply constraints that we already know hold
-        matches = constraints.all? do |op, lhs, rhs|
-          case [lhs, rhs]
-          in [[lkey, lfield], [rkey, rfield]]
-            lvalue = vals[lkey][lfield]
-            rvalue = vals[rkey][rfield]
-            result = if op == "="
-                       lvalue.send("==", rvalue)
-                     else
-                       lvalue.send(op, rvalue)
-                     end
-            logger&.debug do
-              suffix = result ? "matches" : "does not match"
-              real_values = "#{lvalue.inspect} #{op} #{rvalue.inspect}"
-              symbolic_values = "#{lkey}.#{lfield} #{op} #{rkey}.#{rfield}"
-              "Rule(#{id}): #{real_values} (#{symbolic_values}) #{suffix}"
-            end
-            result
-          else
-            # If the constraint doesn't match one of the above, then
-            # just ignore it. It's a constant constraint, and thus has
-            # been done by the Condition node.
-            true
-          end
-        end
-
-        next unless matches
+        arguments = names.keys.map { values[_1] }
 
         if (match_record = rule_matches.find_by(ids: ids))
           current_matches.add(match_record.id)
@@ -173,14 +179,21 @@ module ActiveRecordRules
         logger&.debug { "Rule(#{id}): unmatched with arguments #{names.keys.zip(record.arguments).to_h.to_json}" }
         Object.new.instance_exec(*record.arguments, &on_unmatch_code)
       end
-    rescue Parslet::ParseFailed => e
-      raise e.parse_failure_cause.ascii_tree
     end
 
-    def deactivate(key, object)
+    def update(key, object, old_values, new_values)
+      # This is inefficient. What we should do here is use the
+      # on_update proc if there is one. If there isn't one, then we
+      # should do this more efficiently (e.g. without destroying and
+      # recreating the rule match record).
+      deactivate(key, object, old_values)
+      activate(key, object, new_values)
+    end
+
+    def deactivate(key, object, _values)
       destroyed = rule_matches.destroy_by("ids->>? = ?", key, object.id)
 
-      names, _, _, on_unmatch_code = parse_definition
+      names, _, _, on_unmatch_code = parsed_definition
 
       destroyed.each do |record|
         logger&.info { "Rule(#{id}): unmatched for #{record.ids.to_json} (entry removed by condition)" }
@@ -190,74 +203,89 @@ module ActiveRecordRules
       end
     end
 
+    def parsed_definition
+      @parsed_definition ||= begin
+        parsed = Parser.new.definition.parse(definition,
+                                             reporter: Parslet::ErrorReporter::Deepest.new)
+
+        names = Hash.new { _1[_2] = [] }
+
+        constraints = Set.new
+
+        parsed[:conditions].each_with_index.map do |condition_definition, index|
+          condition_definition[:parts].each do |cond|
+            case cond
+            in { name:, op: "=", rhs: { name: rhs } }
+              names[rhs.to_s] << ["cond#{index + 1}", name.to_s]
+            in { name:, op:, rhs: { number: rhs } }
+              constraints << [op, ["cond#{index + 1}", name.to_s], rhs.to_i]
+            in { name:, op:, rhs: { string: rhs } }
+              constraints << [op, ["cond#{index + 1}", name.to_s], rhs.to_s]
+            in { name:, op:, rhs: { boolean: rhs } }
+              constraints << [op, ["cond#{index + 1}", name.to_s], rhs.to_s == "true"]
+            in { name:, op:, rhs: { nil: _ } }
+              constraints << [op, ["cond#{index + 1}", name.to_s], nil]
+            in { name:, op:, rhs: { name: rhs } }
+              fields = names[rhs.to_s]
+              raise "Right-hand side name does not have a value in constraint: #{name} #{op} #{fields}" if fields.empty?
+
+              fields.each do |field|
+                constraints << [op, ["cond#{index + 1}", name.to_s], field]
+              end
+            in { name: }
+              names[name.to_s] << ["cond#{index + 1}", name.to_s]
+            else
+              raise "Unknown constraint format: #{cond}"
+            end
+          end
+        end
+
+        names.each_value do |fields|
+          fields[1..].zip(fields).each do |lhs, rhs|
+            constraints << ["=", lhs, rhs]
+          end
+        end
+
+        on_match_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
+          # ->(in1, in2) {
+          #   puts "Matching for \#{in1} \#{in2}"
+          # }
+
+          ->(#{names.keys.join(", ")}) {
+            #{parsed[:on_match]&.pluck(:line)&.join("\n  ")}
+          }
+        RUBY
+
+        on_unmatch_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
+          # ->(in1, in2) {
+          #   puts "Unmatching for \#{in1} \#{in2}"
+          # }
+
+          ->(#{names.keys.join(", ")}) {
+            #{parsed[:on_unmatch]&.pluck(:line)&.join("\n  ")}
+          }
+        RUBY
+
+        on_update_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
+          # ->(in1, in2) {
+          #   puts "Updating for \#{in1} \#{in2}"
+          # }
+
+          ->(#{names.keys.join(", ")}) {
+            #{parsed[:on_update]&.pluck(:line)&.join("\n  ")}
+          }
+        RUBY
+
+        [names, constraints, on_match_code, on_unmatch_code, on_update_code]
+      end
+    rescue Parslet::ParseFailed => e
+      raise e.parse_failure_cause.ascii_tree
+    end
+
     private
 
     def logger
       ActiveRecordRules.logger
-    end
-
-    def parse_definition
-      parsed = Parser.new.definition.parse(definition, reporter: Parslet::ErrorReporter::Deepest.new)
-
-      names = Hash.new { _1[_2] = [] }
-
-      constraints = Set.new
-
-      parsed[:conditions].each_with_index.map do |condition_definition, index|
-        condition_definition[:parts].each do |cond|
-          case cond
-          in { name:, op: "=", rhs: { name: rhs } }
-            names[rhs.to_s] << ["cond#{index + 1}", name.to_s]
-          in { name:, op:, rhs: { number: rhs } }
-            constraints << [op, ["cond#{index + 1}", name.to_s], rhs.to_i]
-          in { name:, op:, rhs: { string: rhs } }
-            constraints << [op, ["cond#{index + 1}", name.to_s], rhs.to_s]
-          in { name:, op:, rhs: { boolean: rhs } }
-            constraints << [op, ["cond#{index + 1}", name.to_s], rhs.to_s == "true"]
-          in { name:, op:, rhs: { nil: _ } }
-            constraints << [op, ["cond#{index + 1}", name.to_s], nil]
-          in { name:, op:, rhs: { name: rhs } }
-            fields = names[rhs.to_s]
-            raise "Right-hand side name does not have a value in constraint: #{name} #{op} #{fields}" if fields.empty?
-
-            fields.each do |field|
-              constraints << [op, ["cond#{index + 1}", name.to_s], field]
-            end
-          in { name: }
-            names[name.to_s] << ["cond#{index + 1}", name.to_s]
-          else
-            raise "Unknown constraint format: #{cond}"
-          end
-        end
-      end
-
-      names.each_value do |fields|
-        fields[1..].zip(fields).each do |lhs, rhs|
-          constraints << ["=", lhs, rhs]
-        end
-      end
-
-      on_match_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
-        # ->(in1, in2) {
-        #   puts "Matching for \#{in1} \#{in2}"
-        # }
-
-        ->(#{names.keys.join(", ")}) {
-          #{parsed[:on_match]&.pluck(:line)&.join("\n  ")}
-        }
-      RUBY
-
-      on_unmatch_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
-        # ->(in1, in2) {
-        #   puts "Unmatching for \#{in1} \#{in2}"
-        # }
-
-        ->(#{names.keys.join(", ")}) {
-          #{parsed[:on_unmatch]&.pluck(:line)&.join("\n  ")}
-        }
-      RUBY
-
-      [names, constraints, on_match_code, on_unmatch_code]
     end
   end
 end

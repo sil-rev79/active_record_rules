@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "parslet/convenience"
-
 class Salutation < ActiveRecord::Base; include ActiveRecordRules::Fact; end
 class Person < ActiveRecord::Base; include ActiveRecordRules::Fact; end
 
