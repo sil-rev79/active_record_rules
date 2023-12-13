@@ -109,6 +109,7 @@ module ActiveRecordRules
       end
 
       fetch_ids_and_arguments_for(key, object, old_values, exclude: current_matches).each do |ids, (arguments, _)|
+        rule_matches.destroy_by(ids: ids)
         logger&.info { "Rule(#{id}): unmatched for #{ids.to_json} (set no longer matches rule)" }
         logger&.debug { "Rule(#{id}): unmatched with arguments #{names.keys.zip(arguments).to_h.to_json}" }
         Object.new.instance_exec(*arguments, &on_unmatch_code)

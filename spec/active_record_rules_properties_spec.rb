@@ -198,6 +198,21 @@ RSpec.describe ActiveRecordRules do
           expect(TestHelper.matches.sort).to eq([["diamond", ["2", "3", "4"]]])
         end
       end
+
+      describe "multiple suit updates, taking one match to a different match" do
+        before do
+          card1 = Card.create!(suit: "heart", rank: "2")
+          card2 = Card.create!(suit: "heart", rank: "3")
+          card3 = Card.create!(suit: "heart", rank: "4")
+          card1.update!(suit: "diamond")
+          card2.update!(suit: "diamond")
+          card3.update!(suit: "diamond")
+        end
+
+        it "picks up on multiple card updates" do
+          expect(TestHelper.matches.sort).to eq([["diamond", ["2", "3", "4"]]])
+        end
+      end
     end
   end
 end
