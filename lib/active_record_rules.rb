@@ -44,9 +44,7 @@ module ActiveRecordRules
       conditions = Condition.for_class(klass).includes_for_activate
 
       conditions.each do |condition|
-        objects.each do |object|
-          condition.activate(object)
-        end
+        condition.activate(objects)
       end
     end
   end

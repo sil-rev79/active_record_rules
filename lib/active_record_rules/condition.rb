@@ -42,48 +42,53 @@ module ActiveRecordRules
     }
     scope :includes_for_activate, -> { includes(extractors: { rule: { extractors: {} } }) }
 
-    def activate(object)
-      clauses = match_conditions["clauses"]
-      parser = Parser.new.condition_part
-
-      logger&.debug do
-        "Condition(#{id}): checking #{object.class}(#{object.id})"
+    def activate(objects)
+      unless objects.all? { match_class == _1.class.name }
+        raise "Objects must all be of class #{match_class}, but saw #{objects.map(&:class).uniq.join(", ")}"
       end
 
-      matches = object.persisted? && clauses.all? do |clause|
-        lhs, op, rhs = case parser.parse(clause)
-                       in { name:, op:, rhs: { string: } }
-                         [object[name], (op == "=" ? "==" : op), string.to_s]
-                       in { name:, op:, rhs: { number: } }
-                         [object[name], (op == "=" ? "==" : op), number.to_i]
-                       in { name:, op:, rhs: { boolean: } }
-                         [object[name], (op == "=" ? "==" : op), (boolean.to_s == "true")]
-                       in { name:, op:, rhs: { nil: _ } }
-                         [object[name], (op == "=" ? "==" : op), nil]
-                       else
-                         raise "Non-constant test in Condition(#{id}): #{clause}"
-                       end
-        result = lhs.public_send(op, rhs)
-        logger&.debug do
-          if result
-            "Condition(#{id}): #{lhs.inspect} #{op} #{rhs.inspect} (#{clause}) matches"
-          else
-            "Condition(#{id}): #{lhs.inspect} #{op} #{rhs.inspect} (#{clause}) does not match"
-          end
-        end
-        result
+      # First, do the basic matching to work out which objects match,
+      # and which ones don't. This basically requires us to go object
+      # by object, but it's all in-memory and constant.
+      matching_objects, non_matching_objects = objects.partition do |object|
+        logger&.debug { "Condition(#{id}): checking #{object.class}(#{object.id})" }
+        object.persisted? && clauses.all? { matches_clause?(_1, object) }
       end
 
-      if matches
-        if condition_matches.exists?(entry_id: object.id)
-          logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (updated)" }
-        else
-          logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (matched)" }
-          condition_matches.create!(entry_id: object.id)
-        end
+      # For the matching objects, we need to further divide them into
+      # "activating" (i.e. newly matching) and "updating". This
+      # requires two database queries: one to fetch the existing
+      # records, and then one to insert the new records.
+      updated_ids = condition_matches.where(entry_id: matching_objects).pluck(:entry_id).to_set
+      updating_objects, activating_objects = matching_objects.partition { updated_ids.include?(_1.id) }
+      condition_matches.insert_all!(activating_objects.map { { entry_id: _1.id } }) if activating_objects.any?
 
+      # For the non-matching objects, we need to further divide them
+      # into "deactivating" (i.e. newly non-matching) and "never
+      # matched" records. This also requires two database queries: one
+      # to find the ids of existing records, and the other to delete
+      # them.
+      deactivating_ids = condition_matches.where(entry_id: non_matching_objects).pluck(:entry_id).to_set
+      condition_matches.delete_by(entry_id: deactivating_ids)
+      deactivating_objects, never_matched_objects = non_matching_objects.partition { deactivating_ids.include?(_1.id) }
+
+      # By this point, we have updated the database's record of our
+      # matches, and we've separated our objects into four categories:
+      # "activating", "updating", "deactivating", and "never
+      # matched". Now we need to log that information, and pass these
+      # objects on to any relevant extractors.
+
+      activating_objects.each do |object|
+        logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (matched)" }
         extractors.each { _1.activate(object) }
-      elsif condition_matches.destroy_by(entry_id: object.id).any?
+      end
+
+      updating_objects.each do |object|
+        logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (updated)" }
+        extractors.each { _1.update(object) }
+      end
+
+      deactivating_objects.each do |object|
         logger&.info do
           if object.persisted?
             "Condition(#{id}): unmatched for #{object.class}(#{object.id}) (ceased to match)"
@@ -93,9 +98,51 @@ module ActiveRecordRules
         end
         extractors.each { _1.deactivate(object) }
       end
+
+      # Never matched objects don't actually do anything, but we debug
+      # long them in case it's useful.
+      never_matched_objects.each do |object|
+        logger&.debug do
+          "Condition(#{id}): not matched for #{object.class}(#{object.id}) (never matched)"
+        end
+      end
+
+      # Explicitly return no useful value.
+      nil
     end
 
     private
+
+    def clauses
+      @clauses ||= begin
+        parser = Parser.new.condition_part
+        match_conditions["clauses"].map { parser.parse(_1) }
+      end
+    end
+
+    def matches_clause?(clause, object)
+      lhs, op, rhs = case clause
+                     in { name:, op:, rhs: { string: } }
+                       [object[name], (op == "=" ? "==" : op), string.to_s]
+                     in { name:, op:, rhs: { number: } }
+                       [object[name], (op == "=" ? "==" : op), number.to_i]
+                     in { name:, op:, rhs: { boolean: } }
+                       [object[name], (op == "=" ? "==" : op), (boolean.to_s == "true")]
+                     in { name:, op:, rhs: { nil: _ } }
+                       [object[name], (op == "=" ? "==" : op), nil]
+                     else
+                       raise "Non-constant test in Condition(#{id}): #{clause}"
+                     end
+      result = lhs.public_send(op, rhs)
+      logger&.debug do
+        if result
+          "Condition(#{id}): #{lhs.inspect} #{op} #{rhs.inspect} (#{clause}) matches"
+        else
+          "Condition(#{id}): #{lhs.inspect} #{op} #{rhs.inspect} (#{clause}) does not match"
+        end
+      end
+      result
+    end
 
     def logger
       ActiveRecordRules.logger

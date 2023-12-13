@@ -23,23 +23,26 @@ module ActiveRecordRules
     def activate(object)
       values = fields.to_h { [_1, object[_1]] }
 
-      if (match = extractor_matches.find_by(entry_id: object.id))
-        old_values = match.values
-        match.update!(values: values)
+      logger&.info { "Extractor(#{id}): matched for #{object.class}(#{object.id})" }
+      logger&.debug { "Extractor(#{id}): matched with values #{values}" }
+      extractor_matches.create!(
+        entry_id: object.id,
+        values: values
+      )
 
-        logger&.info { "Extractor(#{id}): updated for #{object.class}(#{object.id})" }
-        logger&.debug { "Extractor(#{id}): updated for #{values} (previously: #{old_values})" }
-        rule.update(key, object, old_values, values) unless old_values == values
-      else
-        logger&.info { "Extractor(#{id}): matched for #{object.class}(#{object.id})" }
-        logger&.debug { "Extractor(#{id}): matched with values #{values}" }
-        extractor_matches.create!(
-          entry_id: object.id,
-          values: values
-        )
+      rule.activate(key, object, values)
+    end
 
-        rule.activate(key, object, values)
-      end
+    def update(object)
+      values = fields.to_h { [_1, object[_1]] }
+
+      match = extractor_matches.find_by(entry_id: object.id)
+      old_values = match.values
+      match.update!(values: values)
+
+      logger&.info { "Extractor(#{id}): updated for #{object.class}(#{object.id})" }
+      logger&.debug { "Extractor(#{id}): updated for #{values} (previously: #{old_values})" }
+      rule.update(key, object, old_values, values) unless old_values == values
     end
 
     def deactivate(object)
