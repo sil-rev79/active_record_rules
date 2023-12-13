@@ -13,7 +13,7 @@ module ActiveRecordRules
       klass.instance_eval do
         after_commit do |object|
           transaction do
-            ActiveRecordRules.trigger_rule_updates(object)
+            ActiveRecordRules.trigger_rule_updates([object])
           end
         end
       end

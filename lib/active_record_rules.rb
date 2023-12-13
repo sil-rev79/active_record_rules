@@ -39,10 +39,15 @@ module ActiveRecordRules
     ActiveRecordRules::Rule.define_rule(string)
   end
 
-  def self.trigger_rule_updates(object)
-    Condition
-      .for_class(object.class)
-      .includes_for_activate
-      .each { _1.activate(object) }
+  def self.trigger_rule_updates(all_objects)
+    all_objects.group_by(&:class).each do |klass, objects|
+      conditions = Condition.for_class(klass).includes_for_activate
+
+      conditions.each do |condition|
+        objects.each do |object|
+          condition.activate(object)
+        end
+      end
+    end
   end
 end
