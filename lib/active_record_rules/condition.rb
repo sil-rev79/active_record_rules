@@ -80,13 +80,13 @@ module ActiveRecordRules
 
       activating_objects.each do |object|
         logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (matched)" }
-        extractors.each { _1.activate(object) }
       end
+      extractors.each { _1.activate(activating_objects) } unless activating_objects.empty?
 
       updating_objects.each do |object|
         logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (updated)" }
-        extractors.each { _1.update(object) }
       end
+      extractors.each { _1.update(updating_objects) } unless updating_objects.empty?
 
       deactivating_objects.each do |object|
         logger&.info do
@@ -96,8 +96,8 @@ module ActiveRecordRules
             "Condition(#{id}): unmatched for #{object.class}(#{object.id}) (deleted)"
           end
         end
-        extractors.each { _1.deactivate(object) }
       end
+      extractors.each { _1.deactivate(deactivating_objects) } unless deactivating_objects.empty?
 
       # Never matched objects don't actually do anything, but we debug
       # long them in case it's useful.
