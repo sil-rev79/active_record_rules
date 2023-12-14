@@ -116,12 +116,15 @@ module ActiveRecordRules
     def clauses
       @clauses ||= begin
         parser = Parser.new.condition_part
-        match_conditions["clauses"].map { parser.parse(_1) }
+        match_conditions["clauses"].map do |text|
+          { parsed: parser.parse(text),
+            text: text }
+        end
       end
     end
 
     def matches_clause?(clause, object)
-      lhs, op, rhs = case clause
+      lhs, op, rhs = case clause[:parsed]
                      in { name:, op:, rhs: { string: } }
                        [object[name], (op == "=" ? "==" : op), string.to_s]
                      in { name:, op:, rhs: { number: } }
@@ -131,14 +134,14 @@ module ActiveRecordRules
                      in { name:, op:, rhs: { nil: _ } }
                        [object[name], (op == "=" ? "==" : op), nil]
                      else
-                       raise "Non-constant test in Condition(#{id}): #{clause}"
+                       raise "Non-constant test in Condition(#{id}): #{clause[:text]}"
                      end
       result = lhs.public_send(op, rhs)
       logger&.debug do
         if result
-          "Condition(#{id}): #{lhs.inspect} #{op} #{rhs.inspect} (#{clause}) matches"
+          "Condition(#{id}): #{lhs.inspect} #{op} #{rhs.inspect} (#{clause[:text]}) matches"
         else
-          "Condition(#{id}): #{lhs.inspect} #{op} #{rhs.inspect} (#{clause}) does not match"
+          "Condition(#{id}): #{lhs.inspect} #{op} #{rhs.inspect} (#{clause[:text]}) does not match"
         end
       end
       result
