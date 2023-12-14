@@ -78,6 +78,8 @@ module ActiveRecordRules
     def activate(key, object, values)
       names, _, on_match_code = parsed_definition
 
+      logger&.debug { "Rule(#{id}): activating with #{object.class}(#{object.id})" }
+
       fetch_ids_and_arguments_for(key, object, values).map do |ids, (arguments, _)|
         rule_matches.create!(ids: ids)
         logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
@@ -234,30 +236,22 @@ module ActiveRecordRules
         case [lhs, rhs]
         in [[^key, left_field], [join_key, right_field]]
           binds << values[left_field]
-          binds << right_field
-          "? #{op} #{join_key}.\"values\"->>?"
+          "? #{op} #{join_key}.\"values\"->>'#{right_field}'"
+
         in [[join_key, left_field], [^key, right_field]]
-          binds << left_field
           binds << values[right_field]
-          "#{join_key}.\"values\"->>? #{op} ?"
+          "#{join_key}.\"values\"->>'#{left_field}' #{op} ?"
+
         in [[left_key, left_field], [right_key, right_field]]
-          binds << left_field
-          binds << right_field
-          "#{left_key}.\"values\"->>? #{op} #{right_key}.\"values\"->>?"
-        in [[^key, _], _] | [_, [^key, _]]
-          # We can ignore constant conditions on ourselves because
-          # that gets checked by the Condition nodes much higher.
-          nil
-        in [[left_key, left_field], right_value]
-          binds << left_field
-          binds << right_value
-          "#{left_key}.\"values\"->>? #{op} ?"
-        in [left_value, [right_key, right_field]]
-          binds << left_value
-          binds << right_field
-          "? #{op} #{left_key}.\"values\"->>?"
+          "#{left_key}.\"values\"->>'#{left_field}' #{op} #{right_key}.\"values\"->>'#{right_field}'"
+
         else
-          raise "Unknown constraint format: #{lhs} #{op} #{rhs}"
+          # The above represent all the clause formats that are
+          # relationships between objects. The only things that remain
+          # are constant clauses, which have already been handled by
+          # the Condition object record activation process, so we can
+          # ignore them here.
+          nil
         end
       end.compact
 

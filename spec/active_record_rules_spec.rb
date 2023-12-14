@@ -227,4 +227,109 @@ RSpec.describe ActiveRecordRules do
       RULE
     end
   end
+
+  describe "multiple rules at the same time" do
+    before do
+      ActiveRecordRules::Rule.define_rule(<<~RULE)
+        rule greet
+          Salutation(greeting, greeting != nil)
+          Person(name)
+        on match
+          TestHelper.matches += [[greeting, name]]
+        on unmatch
+          TestHelper.matches -= [[greeting, name]]
+      RULE
+
+      ActiveRecordRules::Rule.define_rule(<<~RULE)
+        rule farewell
+          Salutation(farewell, farewell != nil)
+          Person(name)
+        on match
+          TestHelper.matches += [[farewell, name]]
+        on unmatch
+          TestHelper.matches -= [[farewell, name]]
+      RULE
+
+      TestHelper.matches = []
+    end
+
+    describe "greeting John" do
+      before { Salutation.create!(greeting: "hi") }
+
+      let!(:person) { Person.create!(name: "John") }
+
+      it "matches" do
+        expect(TestHelper.matches).to eq([["hi", "John"]])
+      end
+
+      it "updates when John is renamed" do
+        person.update!(name: "Jane")
+        expect(TestHelper.matches).to eq([["hi", "Jane"]])
+      end
+
+      it "unmatches when John goes away" do
+        person.destroy!
+        expect(TestHelper.matches).to be_empty
+      end
+    end
+
+    describe "farewelling John" do
+      before { Salutation.create!(farewell: "bye") }
+
+      let!(:person) { Person.create!(name: "John") }
+
+      it "matches" do
+        expect(TestHelper.matches).to eq([["bye", "John"]])
+      end
+
+      it "updates when John is renamed" do
+        person.update!(name: "Jane")
+        expect(TestHelper.matches).to eq([["bye", "Jane"]])
+      end
+
+      it "unmatches when John goes away" do
+        person.destroy!
+        expect(TestHelper.matches).to be_empty
+      end
+    end
+
+    describe "greeting and farewelling John" do
+      let!(:salutation) { Salutation.create!(greeting: "hi", farewell: "bye") }
+      let!(:person) { Person.create!(name: "John") }
+
+      it "matches" do
+        expect(TestHelper.matches.sort).to eq([["bye", "John"], ["hi", "John"]])
+      end
+
+      it "updates when John is renamed" do
+        person.update!(name: "Jane")
+        expect(TestHelper.matches.sort).to eq([["bye", "Jane"], ["hi", "Jane"]])
+      end
+
+      it "updates when greeting changes" do
+        salutation.update!(greeting: "hello")
+        expect(TestHelper.matches.sort).to eq([["bye", "John"], ["hello", "John"]])
+      end
+
+      it "updates when farwell changes" do
+        salutation.update!(farewell: "so long")
+        expect(TestHelper.matches.sort).to eq([["hi", "John"], ["so long", "John"]])
+      end
+
+      it "unmatches when John goes away" do
+        person.destroy!
+        expect(TestHelper.matches).to be_empty
+      end
+
+      it "unmatches when greeting goes away" do
+        salutation.update!(greeting: nil)
+        expect(TestHelper.matches).to eq([["bye", "John"]])
+      end
+
+      it "unmatches when farwell goes away" do
+        salutation.update!(farewell: nil)
+        expect(TestHelper.matches).to eq([["hi", "John"]])
+      end
+    end
+  end
 end
