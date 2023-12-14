@@ -87,7 +87,7 @@ RSpec.describe ActiveRecordRules do
       TestHelper.matches = []
     end
 
-    describe "properties" do # rubocop:disable RSpec/EmptyExampleGroup
+    describe "always" do # rubocop:disable RSpec/EmptyExampleGroup
       generate(
         cards: array(
           tuple(
@@ -170,7 +170,7 @@ RSpec.describe ActiveRecordRules do
       end
     end
 
-    describe "examples found by failing property tests" do
+    describe "found by failing property tests:" do
       describe "multiple suit updates" do
         before do
           card1 = Card.create!(suit: "heart", rank: "2")
@@ -211,6 +211,20 @@ RSpec.describe ActiveRecordRules do
 
         it "picks up on multiple card updates" do
           expect(TestHelper.matches.sort).to eq([["diamond", ["2", "3", "4"]]])
+        end
+      end
+
+      describe "four suits, with duplicates, and a no-op update" do
+        before do
+          Card.create!(suit: "heart", rank: "2")
+          Card.create!(suit: "heart", rank: "2")
+          Card.create!(suit: "heart", rank: "4")
+          card = Card.create!(suit: "heart", rank: "3")
+          card.update!(suit: "heart")
+        end
+
+        it "picks up on multiple card updates" do
+          expect(TestHelper.matches.sort).to eq([["heart", ["2", "3", "4"]], ["heart", ["2", "3", "4"]]])
         end
       end
     end

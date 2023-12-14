@@ -11,13 +11,13 @@ module ActiveRecordRules
   # is responsible for "complex" things (i.e. checks involving
   # multiple objects).
   #
-  # A Rule is provided updates by its related Condition nodes whenever
-  # an object passes, or ceases to pass, its test. This allows for
-  # incremental updates to the output.
+  # A Rule is provided updates by its related Condition nodes (through
+  # an Extractor) whenever an object passes, or ceases to pass, its
+  # test. This allows for incremental updates to the output.
   #
   # A Rule finds the other objects to process by looking into its
-  # conditions' ConditionMatch objects to find the objects which
-  # currently match the condition.
+  # extractor's ExtractorMatch objects to find the values to use in
+  # conditions and as arguments.
   class Rule < ActiveRecord::Base
     self.table_name = :arr__rules
 
@@ -75,70 +75,96 @@ module ActiveRecordRules
       )
     end
 
-    def activate(key, object, values)
-      names, _, on_match_code = parsed_definition
+    # @param key [String] The Extractor key that is being updated
+    # @param objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
+    def activate(key, objects)
+      matches = fetch_ids_and_arguments_for(key, objects)
+      if matches.any?
+        rule_matches.insert_all!(
+          matches.map do |ids, _|
+            { ids: ids }
+          end
+        )
+      end
 
-      logger&.debug { "Rule(#{id}): activating with #{object.class}(#{object.id})" }
-
-      fetch_ids_and_arguments_for(key, object, values).map do |ids, (arguments, _)|
-        rule_matches.create!(ids: ids)
+      matches.map do |ids, (arguments, _)|
         logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
-        logger&.debug { "Rule(#{id}): matched with arguments #{names.keys.zip(arguments).to_h.to_json}" }
+        logger&.debug { "Rule(#{id}): matched with arguments #{pretty_arguments(arguments).to_json}" }
 
-        Object.new.instance_exec(*arguments, &on_match_code)
+        execute_match(arguments)
       end
     end
 
-    def update(key, object, old_values, new_values)
-      names, _, on_match_code, on_unmatch_code = parsed_definition
+    # @param key [String] The Extractor key that is being updated
+    # @param old_objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
+    # @param new_objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
+    def update(key, old_objects, new_objects)
+      all_matches = fetch_ids_and_arguments_for(key, new_objects, old_values: old_objects)
 
-      current_matches = fetch_ids_and_arguments_for(key, object, new_values, old_values: old_values)
-                        .map do |ids, (arguments, old_arguments)|
-        if (match_record = rule_matches.find_by(ids: ids))
-          logger&.info { "Rule(#{id}): re-matched for #{ids.to_json}" }
-          logger&.debug { "Rule(#{id}): re-matched with arguments #{names.keys.zip(arguments).to_h.to_json}" }
+      # We have to construct an Arel here for the query because
+      # otherwise ActiveRecord double-encodes our hashes as JSON.
+      # That is: rule_matches.where(ids: all_matches.keys) writes a
+      # condition like "ids in (?, ?, ...)" where the parameters are
+      # bound to "\"{\\\"key\\\":10}\"". Note that this is similar to
+      # doing ids.to_json.to_json, which means the database can't find
+      # the right records.
+      #
+      # Arel correctly encodes the parameter as "{\"key\":10}".
+      already_matched_ids = rule_matches.where(RuleMatch.arel_table[:ids].in(all_matches.keys)).pluck(:ids).to_set
 
-          Object.new.instance_exec(*old_arguments, &on_unmatch_code)
-        else
-          match_record = rule_matches.create!(ids: ids)
-          logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
-          logger&.debug { "Rule(#{id}): matched with arguments #{names.keys.zip(arguments).to_h.to_json}" }
-        end
-        Object.new.instance_exec(*arguments, &on_match_code)
-
-        # We return the match records, so update can know what to do with it.
-        match_record
+      updating, matching = all_matches.partition do |ids, _|
+        already_matched_ids.include?(ids)
+      end
+      if matching.any?
+        rule_matches.insert_all!(
+          matching.map do |ids, _|
+            { ids: ids }
+          end
+        )
       end
 
-      fetch_ids_and_arguments_for(key, object, old_values, exclude: current_matches).each do |ids, (arguments, _)|
-        rule_matches.destroy_by(ids: ids)
+      unmatching = fetch_ids_and_arguments_for(key, old_objects, exclude_ids: already_matched_ids)
+      rule_matches.destroy_by(ids: unmatching.keys)
+
+      matching.each do |ids, (arguments, _)|
+        logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
+        logger&.debug { "Rule(#{id}): matched with arguments #{pretty_arguments(arguments).to_json}" }
+        execute_match(arguments)
+      end
+
+      updating.each do |ids, (arguments, old_arguments)|
+        logger&.info { "Rule(#{id}): re-matched for #{ids.to_json}" }
+        logger&.debug { "Rule(#{id}): re-matched with arguments #{pretty_arguments(arguments).to_json}" }
+        execute_unmatch(old_arguments)
+        execute_match(arguments)
+      end
+
+      unmatching.each do |ids, (arguments, _)|
         logger&.info { "Rule(#{id}): unmatched for #{ids.to_json} (set no longer matches rule)" }
-        logger&.debug { "Rule(#{id}): unmatched with arguments #{names.keys.zip(arguments).to_h.to_json}" }
-        Object.new.instance_exec(*arguments, &on_unmatch_code)
+        logger&.debug { "Rule(#{id}): unmatched with arguments #{pretty_arguments(arguments).to_json}" }
+        execute_unmatch(arguments)
       end
     end
 
-    def deactivate(key, object, values)
-      names, _, _, on_unmatch_code = parsed_definition
-
-      destroyed = rule_matches.destroy_by("ids->>? = ?", key, object.id)
-
-      # Convert an array of hashes like [{'cond' => id}] into a hash
-      # of arrays like {'cond'=>[id]}
-      object_ids = Hash.new { _1[_2] = [] }
-      destroyed.pluck(:ids).each do |ids|
-        ids.each { object_ids[_1] << _2 }
-      end
-
-      arguments_by_ids = fetch_ids_and_arguments_for(key, object, values)
+    # @param key [String] The Extractor key that is being updated
+    # @param objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
+    def deactivate(key, objects)
+      destroyed = rule_matches.destroy_by("ids->>? = ?", key, objects.keys)
+      arguments_by_ids = fetch_ids_and_arguments_for(key, objects)
 
       destroyed.each do |record|
         arguments, = arguments_by_ids[record.ids]
         logger&.info { "Rule(#{id}): unmatched for #{record.ids.to_json} (entry removed by condition)" }
-        logger&.debug { "Rule(#{id}): unmatched with arguments #{names.keys.zip(arguments).to_h.to_json}" }
+        logger&.debug { "Rule(#{id}): unmatched with arguments #{pretty_arguments(arguments).to_json}" }
 
-        Object.new.instance_exec(*arguments, &on_unmatch_code)
+        execute_unmatch(arguments)
       end
+    end
+
+    private
+
+    def logger
+      ActiveRecordRules.logger
     end
 
     def parsed_definition
@@ -214,34 +240,61 @@ module ActiveRecordRules
           }
         RUBY
 
-        [names, constraints, on_match_code, on_unmatch_code, on_update_code]
+        { names: names,
+          constraints: constraints,
+          on_match: on_match_code,
+          on_unmatch: on_unmatch_code,
+          on_update: on_update_code }
       end
     rescue Parslet::ParseFailed => e
       raise e.parse_failure_cause.ascii_tree
     end
 
-    private
-
-    def logger
-      ActiveRecordRules.logger
+    def pretty_arguments(arguments)
+      parsed_definition => { names: }
+      names.keys.zip(arguments).to_h
     end
 
-    def fetch_ids_and_arguments_for(key, object, values, exclude: nil, old_values: {})
-      names, constraints, = parsed_definition
+    def execute_match(args)
+      parsed_definition => { on_match: }
+      Object.new.instance_exec(*args, &on_match)
+    end
 
-      matches = extractors.to_h { [_1.key, _1.extractor_matches] }.without(key)
+    def execute_unmatch(args)
+      parsed_definition => { on_unmatch: }
+      Object.new.instance_exec(*args, &on_unmatch)
+    end
+
+    def fetch_ids_and_arguments_for(key, objects, exclude_ids: nil, old_values: {})
+      parsed_definition => { names:, constraints: }
 
       binds = []
+
+      matches = extractors.to_h do |match|
+        if match.key == key
+          rows = objects.map do |object_id, values|
+            binds << object_id
+            binds << values.to_json
+            "(?, ?)"
+          end
+          [match.key, "values #{rows.join(", ")}"]
+        else
+          [match.key, match.extractor_matches.to_sql]
+        end
+      end
+
+      close_names = names.transform_values do |definitions|
+        if (definition = definitions.find { _1[0] == key })
+          definition[1] # get the field name
+        end
+      end.compact
+
+      other_names = names.without(*close_names.keys).transform_values do |definition,|
+        "#{definition[0]}.\"values\"->>'#{definition[1]}'"
+      end.to_a
+
       clauses = constraints.map do |op, lhs, rhs|
         case [lhs, rhs]
-        in [[^key, left_field], [join_key, right_field]]
-          binds << values[left_field]
-          "? #{op} #{join_key}.\"values\"->>'#{right_field}'"
-
-        in [[join_key, left_field], [^key, right_field]]
-          binds << values[right_field]
-          "#{join_key}.\"values\"->>'#{left_field}' #{op} ?"
-
         in [[left_key, left_field], [right_key, right_field]]
           "#{left_key}.\"values\"->>'#{left_field}' #{op} #{right_key}.\"values\"->>'#{right_field}'"
 
@@ -255,39 +308,33 @@ module ActiveRecordRules
         end
       end.compact
 
-      our_values, our_old_values, other_names = names.map do |name, definitions|
-        if (definition = definitions.find { _1[0] == key })
-          [[name, values[definition[1]]],
-           [name, old_values[definition[1]]],
-           nil]
-        else
-          definition = definitions.first
-          [nil,
-           nil,
-           [name, "#{definition[0]}.\"values\"->>'#{definition[1]}'"]]
-        end
-      end.transpose.map(&:compact)
+      where_clause = clauses.join(" and ")
 
       query_result = ActiveRecord::Base.connection.select_all(<<~SQL.squish, nil, binds).rows
+        with #{key}(entry_id, "values") as (#{matches[key]})
         select #{matches.keys.map { "#{_1}.entry_id" }.join(", ")}
                #{other_names.map(&:second).map { ", #{_1}" }.join}
-          from #{matches.map { "(#{_2.to_sql}) as #{_1}" }.join(", ")}
-         #{clauses.empty? ? "" : "where #{clauses.join(" and ")}"}
+          from #{key}#{matches.without(key).map { ", (#{_2}) as #{_1}" }.join}
+         #{where_clause.presence && "where #{where_clause}"}
       SQL
 
-      excluded_ids = exclude.pluck(:ids).to_set if exclude
-
       query_result.map do |row|
-        ids = [
-          [key, object.id],
-          *matches.keys.zip(row[..matches.size])
-        ].sort_by(&:first).to_h
+        ids = matches.keys.zip(row[..matches.size]).sort_by(&:first).to_h
 
-        next if excluded_ids&.include?(ids)
+        # TODO: add this to the WHERE clause with JSON_OBJECT and NOT IN
+        next if exclude_ids&.include?(ids)
 
-        other_values = other_names.map(&:first).zip(row[matches.size..])
-        final_values = (our_values + other_values).to_h
-        old_final_values = (our_old_values + other_values).to_h
+        other_values = other_names.map(&:first).zip(row[matches.size..]).to_h
+
+        our_values = objects[ids[key]]
+        our_old_values = old_values[ids[key]]
+
+        final_values = other_values.merge(close_names.transform_values { our_values[_1] })
+        old_final_values = if our_old_values
+                             other_values.merge(close_names.transform_values { our_old_values[_1] })
+                           else
+                             {}
+                           end
 
         [ids, [names.keys.map { final_values[_1] }, names.keys.map { old_final_values[_1] }]]
       end.compact.to_h

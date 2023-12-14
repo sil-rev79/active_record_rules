@@ -69,7 +69,7 @@ module ActiveRecordRules
       # to find the ids of existing records, and the other to delete
       # them.
       deactivating_ids = condition_matches.where(entry_id: non_matching_objects).pluck(:entry_id).to_set
-      condition_matches.delete_by(entry_id: deactivating_ids)
+      condition_matches.delete_by(entry_id: deactivating_ids) if deactivating_ids.any?
       deactivating_objects, never_matched_objects = non_matching_objects.partition { deactivating_ids.include?(_1.id) }
 
       # By this point, we have updated the database's record of our
