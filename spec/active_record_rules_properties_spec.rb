@@ -51,7 +51,7 @@ RSpec.describe ActiveRecordRules do
 
     it_always "notifies all the right people" do
       expected_matches = []
-      clients.each do |_client, data|
+      clients.each_value do |data|
         data[:support_requests].select { _1 == "high" }.each do
           data[:representatives].each do |rep|
             expected_matches << [:notify, rep]

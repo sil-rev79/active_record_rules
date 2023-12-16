@@ -4,9 +4,13 @@ require:
 AllCops:
   TargetRubyVersion: 3.0
   NewCops: enable
+  SuggestExtensions: false
   Include:
     - 'lib/**/*.rb'
     - 'spec/**/*.rb'
+  Exclude:
+    - 'vendor/**/*'
+    - 'gems/**/*'
 
 # Disable all the cops about length/complexity, because they're pretty
 # noisy.
