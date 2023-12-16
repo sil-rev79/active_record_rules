@@ -35,8 +35,52 @@ require "active_record_rules/rule_match"
 module ActiveRecordRules
   cattr_accessor :logger
 
-  def self.define_rule(string)
-    ActiveRecordRules::Rule.define_rule(string)
+  def self.define_rule(definition_string)
+    definition = Parser.new.definition.parse(definition_string, reporter: Parslet::ErrorReporter::Deepest.new)
+
+    extractors = definition[:conditions].each_with_index.map do |condition_definition, index|
+      constant_conditions = (condition_definition[:parts] || []).map do |cond|
+        case cond
+        in { name:, op:, rhs: { string: } }
+          "#{name} #{op} #{string.to_s.to_json}"
+        in { name:, op:, rhs: { number: } }
+          "#{name} #{op} #{number}"
+        in { name:, op:, rhs: { boolean: } }
+          "#{name} #{op} #{boolean}"
+        in { name:, op:, rhs: { nil: _ } }
+          "#{name} #{op} nil"
+        else
+          nil
+        end
+      end.compact
+
+      condition = Condition.find_or_initialize_by(
+        match_class: condition_definition[:class_name].to_s,
+        # We have to wrap the conditions in this fake object
+        # because querying with an array at the toplevel turns
+        # into an ActiveRecord IN query, which ruins everything.
+        # Using an object here simplifies things a lot.
+        match_conditions: { "clauses" => constant_conditions }
+      )
+      condition.validate!
+
+      fields = (condition_definition[:parts] || [])
+               .select { _1[:rhs].nil? || !_1[:rhs][:name].nil? } # remove the constant conditions
+               .map { _1[:name].to_s }
+               .uniq
+
+      Extractor.new(
+        key: "cond#{index + 1}",
+        condition: condition,
+        fields: fields
+      )
+    end
+
+    Rule.create!(
+      extractors: extractors,
+      name: definition[:name].to_s,
+      definition: definition_string
+    )
   end
 
   def self.trigger_rule_updates(all_objects)

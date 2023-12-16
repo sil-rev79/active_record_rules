@@ -33,7 +33,7 @@ RSpec.describe ActiveRecordRules do
         end
       end
 
-      ActiveRecordRules::Rule.define_rule(<<~RULE)
+      described_class.define_rule(<<~RULE)
         rule notify client representative for high importance requests
           SupportRequest(client, level = "high")
           ClientRepresentative(client, name)
@@ -71,7 +71,7 @@ RSpec.describe ActiveRecordRules do
         end
       end
 
-      ActiveRecordRules::Rule.define_rule(<<~RULE)
+      described_class.define_rule(<<~RULE)
         rule three of the same suit
           Card(suit, rank = rank1)
           Card(suit, rank = rank2, rank > rank1)

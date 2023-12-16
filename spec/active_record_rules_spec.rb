@@ -23,7 +23,7 @@ RSpec.describe ActiveRecordRules do
 
   describe "rules with no constraints" do
     before do
-      ActiveRecordRules::Rule.define_rule(<<~RULE)
+      described_class.define_rule(<<~RULE)
         rule greet
           Salutation(greeting)
           Person(name)
@@ -91,7 +91,7 @@ RSpec.describe ActiveRecordRules do
 
   describe "rules with constant constraints" do
     before do
-      ActiveRecordRules::Rule.define_rule(<<~RULE)
+      described_class.define_rule(<<~RULE)
         rule greet
           Salutation(greeting)
           Person(name, greetable = true)
@@ -101,7 +101,7 @@ RSpec.describe ActiveRecordRules do
           TestHelper.matches -= [[greeting, name]]
       RULE
 
-      ActiveRecordRules::Rule.define_rule(<<~RULE)
+      described_class.define_rule(<<~RULE)
         rule farewell
           Salutation(greeting, farewell)
           Person(name, greetable = true)
@@ -148,7 +148,7 @@ RSpec.describe ActiveRecordRules do
 
   describe "rules with constraints between three conditions" do
     before do
-      ActiveRecordRules::Rule.define_rule(<<~RULE)
+      described_class.define_rule(<<~RULE)
         rule greet
           Salutation(greeting)
           Person(name = name1)
@@ -185,7 +185,7 @@ RSpec.describe ActiveRecordRules do
 
   describe "rules which only match a subset of records" do
     before do
-      ActiveRecordRules::Rule.define_rule(<<~RULE)
+      described_class.define_rule(<<~RULE)
         rule greet
           Salutation(greeting)
           Person(name = name1, greetable = true)
@@ -221,7 +221,7 @@ RSpec.describe ActiveRecordRules do
 
   describe "rules referencing non-Fact classes" do
     it "fails if the class is not a Fact" do
-      expect { ActiveRecordRules::Rule.define_rule(<<~RULE) }.to raise_error(ActiveRecord::RecordInvalid)
+      expect { described_class.define_rule(<<~RULE) }.to raise_error(ActiveRecord::RecordInvalid)
         rule fail at defining
           NonFact()
       RULE
@@ -230,7 +230,7 @@ RSpec.describe ActiveRecordRules do
 
   describe "multiple rules at the same time" do
     before do
-      ActiveRecordRules::Rule.define_rule(<<~RULE)
+      described_class.define_rule(<<~RULE)
         rule greet
           Salutation(greeting, greeting != nil)
           Person(name)
@@ -240,7 +240,7 @@ RSpec.describe ActiveRecordRules do
           TestHelper.matches -= [[greeting, name]]
       RULE
 
-      ActiveRecordRules::Rule.define_rule(<<~RULE)
+      described_class.define_rule(<<~RULE)
         rule farewell
           Salutation(farewell, farewell != nil)
           Person(name)

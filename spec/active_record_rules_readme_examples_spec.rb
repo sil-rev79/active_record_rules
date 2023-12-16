@@ -39,7 +39,7 @@ RSpec.describe ActiveRecordRules do
 
   describe "example rule matches" do
     before do
-      ActiveRecordRules::Rule.define_rule(<<~RULE)
+      described_class.define_rule(<<~RULE)
         rule Email users when new post is created
           Post(id = post_id, title, created_at)
           User(id = user_id, name, email)
@@ -135,7 +135,7 @@ RSpec.describe ActiveRecordRules do
     subject { user.reload.post_count }
 
     before do
-      ActiveRecordRules::Rule.define_rule(<<~RULE)
+      described_class.define_rule(<<~RULE)
         rule Update number of posts for user
           Post(id = post_id, author_id, status = "published")
           User(id = author_id)
