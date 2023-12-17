@@ -76,7 +76,8 @@ module ActiveRecordRules
       end
 
       unmatching = fetch_ids_and_arguments_for(key, old_objects, exclude_ids: already_matched_ids)
-      rule_matches.destroy_by(ids: unmatching.keys)
+      # See comment above for why we're dropping to Arel here.
+      rule_matches.delete_by(RuleMatch.arel_table[:ids].in(unmatching.keys))
 
       matching.each do |ids, (arguments, _)|
         logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
@@ -101,11 +102,12 @@ module ActiveRecordRules
     # @param key [String] The Extractor key that is being updated
     # @param objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
     def deactivate(key, objects)
-      destroyed = rule_matches.destroy_by("ids->>? = ?", key, objects.keys)
+      destroyed_ids = rule_matches.where("ids->>? = ?", key, objects.keys).pluck(:ids)
+      rule_matches.delete_by("ids->>? = ?", key, objects.keys)
       arguments_by_ids = fetch_ids_and_arguments_for(key, objects)
 
-      destroyed.each do |record|
-        arguments, = arguments_by_ids[record.ids]
+      destroyed_ids.each do |ids|
+        arguments, = arguments_by_ids[ids]
         logger&.info { "Rule(#{id}): unmatched for #{record.ids.to_json} (entry removed by condition)" }
         logger&.debug { "Rule(#{id}): unmatched with arguments #{pretty_arguments(arguments).to_json}" }
 
