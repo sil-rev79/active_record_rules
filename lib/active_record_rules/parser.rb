@@ -43,7 +43,7 @@ module ActiveRecordRules
     end
 
     rule(:expression) do
-      boolean | string | number | nil_expr | name.as(:name)
+      boolean | string | number | nil_expr | (str("<") >> name.as(:name) >> str(">"))
     end
 
     rule(:operation) do
@@ -51,7 +51,8 @@ module ActiveRecordRules
     end
 
     rule(:condition_part) do
-      name.as(:name) >> whitespace.maybe >> (operation >> whitespace.maybe >> expression.as(:rhs)).maybe
+      (str("<") >> name.as(:name) >> str(">")) |
+        (name.as(:name) >> whitespace.maybe >> operation >> whitespace.maybe >> expression.as(:rhs))
     end
 
     rule(:condition) do

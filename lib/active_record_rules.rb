@@ -15,8 +15,8 @@ require "active_record_rules/rule_match"
 # @example Define a simple rule#
 #   ActiveRecordRules.define_rule(<<~RULE)
 #     rule Update number of posts for user
-#       Post(author_id, status = "published")
-#       User(id = author_id)
+#       Post(<author_id>, status = "published")
+#       User(id = <author_id>)
 #     on match
 #       User.find(author_id).increment!(:post_count)
 #     on unmatch

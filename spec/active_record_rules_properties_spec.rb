@@ -35,8 +35,8 @@ RSpec.describe ActiveRecordRules do
 
       described_class.define_rule(<<~RULE)
         rule notify client representative for high importance requests
-          SupportRequest(client, level = "high")
-          ClientRepresentative(client, name)
+          SupportRequest(<client>, level = "high")
+          ClientRepresentative(<client>, <name>)
         on match
           TestHelper.matches << [:notify, name]
       RULE
@@ -73,9 +73,9 @@ RSpec.describe ActiveRecordRules do
 
       described_class.define_rule(<<~RULE)
         rule three of the same suit
-          Card(suit, rank = rank1)
-          Card(suit, rank = rank2, rank > rank1)
-          Card(suit, rank = rank3, rank > rank2)
+          Card(<suit>, rank = <rank1>)
+          Card(<suit>, rank = <rank2>, rank > <rank1>)
+          Card(<suit>, rank = <rank3>, rank > <rank2>)
         on match
           TestHelper.matches << [suit, [rank1, rank2, rank3]]
         on unmatch
@@ -214,7 +214,7 @@ RSpec.describe ActiveRecordRules do
         end
       end
 
-      describe "four suits, with duplicates, and a no-op update" do
+      describe "four cards, with duplicates, and a no-op update" do
         before do
           Card.create!(suit: "heart", rank: "2")
           Card.create!(suit: "heart", rank: "2")

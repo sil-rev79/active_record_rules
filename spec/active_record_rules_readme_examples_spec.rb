@@ -41,10 +41,10 @@ RSpec.describe ActiveRecordRules do
     before do
       described_class.define_rule(<<~RULE)
         rule Email users when new post is created
-          Post(id = post_id, title, created_at)
-          User(id = user_id, name, email)
-          PostTag(post_id, tag_id)
-          TagSubscription(user_id, tag_id)
+          Post(id = <post_id>, <title>, <created_at>)
+          User(id = <user_id>, <name>, <email>)
+          PostTag(<post_id>, <tag_id>)
+          TagSubscription(<user_id>, <tag_id>)
         on match
           # This is just Ruby code
           if created_at > 5.minutes.ago                # if the post is new
@@ -137,8 +137,8 @@ RSpec.describe ActiveRecordRules do
     before do
       described_class.define_rule(<<~RULE)
         rule Update number of posts for user
-          Post(id = post_id, author_id, status = "published")
-          User(id = author_id)
+          Post(id = <post_id>, <author_id>, status = "published")
+          User(id = <author_id>)
         on match
           User.find(author_id).increment!(:post_count)
         on unmatch

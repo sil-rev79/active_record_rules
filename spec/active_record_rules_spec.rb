@@ -23,8 +23,8 @@ RSpec.describe ActiveRecordRules do
     before do
       described_class.define_rule(<<~RULE)
         rule greet
-          Salutation(greeting)
-          Person(name)
+          Salutation(<greeting>)
+          Person(<name>)
         on match
           # puts "match \#{greeting}/\#{name}"
           TestHelper.matches += [[greeting, name]]
@@ -91,8 +91,8 @@ RSpec.describe ActiveRecordRules do
     before do
       described_class.define_rule(<<~RULE)
         rule greet
-          Salutation(greeting)
-          Person(name, greetable = true)
+          Salutation(<greeting>)
+          Person(<name>, greetable = true)
         on match
           TestHelper.matches += [[greeting, name]]
         on unmatch
@@ -101,9 +101,9 @@ RSpec.describe ActiveRecordRules do
 
       described_class.define_rule(<<~RULE)
         rule farewell
-          Salutation(greeting, farewell)
-          Person(name, greetable = true)
-          Person(name, farewellable = true)
+          Salutation(<greeting>, <farewell>)
+          Person(<name>, greetable = true)
+          Person(<name>, farewellable = true)
         on match
           TestHelper.matches += [[greeting, name]]
           TestHelper.matches += [[farewell, name]]
@@ -148,9 +148,9 @@ RSpec.describe ActiveRecordRules do
     before do
       described_class.define_rule(<<~RULE)
         rule greet
-          Salutation(greeting)
-          Person(name = name1)
-          Person(name = name2, name > name1)
+          Salutation(<greeting>)
+          Person(name = <name1>)
+          Person(name = <name2>, name > <name1>)
         on match
           # puts "match \#{greeting}/\#{name1}/\#{name2}"
           TestHelper.matches += [[greeting, name1, name2]]
@@ -185,9 +185,9 @@ RSpec.describe ActiveRecordRules do
     before do
       described_class.define_rule(<<~RULE)
         rule greet
-          Salutation(greeting)
-          Person(name = name1, greetable = true)
-          Person(name = name2, name > name1)
+          Salutation(<greeting>)
+          Person(name = <name1>, greetable = true)
+          Person(name = <name2>, name > <name1>)
         on match
           # puts "match \#{greeting}/\#{name1}/\#{name2}"
           TestHelper.matches += [[greeting, name1, name2]]
@@ -230,8 +230,8 @@ RSpec.describe ActiveRecordRules do
     before do
       described_class.define_rule(<<~RULE)
         rule greet
-          Salutation(greeting, greeting != nil)
-          Person(name)
+          Salutation(<greeting>, greeting != nil)
+          Person(<name>)
         on match
           TestHelper.matches += [[greeting, name]]
         on unmatch
@@ -240,8 +240,8 @@ RSpec.describe ActiveRecordRules do
 
       described_class.define_rule(<<~RULE)
         rule farewell
-          Salutation(farewell, farewell != nil)
-          Person(name)
+          Salutation(<farewell>, farewell != nil)
+          Person(<name>)
         on match
           TestHelper.matches += [[farewell, name]]
         on unmatch
