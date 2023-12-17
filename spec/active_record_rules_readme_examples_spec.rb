@@ -2,10 +2,10 @@
 
 require "parslet/convenience"
 
-class Post < ActiveRecord::Base; include ActiveRecordRules::Fact; end
-class User < ActiveRecord::Base; include ActiveRecordRules::Fact; end
-class PostTag < ActiveRecord::Base; include ActiveRecordRules::Fact; end
-class TagSubscription < ActiveRecord::Base; include ActiveRecordRules::Fact; end
+class Post < TestRecord; end
+class User < TestRecord; end
+class PostTag < TestRecord; end
+class TagSubscription < TestRecord; end
 
 RSpec.describe ActiveRecordRules do
   subject(:matches) { TestHelper.matches }

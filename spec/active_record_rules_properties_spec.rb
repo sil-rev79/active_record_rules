@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 # For the first example group
-class SupportRequest < ActiveRecord::Base; include ActiveRecordRules::Fact; end
-class ClientRepresentative < ActiveRecord::Base; include ActiveRecordRules::Fact; end
+class SupportRequest < TestRecord; end
+class ClientRepresentative < TestRecord; end
 
 # For the second example group
-class Card < ActiveRecord::Base; include ActiveRecordRules::Fact; end
+class Card < TestRecord; end
 
 RSpec.describe ActiveRecordRules do
   # the basic idea of this test is taken from the Clara Rules documentation
@@ -93,8 +93,8 @@ RSpec.describe ActiveRecordRules do
           tuple(
             one_of("heart", "diamond", "club", "spade"),
             one_of("2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king", "ace"),
-            boolean, # whether to retract this fact
-            boolean, # whether to re-assert this fact after it's retracted
+            boolean, # whether to delete this record
+            boolean, # whether to re-create this record after it's deleted
             maybe(one_of("heart", "diamond", "club", "spade")) # a new suit to update to
           )
         )

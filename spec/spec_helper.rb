@@ -27,6 +27,12 @@ module TestHelper
   cattr_accessor :matches
 end
 
+class TestRecord < ActiveRecord::Base
+  self.abstract_class = true
+
+  after_commit ->(object) { ActiveRecordRules.trigger([object]) }
+end
+
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
   config.example_status_persistence_file_path = ".rspec_status"

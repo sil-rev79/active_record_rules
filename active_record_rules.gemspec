@@ -9,9 +9,8 @@ Gem::Specification.new do |spec|
 
   spec.summary = "Database-driven production rules in Ruby"
   spec.description = <<~TEXT
-    A production rule library that uses database records as facts in
-    its working memory. Rules are database objects which get matched
-    and unmatched via ActiveRecord callbacks as records are updated.
+    A production rule library that uses database records as its
+    working memory.
   TEXT
 
   spec.homepage = "https://sr.ht/~czan/active_record_rules/"

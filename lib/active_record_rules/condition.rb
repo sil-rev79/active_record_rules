@@ -35,10 +35,10 @@ module ActiveRecordRules
     has_many :extractors
     has_many :condition_matches
     validates :match_class, presence: true
-    validate :validate_fact_class
+    validate :validate_record_class
 
     scope :for_class, lambda { |c|
-      where(match_class: c.ancestors.select { _1.included_modules.include?(ActiveRecordRules::Fact) }.map(&:name))
+      where(match_class: c.ancestors.select { _1 < ActiveRecord::Base }.map(&:name))
     }
     scope :includes_for_activate, -> { includes(extractors: { rule: { extractors: {} } }) }
 
@@ -151,8 +151,11 @@ module ActiveRecordRules
       ActiveRecordRules.logger
     end
 
-    def validate_fact_class
-      errors.add(:match_class, "must be a subclass of ActiveRecordRules::Fact") unless match_class.constantize < Fact
+    def validate_record_class
+      return if match_class.constantize < ActiveRecord::Base
+
+      errors.add(:match_class,
+                 "must be a subclass of ActiveRecord::Base")
     end
   end
 end

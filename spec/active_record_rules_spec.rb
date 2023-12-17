@@ -1,9 +1,7 @@
 # frozen_string_literal: true
 
-class Salutation < ActiveRecord::Base; include ActiveRecordRules::Fact; end
-class Person < ActiveRecord::Base; include ActiveRecordRules::Fact; end
-
-class NonFact < ActiveRecord::Base; end
+class Salutation < TestRecord; end
+class Person < TestRecord; end
 
 RSpec.describe ActiveRecordRules do
   before do
@@ -219,11 +217,11 @@ RSpec.describe ActiveRecordRules do
     end
   end
 
-  describe "rules referencing non-Fact classes" do
-    it "fails if the class is not a Fact" do
+  describe "rules referencing non-ActiveRecord::Base classes" do
+    it "fails if the class is not an ActiveRecord::Base" do
       expect { described_class.define_rule(<<~RULE) }.to raise_error(ActiveRecord::RecordInvalid)
         rule fail at defining
-          NonFact()
+          Object()
       RULE
     end
   end

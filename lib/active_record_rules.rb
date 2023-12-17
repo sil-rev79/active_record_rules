@@ -4,21 +4,15 @@ require "active_record_rules/condition"
 require "active_record_rules/condition_match"
 require "active_record_rules/extractor"
 require "active_record_rules/extractor_match"
-require "active_record_rules/fact"
 require "active_record_rules/parser"
 require "active_record_rules/rule"
 require "active_record_rules/rule_match"
 
 # A production rule system for ActiveRecord objects.
 #
-# To use this system, include +ActiveRecordRules::Fact+ in the models
-# that you would like to use in your rules, then define rules to match
-# them.
+# Rules are defined using a DSL which looks like this:
 #
-# @example Define a simple rule
-#   class Post < ApplicationRecord; include ActiveRecordRules::Fact; end
-#   class User < ApplicationRecord; include ActiveRecordRules::Fact; end
-#
+# @example Define a simple rule#
 #   ActiveRecordRules.define_rule(<<~RULE)
 #     rule Update number of posts for user
 #       Post(author_id, status = "published")
@@ -83,12 +77,14 @@ module ActiveRecordRules
     )
   end
 
-  def self.trigger_rule_updates(all_objects)
-    all_objects.group_by(&:class).each do |klass, objects|
-      conditions = Condition.for_class(klass).includes_for_activate
+  def self.trigger(all_objects)
+    ActiveRecord::Base.transaction do
+      all_objects.group_by(&:class).each do |klass, objects|
+        conditions = Condition.for_class(klass).includes_for_activate
 
-      conditions.each do |condition|
-        condition.activate(objects)
+        conditions.each do |condition|
+          condition.activate(objects)
+        end
       end
     end
   end

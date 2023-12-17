@@ -9,7 +9,7 @@ module ActiveRecordRules
 
     desc "Generates a migration for ActiveRecordRules models."
 
-    class_option :id_type, type: :string, default: "integer", desc: "The column type to use to track fact ids"
+    class_option :id_type, type: :string, default: "integer", desc: "The column type to use to track record ids"
     class_option :json_type, type: :string, default: "json", desc: <<~DESC
       The column type to use for JSON payloads. This should be "jsonb" for Postgres and "json" for SQLite.
     DESC
