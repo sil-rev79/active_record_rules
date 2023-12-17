@@ -34,17 +34,17 @@ module ActiveRecordRules
 
     has_many :extractors
     has_many :condition_matches
-    validates :match_class, presence: true
+    validates :match_class_name, presence: true
     validate :validate_record_class
 
     scope :for_class, lambda { |c|
-      where(match_class: c.ancestors.select { _1 < ActiveRecord::Base }.map(&:name))
+      where(match_class_name: c.ancestors.select { _1 < ActiveRecord::Base }.map(&:name))
     }
     scope :includes_for_activate, -> { includes(extractors: { rule: { extractors: {} } }) }
 
     def activate(objects)
-      unless objects.all? { match_class == _1.class.name }
-        raise "Objects must all be of class #{match_class}, but saw #{objects.map(&:class).uniq.join(", ")}"
+      unless objects.all? { match_class_name == _1.class.name }
+        raise "Objects must all be of class #{match_class_name}, but saw #{objects.map(&:class).uniq.join(", ")}"
       end
 
       # First, do the basic matching to work out which objects match,
@@ -151,10 +151,14 @@ module ActiveRecordRules
       ActiveRecordRules.logger
     end
 
-    def validate_record_class
-      return if match_class.constantize < ActiveRecord::Base
+    def match_class
+      match_class_name.constantize
+    end
 
-      errors.add(:match_class,
+    def validate_record_class
+      return if match_class < ActiveRecord::Base
+
+      errors.add(:match_class_name,
                  "must be a subclass of ActiveRecord::Base")
     end
   end

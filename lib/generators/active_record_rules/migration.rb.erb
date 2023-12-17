@@ -1,7 +1,7 @@
 class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_version %>
   def change
     create_table :arr__conditions do |t|
-      t.string :match_class
+      t.string :match_class_name
       t.<%= @json_type %> :match_conditions
     end
 

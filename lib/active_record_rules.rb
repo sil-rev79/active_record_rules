@@ -49,7 +49,7 @@ module ActiveRecordRules
       end.compact
 
       condition = Condition.find_or_initialize_by(
-        match_class: condition_definition[:class_name].to_s,
+        match_class_name: condition_definition[:class_name].to_s,
         # We have to wrap the conditions in this fake object
         # because querying with an array at the toplevel turns
         # into an ActiveRecord IN query, which ruins everything.
