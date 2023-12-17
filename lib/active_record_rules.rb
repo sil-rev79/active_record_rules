@@ -77,6 +77,19 @@ module ActiveRecordRules
     )
   end
 
+  def self.trigger_all(*klasses)
+    conditions = if klasses.empty?
+                   Condition.all
+                 else
+                   klasses.reduce(Condition.none) do |relation, klass|
+                     relation.or(Condition.for_class(klass))
+                   end
+                 end
+    ActiveRecord::Base.transaction do
+      conditions.each(&:activate_all)
+    end
+  end
+
   def self.trigger(all_objects)
     ActiveRecord::Base.transaction do
       all_objects.group_by(&:class).each do |klass, objects|
