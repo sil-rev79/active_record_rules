@@ -30,7 +30,7 @@ module ActiveRecordRules
 
     # @param key [String] The Extractor key that is being updated
     # @param objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
-    def activate(key, objects)
+    def activate(key, objects, trigger_rules: true)
       matches = fetch_ids_and_arguments_for(key, objects)
       if matches.any?
         rule_matches.insert_all!(
@@ -44,14 +44,14 @@ module ActiveRecordRules
         logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
         logger&.debug { "Rule(#{id}): matched with arguments #{pretty_arguments(arguments).to_json}" }
 
-        execute_match(arguments)
+        execute_match(arguments) if trigger_rules
       end
     end
 
     # @param key [String] The Extractor key that is being updated
     # @param old_objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
     # @param new_objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
-    def update(key, old_objects, new_objects)
+    def update(key, old_objects, new_objects, trigger_rules: true)
       all_matches = fetch_ids_and_arguments_for(key, new_objects, old_values: old_objects)
 
       # We have to construct an Arel here for the query because
@@ -83,25 +83,25 @@ module ActiveRecordRules
       matching.each do |ids, (arguments, _)|
         logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
         logger&.debug { "Rule(#{id}): matched with arguments #{pretty_arguments(arguments).to_json}" }
-        execute_match(arguments)
+        execute_match(arguments) if trigger_rules
       end
 
       updating.each do |ids, (arguments, old_arguments)|
         logger&.info { "Rule(#{id}): re-matched for #{ids.to_json}" }
         logger&.debug { "Rule(#{id}): re-matched with arguments #{pretty_arguments(arguments).to_json}" }
-        execute_update(old_arguments, arguments)
+        execute_update(old_arguments, arguments) if trigger_rules
       end
 
       unmatching.each do |ids, (arguments, _)|
         logger&.info { "Rule(#{id}): unmatched for #{ids.to_json} (set no longer matches rule)" }
         logger&.debug { "Rule(#{id}): unmatched with arguments #{pretty_arguments(arguments).to_json}" }
-        execute_unmatch(arguments)
+        execute_unmatch(arguments) if trigger_rules
       end
     end
 
     # @param key [String] The Extractor key that is being updated
     # @param objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
-    def deactivate(key, objects)
+    def deactivate(key, objects, trigger_rules: true)
       destroyed_ids = rule_matches.where("ids->>? = ?", key, objects.keys).pluck(:ids)
       rule_matches.delete_by("ids->>? = ?", key, objects.keys)
       arguments_by_ids = fetch_ids_and_arguments_for(key, objects)
@@ -111,7 +111,7 @@ module ActiveRecordRules
         logger&.info { "Rule(#{id}): unmatched for #{ids.to_json} (entry removed by condition)" }
         logger&.debug { "Rule(#{id}): unmatched with arguments #{pretty_arguments(arguments).to_json}" }
 
-        execute_unmatch(arguments)
+        execute_unmatch(arguments) if trigger_rules
       end
     end
 

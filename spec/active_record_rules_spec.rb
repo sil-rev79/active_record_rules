@@ -401,4 +401,62 @@ RSpec.describe ActiveRecordRules do
       end
     end
   end
+
+  describe "rule definition" do
+    before do
+      TestHelper.matches = []
+    end
+
+    let!(:person) { Person.create!(name: "John") }
+
+    context "with rule triggering" do
+      before do
+        described_class.define_rule(<<~RULE, trigger_rules: true)
+          rule run custom methods
+            Person(<name>)
+          on match
+            TestHelper.matches << name
+        RULE
+      end
+
+      it "matches existing objects" do
+        expect(TestHelper.matches).to include("John")
+      end
+
+      it "matches new objects" do
+        Person.create!(name: "Jane")
+        expect(TestHelper.matches).to include("Jane")
+      end
+    end
+
+    context "without rule triggering" do
+      before do
+        described_class.define_rule(<<~RULE, trigger_rules: false)
+          rule run custom methods
+            Person(<name>)
+          on match
+            TestHelper.matches << name
+        RULE
+      end
+
+      it "doesn't match existing objects" do
+        expect(TestHelper.matches).to be_empty
+      end
+
+      it "doesn't match existing objects after an unrelated update" do
+        person.update!(greetable: true)
+        expect(TestHelper.matches).to be_empty
+      end
+
+      it "does match existing objects after a relevant update" do
+        person.update!(name: "Johns")
+        expect(TestHelper.matches).to include("Johns")
+      end
+
+      it "matches new objects" do
+        Person.create!(name: "Jane")
+        expect(TestHelper.matches).to include("Jane")
+      end
+    end
+  end
 end

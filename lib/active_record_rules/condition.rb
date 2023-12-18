@@ -42,7 +42,7 @@ module ActiveRecordRules
     }
     scope :includes_for_activate, -> { includes(extractors: { extractor_keys: { rule: { extractor_keys: {} } } }) }
 
-    def activate_all
+    def activate_all(trigger_rules: true)
       all_matching_objects = clauses.reduce(match_class.all) do |relation, clause|
         relation.where(clause_arel(clause))
       end
@@ -64,12 +64,12 @@ module ActiveRecordRules
       activating.each do |object|
         logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (matched)" }
       end
-      extractors.each { _1.activate(activating) } unless activating.empty?
+      extractors.each { _1.activate(activating, trigger_rules: trigger_rules) } unless activating.empty?
 
       updating.each do |object|
         logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (updated)" }
       end
-      extractors.each { _1.update(updating) } unless updating.empty?
+      extractors.each { _1.update(updating, trigger_rules: trigger_rules) } unless updating.empty?
 
       deactivating.each do |object, still_exists|
         logger&.info do
@@ -80,7 +80,11 @@ module ActiveRecordRules
           end
         end
       end
-      extractors.each { _1.deactivate(deactivating.map(&:first)) } unless deactivating.empty?
+      unless deactivating.empty?
+        extractors.each do |extractor|
+          extractor.deactivate(deactivating.map(&:first), trigger_rules: trigger_rules)
+        end
+      end
 
       nil
     end

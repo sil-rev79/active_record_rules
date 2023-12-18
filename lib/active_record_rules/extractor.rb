@@ -11,7 +11,7 @@ module ActiveRecordRules
     has_many :extractor_matches, dependent: :destroy
     has_many :extractor_keys, dependent: :destroy
 
-    def activate(objects)
+    def activate(objects, trigger_rules: true)
       id_to_values = objects.to_h do |object|
         [object.id, fields["names"].to_h { [_1, object[_1]] }]
       end
@@ -27,11 +27,10 @@ module ActiveRecordRules
         logger&.debug { "Extractor(#{id}): matched with values #{id_to_values[object.id]}" }
       end
 
-      extractor_keys.each { _1.activate(id_to_values) }
-      # rule.activate(key, id_to_values)
+      extractor_keys.each { _1.activate(id_to_values, trigger_rules: trigger_rules) }
     end
 
-    def update(objects)
+    def update(objects, trigger_rules: true)
       records = extractor_matches.where(entry_id: objects.pluck(:id)).pluck(:entry_id, :values).to_h
 
       new_objects = {}
@@ -70,11 +69,10 @@ module ActiveRecordRules
         end
       end
 
-      # rule.update(key, old_objects, new_objects)
-      extractor_keys.each { _1.update(old_objects, new_objects) }
+      extractor_keys.each { _1.update(old_objects, new_objects, trigger_rules: trigger_rules) }
     end
 
-    def deactivate(objects)
+    def deactivate(objects, trigger_rules: true)
       records = extractor_matches.where(entry_id: objects.pluck(:id)).pluck(:entry_id, :values).to_h
       if records.size < objects.size
         logger&.warn do
@@ -89,8 +87,7 @@ module ActiveRecordRules
           "Extractor(#{id}): unmatched for #{object.class}(#{object.id}) (condition no longer matches)"
         end
       end
-      # rule.deactivate(key, records)
-      extractor_keys.each { _1.deactivate(records) }
+      extractor_keys.each { _1.deactivate(records, trigger_rules: trigger_rules) }
     end
 
     private

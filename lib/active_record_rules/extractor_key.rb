@@ -13,16 +13,16 @@ module ActiveRecordRules
     belongs_to :rule
     validates :key, uniqueness: { scope: :rule }
 
-    def activate(objects)
-      rule.activate(key, objects)
+    def activate(objects, trigger_rules: true)
+      rule.activate(key, objects, trigger_rules: trigger_rules)
     end
 
-    def update(old_objects, new_objects)
-      rule.update(key, old_objects, new_objects)
+    def update(old_objects, new_objects, trigger_rules: true)
+      rule.update(key, old_objects, new_objects, trigger_rules: trigger_rules)
     end
 
-    def deactivate(objects)
-      rule.deactivate(key, objects)
+    def deactivate(objects, trigger_rules: true)
+      rule.deactivate(key, objects, trigger_rules: trigger_rules)
     end
 
     private

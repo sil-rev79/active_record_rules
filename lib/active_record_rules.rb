@@ -30,7 +30,7 @@ require "active_record_rules/rule_match"
 module ActiveRecordRules
   cattr_accessor :logger, :execution_context
 
-  def self.define_rule(definition_string)
+  def self.define_rule(definition_string, trigger_rules: true)
     definition = Parser.new.definition.parse(definition_string, reporter: Parslet::ErrorReporter::Deepest.new)
 
     extractor_keys = definition[:conditions].each_with_index.map do |condition_definition, index|
@@ -80,11 +80,17 @@ module ActiveRecordRules
       )
     end
 
-    Rule.create!(
+    rule = Rule.create!(
       extractor_keys: extractor_keys,
       name: definition[:name].to_s,
       definition: definition_string
     )
+
+    rule.conditions.each do |condition|
+      condition.activate_all(trigger_rules: trigger_rules)
+    end
+
+    rule
   end
 
   def self.trigger_all(*klasses)
