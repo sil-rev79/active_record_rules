@@ -49,6 +49,7 @@ module ActiveRecordRules
 
       updating = condition_matches.where(entry_id: all_matching_objects).pluck(:id).to_set
       updating, activating = all_matching_objects.partition { updating.include?(_1.id) }
+      condition_matches.insert_all!(activating.map { { entry_id: _1.id } }) if activating.any?
 
       all_ids_arel = match_class.all.arel.tap do |arel|
         arel.projections = [match_class.arel_table[:id]]
@@ -58,6 +59,7 @@ module ActiveRecordRules
                      .where(entry_id: match_class.all)
                      .pluck(:entry_id, ConditionMatch.arel_table[:entry_id].in(all_ids_arel))
                      .map { [match_class.new(id: _1), _2] }
+      condition_matches.delete_by(entry_id: deactivating.map(&:first).pluck(:id)) if deactivating.any?
 
       activating.each do |object|
         logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (matched)" }
@@ -190,7 +192,7 @@ module ActiveRecordRules
 
     def clause_arel(clause)
       table = match_class.arel_table
-      op_method = { "=" => :eq, "!=" => :neq, "<" => :lt, "<=" => :lte, ">" => :gt, ">=" => :gte }
+      op_method = { "=" => :eq, "!=" => :not_eq, "<" => :lt, "<=" => :lte, ">" => :gt, ">=" => :gte }
       lhs, op, rhs = case clause[:parsed]
                      in { name:, op:, rhs: { string: } }
                        [table[name], op_method[op.to_s], string.to_s]
