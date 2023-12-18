@@ -94,73 +94,66 @@ RSpec.describe ActiveRecordRules do
           tuple(
             one_of("heart", "diamond", "club", "spade"),
             one_of("2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king", "ace"),
-            boolean, # whether to delete this record
-            boolean, # whether to re-create this record after it's deleted
-            maybe(one_of("heart", "diamond", "club", "spade")) # a new suit to update to
+            # A collection of potential types of updates
+            array(
+              one_of(
+                # Update the suit
+                tuple(:suit, one_of("heart", "diamond", "club", "spade")),
+                # Update the rank
+                tuple(:rank, one_of("2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king", "ace")),
+                # Delete the object
+                :delete,
+                # Create a new object with the same values
+                :clone
+              ),
+              length: 0..4
+            )
           )
         )
       )
-      let!(:card_records) do
-        cards.map do |suit, rank|
+
+      let!(:card_state) do
+        card_state = []
+        records = cards.map do |suit, rank|
+          card_state << { suit: suit, rank: rank }
           Card.create!(suit: suit, rank: rank)
         end
+
+        (0..).each do |update_number|
+          any_updates = false
+          records.zip(cards.map(&:third), 0..).each do |record, updates, index|
+            update = updates[update_number]
+            next unless update
+
+            any_updates = true
+            case update
+            in [:suit, suit]
+              next if record.destroyed?
+
+              record.update!(suit: suit)
+              card_state[index][:suit] = suit
+            in [:rank, rank]
+              next if record.destroyed?
+
+              record.update!(rank: rank)
+              card_state[index][:rank] = rank
+            in :delete
+              record.destroy!
+              card_state[index] = nil
+            in :clone
+              record.dup.save!
+              card_state << { suit: record.suit, rank: record.rank }
+            end
+          end
+          break unless any_updates
+        end
+
+        card_state.compact
       end
 
       it_always "matches on groups of three" do
-        expected_matches = cards.group_by(&:first).flat_map do |suit, cards|
-          ranks = cards.map(&:second)
-          ranks.product(ranks, ranks).map do |rank1, rank2, rank3|
-            next unless rank1 < rank2 && rank2 < rank3
-
-            [suit, [rank1, rank2, rank3]]
-          end
-        end.compact
-        expect(TestHelper.matches.sort).to eq(expected_matches.sort)
-      end
-
-      it_always "matches on groups of three after deleting some records" do
-        cards.zip(card_records).each do |card, record|
-          record.destroy! if card[2]
-        end
-
-        expected_matches = cards.group_by(&:first).flat_map do |suit, cards|
-          ranks = cards.reject { _3 }.map(&:second)
-          ranks.product(ranks, ranks).map do |rank1, rank2, rank3|
-            next unless rank1 < rank2 && rank2 < rank3
-
-            [suit, [rank1, rank2, rank3]]
-          end
-        end.compact
-        expect(TestHelper.matches.sort).to eq(expected_matches.sort)
-      end
-
-      it_always "matches on groups of three after deleting and restoring some records" do
-        cards.zip(card_records).each do |card, record|
-          record.destroy! if card[2]
-        end
-
-        cards.each do |suit, rank, destroy, restore|
-          Card.create!(suit: suit, rank: rank) if destroy && restore
-        end
-
-        expected_matches = cards.group_by(&:first).flat_map do |suit, cards|
-          ranks = cards.reject { _3 && !_4 }.map(&:second)
-          ranks.product(ranks, ranks).map do |rank1, rank2, rank3|
-            next unless rank1 < rank2 && rank2 < rank3
-
-            [suit, [rank1, rank2, rank3]]
-          end
-        end.compact
-        expect(TestHelper.matches.sort).to eq(expected_matches.sort)
-      end
-
-      it_always "matches on groups of three after updating some records" do
-        cards.zip(card_records).each do |card, record|
-          record.update!(suit: card[4]) if card[4]
-        end
-
-        expected_matches = cards.group_by { _5 || _1 }.flat_map do |suit, cards|
-          ranks = cards.map(&:second)
+        expected_matches = card_state.group_by { _1[:suit] }.flat_map do |suit, cards|
+          ranks = cards.pluck(:rank)
           ranks.product(ranks, ranks).map do |rank1, rank2, rank3|
             next unless rank1 < rank2 && rank2 < rank3
 
@@ -244,6 +237,19 @@ RSpec.describe ActiveRecordRules do
           expect(TestHelper.matches.sort).to eq([["heart", ["2", "3", "4"]]])
         end
       end
+
+      # describe "four cards, one created with dup" do
+      #   before do
+      #     Card.create!(suit: "heart", rank: "2")
+      #     Card.create!(suit: "heart", rank: "3")
+      #     card = Card.create!(suit: "heart", rank: "4")
+      #     card.dup.save!
+      #   end
+
+      #   it "matches the resulting match" do
+      #     expect(TestHelper.matches.sort).to eq([["heart", ["2", "3", "4"]], ["heart", ["2", "3", "4"]]])
+      #   end
+      # end
     end
   end
 end
