@@ -93,7 +93,15 @@ with tight integration with RSpec.")
  (inputs (list ruby
                ruby-activerecord
                ruby-parslet))
- (native-inputs (list bundler ruby-rake ruby-rails ruby-rspec ruby-rubocop ruby-rubocop-rspec ruby-solargraph ruby-properb))
+ (native-inputs (list bundler
+                      ruby-rake
+                      ruby-rails
+                      ruby-rspec
+                      ruby-rubocop
+                      ruby-rubocop-rspec
+                      ruby-simplecov
+                      ruby-solargraph
+                      ruby-properb))
  (synopsis "Database-driven production rules in Ruby")
  (description
   "A production rule library that uses database records as its

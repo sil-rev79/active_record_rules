@@ -1,5 +1,23 @@
 # frozen_string_literal: true
 
+# Run tests with coverage report information
+if ENV["TRACK_COVERAGE"]
+  require "simplecov"
+
+  # Due to the way I do development, using Guix, the coverage report
+  # can't write over the top of the previous one without some
+  # help. The easiest way: remove the old coverage report when running
+  # tests again.
+  Pathname.new(__FILE__).join("..", "..", "coverage").tap do |dir|
+    # clear old coverage results
+    FileUtils.rm_rf(dir) if dir.exist?
+  end
+  SimpleCov.start do
+    enable_coverage :branch
+    primary_coverage :branch
+  end
+end
+
 require "active_record"
 require "active_record_rules"
 require "generators/active_record_rules/install_generator"
