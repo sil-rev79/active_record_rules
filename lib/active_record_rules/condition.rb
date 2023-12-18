@@ -40,7 +40,7 @@ module ActiveRecordRules
     scope :for_class, lambda { |c|
       where(match_class_name: c.ancestors.select { _1 < ActiveRecord::Base }.map(&:name))
     }
-    scope :includes_for_activate, -> { includes(extractors: { rule: { extractors: {} } }) }
+    scope :includes_for_activate, -> { includes(extractors: { extractor_keys: { rule: { extractor_keys: {} } } }) }
 
     def activate_all
       all_matching_objects = clauses.reduce(match_class.all) do |relation, clause|

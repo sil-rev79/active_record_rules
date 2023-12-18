@@ -4,6 +4,7 @@ require "active_record_rules/condition"
 require "active_record_rules/condition_match"
 require "active_record_rules/extractor"
 require "active_record_rules/extractor_match"
+require "active_record_rules/extractor_key"
 require "active_record_rules/parser"
 require "active_record_rules/rule"
 require "active_record_rules/rule_match"
@@ -32,7 +33,7 @@ module ActiveRecordRules
   def self.define_rule(definition_string)
     definition = Parser.new.definition.parse(definition_string, reporter: Parslet::ErrorReporter::Deepest.new)
 
-    extractors = definition[:conditions].each_with_index.map do |condition_definition, index|
+    extractor_keys = definition[:conditions].each_with_index.map do |condition_definition, index|
       constant_conditions = (condition_definition[:parts] || []).map do |cond|
         case cond
         in { name:, op:, rhs: { string: } }
@@ -63,15 +64,24 @@ module ActiveRecordRules
                .map { _1[:name].to_s }
                .uniq
 
-      Extractor.new(
-        key: "cond#{index + 1}",
+      extractor = Extractor.find_or_initialize_by(
         condition: condition,
-        fields: fields
+        # We have to wrap the fields in this fake object because
+        # querying with an array at the toplevel turns into an
+        # ActiveRecord IN query, which ruins everything.  Using an
+        # object here simplifies things a lot.
+        fields: { "names" => fields }
+      )
+      extractor.validate!
+
+      ExtractorKey.new(
+        extractor: extractor,
+        key: "cond#{index + 1}"
       )
     end
 
     Rule.create!(
-      extractors: extractors,
+      extractor_keys: extractor_keys,
       name: definition[:name].to_s,
       definition: definition_string
     )

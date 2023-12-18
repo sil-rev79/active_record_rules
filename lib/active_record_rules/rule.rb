@@ -21,7 +21,8 @@ module ActiveRecordRules
   class Rule < ActiveRecord::Base
     self.table_name = :arr__rules
 
-    has_many :extractors
+    has_many :extractor_keys
+    has_many :extractors, through: :extractor_keys
     has_many :conditions, through: :extractors
     has_many :rule_matches
 
@@ -238,7 +239,7 @@ module ActiveRecordRules
 
       binds = []
 
-      matches = extractors.to_h do |match|
+      matches = extractor_keys.to_h do |match|
         if match.key == key
           rows = objects.map do |object_id, values|
             binds << object_id

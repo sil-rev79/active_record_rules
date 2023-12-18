@@ -119,6 +119,12 @@ RSpec.describe ActiveRecordRules do
       expect(ActiveRecordRules::Condition.all.size).to be == 3
     end
 
+    it "shares an Extractor node" do
+      # This only shares a single extractor, between the two
+      # Person(<name>, greetable = true) nodes.
+      expect(ActiveRecordRules::Extractor.all.size).to be == 4
+    end
+
     context "with ten people" do
       before do
         Salutation.create!(greeting: "What's up?")
