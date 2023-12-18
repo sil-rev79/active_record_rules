@@ -93,6 +93,27 @@ module ActiveRecordRules
     rule
   end
 
+  def self.delete_rule(rule_name, trigger_rules: true)
+    rule = Rule.find_by(name: rule_name)
+
+    rule.unmatch_all if trigger_rules
+    rule.destroy!
+
+    empty_extractors = Extractor.joins(:extractor_keys)
+                                .group(:id)
+                                .having(Arel.sql("count").eq(0))
+                                .pluck(:id, "count(arr__extractor_keys.id) as count")
+    Extractor.where(id: empty_extractors).destroy_all unless empty_extractors.empty?
+
+    empty_conditions = Condition.joins(:extractors)
+                                .group(:id)
+                                .having(Arel.sql("count").eq(0))
+                                .pluck(:id, "count(arr__extractors.id) as count")
+    Condition.where(id: empty_conditions).destroy_all unless empty_conditions.empty?
+
+    rule
+  end
+
   def self.trigger_all(*klasses)
     conditions = if klasses.empty?
                    Condition.all

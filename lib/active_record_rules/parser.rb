@@ -95,7 +95,5 @@ module ActiveRecordRules
         on_update.as(:on_update).maybe >>
         on_unmatch.as(:on_unmatch).maybe
     end
-
-    root :definition
   end
 end

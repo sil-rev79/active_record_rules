@@ -115,6 +115,20 @@ module ActiveRecordRules
       end
     end
 
+    def unmatch_all
+      arguments_by_ids = fetch_all_ids_and_arguments
+      deleted_ids = rule_matches.pluck(:ids)
+      rule_matches.delete_all
+
+      deleted_ids.each do |ids|
+        arguments = arguments_by_ids[ids]
+        logger&.info { "Rule(#{id}): unmatched for #{ids.to_json} (rule deleted)" }
+        logger&.debug { "Rule(#{id}): unmatched with arguments #{pretty_arguments(arguments).to_json}" }
+
+        execute_unmatch(arguments)
+      end
+    end
+
     private
 
     def logger
@@ -317,6 +331,53 @@ module ActiveRecordRules
 
         [ids, [names.keys.map { final_values[_1] }, names.keys.map { old_final_values[_1] }]]
       end.compact.to_h
+    end
+
+    # This is a simplification of `fetch_ids_and_arguments_for',
+    # above. I'm sure there's some helpful refactoring of them that
+    # could be done, but I'll have to return to it later.
+    def fetch_all_ids_and_arguments
+      parsed_definition => { names:, constraints: }
+
+      matches = extractor_keys.to_h do |match|
+        [match.key, match.extractor_matches.to_sql]
+      end
+
+      sql_names = names.transform_values do |definition,|
+        "#{definition[0]}.\"values\"->>'#{definition[1]}'"
+      end.to_a
+
+      clauses = constraints.map do |op, lhs, rhs|
+        case [lhs, rhs]
+        in [[left_key, left_field], [right_key, right_field]]
+          "#{left_key}.\"values\"->>'#{left_field}' #{op} #{right_key}.\"values\"->>'#{right_field}'"
+
+        else
+          # The above represent all the clause formats that are
+          # relationships between objects. The only things that remain
+          # are constant clauses, which have already been handled by
+          # the Condition object record activation process, so we can
+          # ignore them here.
+          nil
+        end
+      end.compact
+
+      where_clause = clauses.join(" and ")
+
+      query_result = ActiveRecord::Base.connection.select_all(<<~SQL.squish, nil).rows
+        select #{matches.keys.map { "#{_1}.entry_id" }.join(", ")}
+               #{sql_names.map(&:second).map { ", #{_1}" }.join}
+          from #{matches.map { "(#{_2}) as #{_1}" }.join(",")}
+         #{where_clause.presence && "where #{where_clause}"}
+      SQL
+
+      query_result.to_h do |row|
+        ids = matches.keys.zip(row[..matches.size]).sort_by(&:first).to_h
+
+        values = sql_names.map(&:first).zip(row[matches.size..]).to_h
+
+        [ids, names.keys.map { values[_1] }]
+      end
     end
   end
 end

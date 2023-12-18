@@ -459,4 +459,37 @@ RSpec.describe ActiveRecordRules do
       end
     end
   end
+
+  describe "rule deletion" do
+    before do
+      described_class.define_rule(<<~RULE)
+        rule run custom methods
+          Person(<name>)
+        on unmatch # note: on UNmatch
+          TestHelper.matches << name
+      RULE
+      TestHelper.matches = []
+      Person.create!(name: "John")
+    end
+
+    context "with rule triggering" do
+      before do
+        described_class.delete_rule("run custom methods", trigger_rules: true)
+      end
+
+      it "unmatches existing objects" do
+        expect(TestHelper.matches).to include("John")
+      end
+    end
+
+    context "without rule triggering" do
+      before do
+        described_class.delete_rule("run custom methods", trigger_rules: false)
+      end
+
+      it "doesn't unmatch existing objects" do
+        expect(TestHelper.matches).to be_empty
+      end
+    end
+  end
 end
