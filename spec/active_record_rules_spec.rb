@@ -368,4 +368,37 @@ RSpec.describe ActiveRecordRules do
       end
     end
   end
+
+  describe "custom execution objects" do
+    before do
+      described_class.define_rule(<<~RULE)
+        rule run custom methods
+          Person(<name>)
+        on match
+          insert(0, name)
+      RULE
+
+      TestHelper.matches = []
+    end
+
+    context "with constant TestHelper.match value" do
+      before { described_class.execution_context = TestHelper.matches }
+      after { described_class.execution_context = nil }
+
+      it "calls the methods on right object" do
+        Person.create!(name: "John")
+        expect(TestHelper.matches).to include("John")
+      end
+    end
+
+    context "with proc returning the TestHelper.match value" do
+      before { described_class.execution_context = -> { TestHelper.matches } }
+      after { described_class.execution_context = nil }
+
+      it "calls the methods on right object" do
+        Person.create!(name: "John")
+        expect(TestHelper.matches).to include("John")
+      end
+    end
+  end
 end

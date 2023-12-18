@@ -213,7 +213,7 @@ module ActiveRecordRules
 
     def execute_match(args)
       parsed_definition => { on_match: }
-      Object.new.instance_exec(*args, &on_match)
+      context.instance_exec(*args, &on_match)
     end
 
     ArgumentPair = Struct.new(:old, :new)
@@ -222,16 +222,26 @@ module ActiveRecordRules
       parsed_definition => { on_match:, on_update:, on_unmatch: }
       if on_update
         arg_pairs = old_args.zip(new_args).map { ArgumentPair.new(_1, _2) }
-        Object.new.instance_exec(*arg_pairs, &on_update)
+        context.instance_exec(*arg_pairs, &on_update)
       else
-        Object.new.instance_exec(*old_args, &on_unmatch)
-        Object.new.instance_exec(*new_args, &on_match)
+        context.instance_exec(*old_args, &on_unmatch)
+        context.instance_exec(*new_args, &on_match)
       end
     end
 
     def execute_unmatch(args)
       parsed_definition => { on_unmatch: }
-      Object.new.instance_exec(*args, &on_unmatch)
+      context.instance_exec(*args, &on_unmatch)
+    end
+
+    def context
+      if ActiveRecordRules.execution_context.nil?
+        Object.new
+      elsif ActiveRecordRules.execution_context.is_a?(Proc)
+        ActiveRecordRules.execution_context.call
+      else
+        ActiveRecordRules.execution_context
+      end
     end
 
     def fetch_ids_and_arguments_for(key, objects, exclude_ids: nil, old_values: {})

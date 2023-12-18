@@ -28,7 +28,7 @@ require "active_record_rules/rule_match"
 # ActiveRecordRules::Rule), and can be modified as part of a running
 # system.
 module ActiveRecordRules
-  cattr_accessor :logger
+  cattr_accessor :logger, :execution_context
 
   def self.define_rule(definition_string)
     definition = Parser.new.definition.parse(definition_string, reporter: Parslet::ErrorReporter::Deepest.new)
