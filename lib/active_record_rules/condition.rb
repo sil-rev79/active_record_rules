@@ -32,8 +32,8 @@ module ActiveRecordRules
   class Condition < ActiveRecord::Base
     self.table_name = :arr__conditions
 
-    has_many :extractors
-    has_many :condition_matches
+    has_many :extractors, dependent: :destroy
+    has_many :condition_matches, dependent: :delete_all
     validates :match_class_name, presence: true
     validate :validate_record_class
 

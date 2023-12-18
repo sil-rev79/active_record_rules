@@ -8,8 +8,8 @@ module ActiveRecordRules
     self.table_name = :arr__extractors
 
     belongs_to :condition
-    has_many :extractor_matches, dependent: :destroy
-    has_many :extractor_keys, dependent: :destroy
+    has_many :extractor_matches, dependent: :delete_all
+    has_many :extractor_keys, dependent: :delete_all
 
     def activate(objects, trigger_rules: true)
       id_to_values = objects.to_h do |object|

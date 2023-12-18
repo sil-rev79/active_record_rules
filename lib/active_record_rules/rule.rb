@@ -21,10 +21,10 @@ module ActiveRecordRules
   class Rule < ActiveRecord::Base
     self.table_name = :arr__rules
 
-    has_many :extractor_keys
+    has_many :extractor_keys, dependent: :delete_all
     has_many :extractors, through: :extractor_keys
     has_many :conditions, through: :extractors
-    has_many :rule_matches
+    has_many :rule_matches, dependent: :delete_all
 
     class RuleSyntaxError < StandardError; end
 
