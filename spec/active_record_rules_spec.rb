@@ -330,4 +330,36 @@ RSpec.describe ActiveRecordRules do
       end
     end
   end
+
+  describe "rules with updates" do
+    before do
+      described_class.define_rule(<<~RULE)
+        rule greet
+          Salutation(<greeting>)
+          Person(<name>)
+        on match
+          TestHelper.matches += [[greeting, name, 0]]
+        on update
+          record = TestHelper.matches.find { _1 == greeting.old && _2 == name.old }
+          record[0] = greeting.new
+          record[1] = name.new
+          record[2] += 1
+        on unmatch
+          TestHelper.matches.delete! { _1 == greeting && _2 == name }
+      RULE
+
+      TestHelper.matches = []
+
+      Salutation.create!(greeting: "hello")
+    end
+
+    context "with John as a person" do
+      let!(:john) { Person.create!(name: "John") }
+
+      it "changes value when John changes name" do
+        john.update!(name: "Jane")
+        expect(TestHelper.matches).to include(["hello", "Jane", 1])
+      end
+    end
+  end
 end

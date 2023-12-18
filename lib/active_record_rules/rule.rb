@@ -88,8 +88,7 @@ module ActiveRecordRules
       updating.each do |ids, (arguments, old_arguments)|
         logger&.info { "Rule(#{id}): re-matched for #{ids.to_json}" }
         logger&.debug { "Rule(#{id}): re-matched with arguments #{pretty_arguments(arguments).to_json}" }
-        execute_unmatch(old_arguments)
-        execute_match(arguments)
+        execute_update(old_arguments, arguments)
       end
 
       unmatching.each do |ids, (arguments, _)|
@@ -184,15 +183,17 @@ module ActiveRecordRules
           }
         RUBY
 
-        on_update_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
-          # ->(in1, in2) {
-          #   puts "Updating for \#{in1} \#{in2}"
-          # }
+        if parsed[:on_update]
+          on_update_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
+            # ->(in1, in2) {
+            #   puts "Updating for \#{in1} \#{in2}"
+            # }
 
-          ->(#{names.keys.join(", ")}) {
-            #{parsed[:on_update]&.pluck(:line)&.join("\n  ")}
-          }
-        RUBY
+            ->(#{names.keys.join(", ")}) {
+              #{parsed[:on_update]&.pluck(:line)&.join("\n  ")}
+            }
+          RUBY
+        end
 
         { names: names,
           constraints: constraints,
@@ -212,6 +213,19 @@ module ActiveRecordRules
     def execute_match(args)
       parsed_definition => { on_match: }
       Object.new.instance_exec(*args, &on_match)
+    end
+
+    ArgumentPair = Struct.new(:old, :new)
+
+    def execute_update(old_args, new_args)
+      parsed_definition => { on_match:, on_update:, on_unmatch: }
+      if on_update
+        arg_pairs = old_args.zip(new_args).map { ArgumentPair.new(_1, _2) }
+        Object.new.instance_exec(*arg_pairs, &on_update)
+      else
+        Object.new.instance_exec(*old_args, &on_unmatch)
+        Object.new.instance_exec(*new_args, &on_match)
+      end
     end
 
     def execute_unmatch(args)
