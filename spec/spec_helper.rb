@@ -65,6 +65,10 @@ RSpec.configure do |config|
       end
     end
 
+    # Set up a logger that goes nowhere. This ensures that we always
+    # run the logging-related code so we make sure it doesn't crash.
+    ActiveRecordRules.logger = Logger.new(StringIO.new)
+
     example.run
   end
 

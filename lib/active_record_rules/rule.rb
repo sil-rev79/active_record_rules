@@ -107,7 +107,7 @@ module ActiveRecordRules
 
       destroyed_ids.each do |ids|
         arguments, = arguments_by_ids[ids]
-        logger&.info { "Rule(#{id}): unmatched for #{record.ids.to_json} (entry removed by condition)" }
+        logger&.info { "Rule(#{id}): unmatched for #{ids.to_json} (entry removed by condition)" }
         logger&.debug { "Rule(#{id}): unmatched with arguments #{pretty_arguments(arguments).to_json}" }
 
         execute_unmatch(arguments)

@@ -42,6 +42,7 @@ RSpec.describe ActiveRecordRules do
       RULE
 
       TestHelper.matches = []
+      described_class.logger = nil # to speed these tests up, we turn off the logging entirely
 
       clients.each do |client, data|
         data[:representatives].each { ClientRepresentative.create!(client: client, name: _1) }
@@ -86,6 +87,7 @@ RSpec.describe ActiveRecordRules do
       RULE
 
       TestHelper.matches = []
+      described_class.logger = nil # to speed these tests up, we turn off the logging entirely
     end
 
     describe "always" do # rubocop:disable RSpec/EmptyExampleGroup
