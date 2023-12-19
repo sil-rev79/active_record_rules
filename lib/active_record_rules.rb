@@ -177,8 +177,12 @@ module ActiveRecordRules
         on_unmatch: definition[:on_unmatch]&.pluck(:line)&.join("\n  ")
       )
 
-      new_conditions.each do |condition|
-        condition.activate_all(trigger_rules: trigger_rules)
+      if new_conditions.any?
+        new_conditions.each do |condition|
+          condition.activate_all(trigger_rules: trigger_rules)
+        end
+      elsif trigger_rules
+        rule.match_all
       end
 
       rule

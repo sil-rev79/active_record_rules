@@ -115,6 +115,24 @@ module ActiveRecordRules
       end
     end
 
+    def match_all
+      arguments_by_ids = fetch_all_ids_and_arguments(exclude_ids: rule_matches.pluck(:ids).to_set)
+      unless arguments_by_ids.empty?
+        rule_matches.insert_all!(
+          arguments_by_ids.map do |ids, _|
+            { ids: ids }
+          end
+        )
+      end
+
+      arguments_by_ids.each do |ids, arguments|
+        logger&.info { "Rule(#{id}): matched for #{ids.to_json} (newly defined rule)" }
+        logger&.debug { "Rule(#{id}): matched with arguments #{pretty_arguments(arguments).to_json}" }
+
+        execute_match(arguments)
+      end
+    end
+
     def unmatch_all
       arguments_by_ids = fetch_all_ids_and_arguments
       deleted_ids = rule_matches.pluck(:ids)
@@ -338,7 +356,7 @@ module ActiveRecordRules
     # This is a simplification of `fetch_ids_and_arguments_for',
     # above. I'm sure there's some helpful refactoring of them that
     # could be done, but I'll have to return to it later.
-    def fetch_all_ids_and_arguments
+    def fetch_all_ids_and_arguments(exclude_ids: nil)
       parsed_definition => { names:, constraints: }
 
       matches = extractor_keys.to_h do |match|
@@ -373,13 +391,16 @@ module ActiveRecordRules
          #{where_clause.presence && "where #{where_clause}"}
       SQL
 
-      query_result.to_h do |row|
+      query_result.map do |row|
         ids = matches.keys.zip(row[..matches.size]).sort_by(&:first).to_h
+
+        # TODO: add this to the WHERE clause with JSON_OBJECT and NOT IN
+        next if exclude_ids&.include?(ids)
 
         values = sql_names.map(&:first).zip(row[matches.size..]).to_h
 
         [ids, names.keys.map { values[_1] }]
-      end
+      end.compact.to_h
     end
   end
 end

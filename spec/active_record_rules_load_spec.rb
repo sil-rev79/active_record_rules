@@ -35,7 +35,7 @@ RSpec.describe ActiveRecordRules do
 
     it { is_expected.to eq(["Hi, John", "Hi, Jane"]) }
 
-    describe "updating rules after the fact, with default settings" do
+    context "when updating rules, with default settings" do
       before do
         described_class.load_rules("#{__dir__}/rules-initial.rrb")
       end
@@ -43,28 +43,28 @@ RSpec.describe ActiveRecordRules do
       it { is_expected.to eq(["Hi, John", "Hi, Jane"]) }
     end
 
-    describe "updating rules after the fact, with trigger_matches: true" do
+    context "when updating rules, with trigger_matches: true" do
       before do
         described_class.load_rules("#{__dir__}/rules-update.rrb", trigger_matches: true)
       end
 
-      it { is_expected.to eq(["Hi, John", "Hi, Jane"]) }
+      it { is_expected.to eq(["Hi, John", "Hi, Jane", "Hi there, John", "Hi there, Jane"]) }
     end
 
-    describe "updating rules after the fact, with trigger_unmatches: true" do
+    context "when updating rules, with trigger_unmatches: true" do
       before do
         described_class.load_rules("#{__dir__}/rules-update.rrb", trigger_unmatches: true)
       end
 
-      it { is_expected.to eq(["Hi, John", "Hi, Jane", "Bye, John", "Bye, Joan"]) }
+      it { is_expected.to eq(["Bye, John", "Bye, Joan"]) }
     end
 
-    describe "updating rules after the fact, with trigger_matches: true and trigger_unmatches: true" do
+    context "when updating rules, with trigger_matches: true and trigger_unmatches: true" do
       before do
         described_class.load_rules("#{__dir__}/rules-update.rrb", trigger_matches: true, trigger_unmatches: true)
       end
 
-      it { is_expected.to eq(["Hi, John", "Hi, Jane", "Bye, John", "Bye, Joan"]) }
+      it { is_expected.to eq(["Hi there, John", "Hi there, Jane", "Bye, John", "Bye, Joan"]) }
     end
   end
 end

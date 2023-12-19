@@ -3,6 +3,8 @@ rule Greet People
   Person(<name>, greetable = true)
 on match
   push("#{greeting}, #{name}")
+on unmatch
+  delete("#{greeting}, #{name}")
 
 
 rule Farewell People

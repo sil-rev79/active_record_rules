@@ -2,4 +2,4 @@ rule Greet People
   Salutation(<greeting>)
   Person(<name>, greetable = true)
 on match
-  push("greet: #{greeting} there, #{name}")
+  push("#{greeting} there, #{name}")
