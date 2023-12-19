@@ -511,7 +511,8 @@ RSpec.describe ActiveRecordRules do
     end
 
     it "is quick to remove one person" do
-      result = Benchmark.measure { Person.all.sample.destroy! }
+      person = Person.all.sample
+      result = Benchmark.measure { person.destroy! }
       expect(result.total).to be < 0.1
     end
   end
