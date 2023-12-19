@@ -84,7 +84,7 @@ module ActiveRecordRules
 
     rule(:on_unmatch) do
       str("on") >> whitespace >> str("unmatch") >> whitespace.maybe >> newline >>
-        (whitespace >> (eol.absent? >> any).repeat.as(:line) >> eol).repeat
+        (whitespace >> (eol.absent? >> any).repeat.as(:line) >> (eol | any.absent?)).repeat
     end
 
     rule(:definition) do
@@ -94,6 +94,10 @@ module ActiveRecordRules
         on_match.as(:on_match).maybe >>
         on_update.as(:on_update).maybe >>
         on_unmatch.as(:on_unmatch).maybe
+    end
+
+    rule(:definitions) do
+      ((whitespace | newline).repeat >> definition.as(:definition)).repeat >> (whitespace | newline).repeat
     end
   end
 end

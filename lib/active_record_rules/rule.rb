@@ -137,15 +137,17 @@ module ActiveRecordRules
 
     def parsed_definition
       @parsed_definition ||= begin
-        parsed = Parser.new.definition.parse(definition,
-                                             reporter: Parslet::ErrorReporter::Deepest.new)
+        parsed = Parser.new.conditions.parse(
+          variable_conditions,
+          reporter: Parslet::ErrorReporter::Deepest.new
+        )
 
         names = Hash.new { _1[_2] = [] }
 
         constraints = Set.new
 
-        parsed[:conditions].each_with_index.map do |condition_definition, index|
-          condition_definition[:parts].each do |cond|
+        parsed.each_with_index.map do |condition_definition, index|
+          (condition_definition[:parts] || []).each do |cond|
             case cond
             in { name:, op: "=", rhs: { name: rhs } }
               names[rhs.to_s] << ["cond#{index + 1}", name.to_s]
@@ -178,46 +180,49 @@ module ActiveRecordRules
           end
         end
 
-        on_match_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
-          # ->(*arguments) {
-          #   code to run when matching
-          # }
-
-          ->(#{names.keys.join(", ")}) {
-            #{parsed[:on_match]&.pluck(:line)&.join("\n  ")}
-          }
-        RUBY
-
-        on_unmatch_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
-          # ->(*arguments) {
-          #   code to run when unmatching
-          # }
-
-          ->(#{names.keys.join(", ")}) {
-            #{parsed[:on_unmatch]&.pluck(:line)&.join("\n  ")}
-          }
-        RUBY
-
-        if parsed[:on_update]
-          on_update_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
-            # ->(*arguments) {
-            #   code to run when updating
-            # }
-
-            ->(#{names.keys.join(", ")}) {
-              #{parsed[:on_update]&.pluck(:line)&.join("\n  ")}
-            }
-          RUBY
-        end
-
         { names: names,
-          constraints: constraints,
-          on_match: on_match_code,
-          on_unmatch: on_unmatch_code,
-          on_update: on_update_code }
+          constraints: constraints }
       end
     rescue Parslet::ParseFailed => e
       raise e.parse_failure_cause.ascii_tree
+    end
+
+    def on_match_proc
+      parsed_definition => { names: }
+      @on_match_proc ||= Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
+        # ->(*arguments) {
+        #   code to run when matching
+        # }
+        ->(#{names.keys.join(", ")}) {
+          #{on_match}
+        }
+      RUBY
+    end
+
+    def on_unmatch_proc
+      parsed_definition => { names: }
+      @on_unmatch_proc ||= Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
+        # ->(*arguments) {
+        #   code to run when unmatching
+        # }
+        ->(#{names.keys.join(", ")}) {
+          #{on_unmatch}
+        }
+      RUBY
+    end
+
+    def on_update_proc
+      return unless on_update
+
+      parsed_definition => { names: }
+      @on_update_proc ||= Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
+        # ->(*arguments) {
+        #   code to run when updating
+        # }
+        ->(#{names.keys.join(", ")}) {
+          #{on_update}
+        }
+      RUBY
     end
 
     def pretty_arguments(arguments)
@@ -226,26 +231,23 @@ module ActiveRecordRules
     end
 
     def execute_match(args)
-      parsed_definition => { on_match: }
-      context.instance_exec(*args, &on_match)
+      context.instance_exec(*args, &on_match_proc)
     end
 
     ArgumentPair = Struct.new(:old, :new)
 
     def execute_update(old_args, new_args)
-      parsed_definition => { on_match:, on_update:, on_unmatch: }
       if on_update
         arg_pairs = old_args.zip(new_args).map { ArgumentPair.new(_1, _2) }
-        context.instance_exec(*arg_pairs, &on_update)
+        context.instance_exec(*arg_pairs, &on_update_proc)
       else
-        context.instance_exec(*old_args, &on_unmatch)
-        context.instance_exec(*new_args, &on_match)
+        context.instance_exec(*old_args, &on_unmatch_proc)
+        context.instance_exec(*new_args, &on_match_proc)
       end
     end
 
     def execute_unmatch(args)
-      parsed_definition => { on_unmatch: }
-      context.instance_exec(*args, &on_unmatch)
+      context.instance_exec(*args, &on_unmatch_proc)
     end
 
     def context

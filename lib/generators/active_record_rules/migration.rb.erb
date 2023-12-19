@@ -7,7 +7,10 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
 
     create_table :arr__rules do |t|
       t.string :name, index: { unique: true }
-      t.string :definition
+      t.string :variable_conditions
+      t.string :on_match
+      t.string :on_update
+      t.string :on_unmatch
     end
 
     create_table :arr__extractor_keys do |t|

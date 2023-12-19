@@ -1,0 +1,12 @@
+rule Greet People
+  Salutation(<greeting>)
+  Person(<name>, greetable = true)
+on match
+  push("#{greeting}, #{name}")
+
+
+rule Farewell People
+  Salutation(<farewell>)
+  Person(<name>, farewellable = true)
+on unmatch
+  push("#{farewell}, #{name}")
