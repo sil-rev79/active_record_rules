@@ -507,13 +507,13 @@ RSpec.describe ActiveRecordRules do
 
     it "is quick to add one more person" do
       result = Benchmark.measure { Person.create!(name: "John") }
-      expect(result.total).to be < 0.1
+      expect(result.total).to be < 0.05
     end
 
     it "is quick to remove one person" do
       person = Person.all.sample
       result = Benchmark.measure { person.destroy! }
-      expect(result.total).to be < 0.1
+      expect(result.total).to be < 0.05
     end
   end
 end
