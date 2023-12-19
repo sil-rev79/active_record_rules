@@ -492,4 +492,33 @@ RSpec.describe ActiveRecordRules do
       end
     end
   end
+
+  describe "modifications with lots of people" do
+    before do
+      described_class.define_rule(<<~RULE)
+        rule run custom methods
+          Salutation(<greeting>)
+          Person(<name>)
+        on match
+          TestHelper.matches.add([greeting, name])
+        on unmatch
+          TestHelper.matches.delete([greeting, name])
+      RULE
+      TestHelper.matches = Set.new
+
+      Salutation.create!(greeting: "hi")
+      Person.insert_all((0..10_000).map { { name: "Person #{_1}" } })
+      described_class.trigger_all # trigger everything in a batch
+    end
+
+    it "is quick to add one more person" do
+      result = Benchmark.measure { Person.create!(name: "John") }
+      expect(result.total).to be < 0.1
+    end
+
+    it "is quick to remove one person" do
+      result = Benchmark.measure { Person.all.sample.destroy! }
+      expect(result.total).to be < 0.1
+    end
+  end
 end
