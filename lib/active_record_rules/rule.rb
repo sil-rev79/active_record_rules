@@ -179,8 +179,8 @@ module ActiveRecordRules
         end
 
         on_match_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
-          # ->(in1, in2) {
-          #   puts "Matching for \#{in1} \#{in2}"
+          # ->(*arguments) {
+          #   code to run when matching
           # }
 
           ->(#{names.keys.join(", ")}) {
@@ -189,8 +189,8 @@ module ActiveRecordRules
         RUBY
 
         on_unmatch_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
-          # ->(in1, in2) {
-          #   puts "Unmatching for \#{in1} \#{in2}"
+          # ->(*arguments) {
+          #   code to run when unmatching
           # }
 
           ->(#{names.keys.join(", ")}) {
@@ -200,8 +200,8 @@ module ActiveRecordRules
 
         if parsed[:on_update]
           on_update_code = Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
-            # ->(in1, in2) {
-            #   puts "Updating for \#{in1} \#{in2}"
+            # ->(*arguments) {
+            #   code to run when updating
             # }
 
             ->(#{names.keys.join(", ")}) {

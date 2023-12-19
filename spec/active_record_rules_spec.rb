@@ -26,10 +26,8 @@ RSpec.describe ActiveRecordRules do
           Salutation(<greeting>)
           Person(<name>)
         on match
-          # puts "match \#{greeting}/\#{name}"
           TestHelper.matches += [[greeting, name]]
         on unmatch
-          # puts "unmatch \#{greeting}/\#{name}"
           TestHelper.matches -= [[greeting, name]]
       RULE
 
@@ -158,10 +156,8 @@ RSpec.describe ActiveRecordRules do
           Person(name = <name1>)
           Person(name = <name2>, name > <name1>)
         on match
-          # puts "match \#{greeting}/\#{name1}/\#{name2}"
           TestHelper.matches += [[greeting, name1, name2]]
         on unmatch
-          # puts "unmatch \#{greeting}/\#{name1}/\#{name2}"
           TestHelper.matches -= [[greeting, name1, name2]]
       RULE
 
@@ -195,10 +191,8 @@ RSpec.describe ActiveRecordRules do
           Person(name = <name1>, greetable = true)
           Person(name = <name2>, name > <name1>)
         on match
-          # puts "match \#{greeting}/\#{name1}/\#{name2}"
           TestHelper.matches += [[greeting, name1, name2]]
         on unmatch
-          # puts "unmatch \#{greeting}/\#{name1}/\#{name2}"
           TestHelper.matches -= [[greeting, name1, name2]]
       RULE
 
