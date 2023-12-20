@@ -1,6 +1,6 @@
 GIT
   remote: https://git.sr.ht/~czan/properb
-  revision: 065ef67288f19fea34461621f59a9510003b3754
+  revision: 99b01e5b2ab17f2f34760390d030e8be81295882
   specs:
     properb (0.0.1)
       rspec (~> 3)

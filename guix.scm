@@ -64,9 +64,9 @@ very flexible.")
      (method git-fetch)
      (uri (git-reference
            (url "https://git.sr.ht/~czan/properb")
-           (commit "065ef67288f19fea34461621f59a9510003b3754")))
+           (commit "99b01e5b2ab17f2f34760390d030e8be81295882")))
      (sha256
-      (base32 "110r4dpzza761r4rrv0xm7by97za1230raz0h2can8p2ap9j5hrj"))))
+      (base32 "0i19hnjm0cqg7sb6g8asfl4mfyi7xrlsjmlgqjdj77gl93alm359"))))
    (build-system ruby-build-system)
    (arguments
     `(#:test-target "spec"))

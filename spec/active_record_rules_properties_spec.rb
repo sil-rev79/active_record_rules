@@ -64,6 +64,93 @@ RSpec.describe ActiveRecordRules do
     end
   end
 
+  describe "rule definition" do
+    generate(
+      steps: array(
+        one_of(
+          tuple(
+            one_of("heart", "diamond", "club", "spade"),
+            one_of("2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king", "ace")
+          ),
+          # A sole rank is a rule which counts cards of that rank
+          one_of("2", "3", "4", "5", "6", "7", "8", "9", "10", "jack", "queen", "king", "ace")
+        )
+      ).map(&:uniq)
+    )
+
+    let!(:counts) { Hash.new { _1[_2] = 0 } }
+
+    before do
+      define_tables do |schema|
+        schema.create_table :cards do |t|
+          t.string :suit
+          t.string :rank
+        end
+      end
+
+      described_class.execution_context = counts
+
+      steps.each do |step|
+        case step
+        in [suit, rank]
+          Card.create!(suit: suit, rank: rank)
+        in rank
+          described_class.define_rule(<<~RULE, trigger_rules: trigger_rules)
+            rule counting #{rank}s
+              Card(rank = "#{rank}", <rank>)
+            on match
+              self[rank] += 1
+          RULE
+        end
+      end
+    end
+
+    context "when not triggering on existing matches" do # rubocop:disable RSpec/EmptyExampleGroup
+      let(:trigger_rules) { false }
+
+      it_always "matches objects which are created later" do
+        expect(counts)
+          .to eq(
+            steps.each_with_index.map do |step, i|
+              next unless step.is_a?(String)
+
+              # Only look at the steps which come *later*
+              count = steps[i..]
+                 .reject { _1.is_a?(String) }
+                 .map(&:second)
+                 .select { _1 == step }
+                 .size
+              next if count.zero?
+
+              [step, count]
+            end.compact.to_h
+          )
+      end
+    end
+
+    context "when triggering on existing matches" do # rubocop:disable RSpec/EmptyExampleGroup
+      let(:trigger_rules) { true }
+
+      it_always "matches all objects" do
+        expect(counts)
+          .to eq(
+            steps.map do |step|
+              next unless step.is_a?(String)
+
+              count = steps
+                 .reject { _1.is_a?(String) }
+                 .map(&:second)
+                 .select { _1 == step }
+                 .size
+              next if count.zero?
+
+              [step, count]
+            end.compact.to_h
+          )
+      end
+    end
+  end
+
   describe "Card example" do
     before do
       define_tables do |schema|

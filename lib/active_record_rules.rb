@@ -179,9 +179,14 @@ module ActiveRecordRules
 
       if new_conditions.any?
         new_conditions.each do |condition|
-          condition.activate_all(trigger_rules: trigger_rules)
+          # Only trigger rules on the last condition, to minimise the
+          # number of times we re-assess the rule records.
+          condition.activate_all(trigger_rules: trigger_rules && condition == new_conditions.last)
         end
       elsif trigger_rules
+        # If we don't have any new conditions then we've already got
+        # all the condition/extractor records we need, so we can just
+        # trigger the rule.
         rule.match_all
       end
 
