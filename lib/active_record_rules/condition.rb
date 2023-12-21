@@ -162,7 +162,7 @@ module ActiveRecordRules
 
     def clauses
       @clauses ||= begin
-        parser = Parser.new.condition_part
+        parser = Parser.new.clause
         match_conditions["clauses"].map do |text|
           { parsed: parser.parse(text),
             text: text }

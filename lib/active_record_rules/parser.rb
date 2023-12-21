@@ -54,7 +54,7 @@ module ActiveRecordRules
       (str("=") | str("!=") | str("<=") | str("<") | str(">=") | str(">")).as(:op)
     end
 
-    rule(:condition_part) do
+    rule(:clause) do
       (str("<") >> name.as(:name) >> str(">")) |
         (name.as(:name) >> whitespace.maybe >> operation >> whitespace.maybe >> expression.as(:rhs))
     end
@@ -64,9 +64,9 @@ module ActiveRecordRules
         str("(") >>
         (
           (
-            whitespace.maybe >> condition_part.repeat(1, 1) >> whitespace.maybe
+            whitespace.maybe >> clause.repeat(1, 1) >> whitespace.maybe
           ) >> (
-            str(",") >> whitespace.maybe >> condition_part >> whitespace.maybe
+            str(",") >> whitespace.maybe >> clause >> whitespace.maybe
           ).repeat
         ).maybe.as(:parts) >>
         str(")")
