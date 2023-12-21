@@ -3,6 +3,11 @@
 class Salutation < TestRecord; end
 class Person < TestRecord; end
 
+module TestRecordModule
+  class Salutation < TestRecord; end
+  class Person < TestRecord; end
+end
+
 RSpec.describe ActiveRecordRules do
   before do
     define_tables do |schema|
@@ -68,6 +73,72 @@ RSpec.describe ActiveRecordRules do
       before { Person.create!(name: "John") }
 
       let!(:jane) { Person.create!(name: "Jane") }
+
+      it "matches for hello/Jane" do
+        expect(TestHelper.matches).to include(["hello", "Jane"])
+      end
+
+      it "unmatches Jane when Jane is deleted" do
+        jane.destroy!
+        expect(TestHelper.matches).not_to include(["hello", "Jane"])
+      end
+
+      it "leave John matched when Jane is deleted" do
+        jane.destroy!
+        expect(TestHelper.matches).to include(["hello", "John"])
+      end
+    end
+  end
+
+  describe "rules with a class in a module" do
+    before do
+      described_class.define_rule(<<~RULE)
+        rule greet
+          TestRecordModule::Salutation(<greeting>)
+          TestRecordModule::Person(<name>)
+        on match
+          TestHelper.matches += [[greeting, name]]
+        on unmatch
+          TestHelper.matches -= [[greeting, name]]
+      RULE
+
+      TestHelper.matches = []
+    end
+
+    let!(:salutation) { TestRecordModule::Salutation.create!(greeting: "hello") }
+
+    context "with John as a person" do
+      let!(:john) { TestRecordModule::Person.create!(name: "John") }
+
+      it "matches for hello/John" do
+        expect(TestHelper.matches).to include(["hello", "John"])
+      end
+
+      it "unmatches when John is deleted" do
+        john.destroy!
+        expect(TestHelper.matches).not_to include(["hello", "John"])
+      end
+
+      it "unmatches when John changes name" do
+        john.update!(name: "Johns")
+        expect(TestHelper.matches).not_to include(["hello", "John"])
+      end
+
+      it "matches for the new value when John changes name" do
+        john.update!(name: "Johns")
+        expect(TestHelper.matches).to include(["hello", "Johns"])
+      end
+
+      it "does nothing when an unrelated attributes changes" do
+        salutation.update!(farewell: "goodbye")
+        expect(TestHelper.matches).to include(["hello", "John"])
+      end
+    end
+
+    context "with John and Jane as people" do
+      before { TestRecordModule::Person.create!(name: "John") }
+
+      let!(:jane) { TestRecordModule::Person.create!(name: "Jane") }
 
       it "matches for hello/Jane" do
         expect(TestHelper.matches).to include(["hello", "Jane"])

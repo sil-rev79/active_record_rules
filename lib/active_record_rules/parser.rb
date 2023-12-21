@@ -42,6 +42,10 @@ module ActiveRecordRules
       (match("[a-zA-Z_]") >> match("[a-zA-Z_0-9!?]").repeat)
     end
 
+    rule(:class_name) do
+      name >> (str("::") >> name).repeat
+    end
+
     rule(:expression) do
       boolean | string | number | nil_expr | (str("<") >> name.as(:name) >> str(">"))
     end
@@ -56,7 +60,7 @@ module ActiveRecordRules
     end
 
     rule(:condition) do
-      name.as(:class_name) >>
+      class_name.as(:class_name) >>
         str("(") >>
         (
           (
