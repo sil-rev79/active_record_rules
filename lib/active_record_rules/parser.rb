@@ -68,7 +68,7 @@ module ActiveRecordRules
           ) >> (
             str(",") >> whitespace.maybe >> clause >> whitespace.maybe
           ).repeat
-        ).maybe.as(:parts) >>
+        ).maybe.as(:clauses) >>
         str(")")
     end
 

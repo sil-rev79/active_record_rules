@@ -107,7 +107,7 @@ module ActiveRecordRules
       new_conditions = []
 
       extractor_keys, condition_strings = definition[:conditions].each_with_index.map do |condition_definition, index|
-        constant_clauses = (condition_definition[:parts] || []).map do |cond|
+        constant_clauses = (condition_definition[:clauses] || []).map do |cond|
           case cond
           in { name:, op:, rhs: { string: } }
             "#{name} #{op} #{string.to_s.to_json}"
@@ -122,7 +122,7 @@ module ActiveRecordRules
           end
         end.compact
 
-        variable_clauses = (condition_definition[:parts] || []).map do |cond|
+        variable_clauses = (condition_definition[:clauses] || []).map do |cond|
           case cond
           in { name:, op:, rhs: { name: rhs } }
             "#{name} #{op} <#{rhs}>"
@@ -144,7 +144,7 @@ module ActiveRecordRules
         condition.validate!
         new_conditions << condition unless condition.persisted?
 
-        fields = (condition_definition[:parts] || [])
+        fields = (condition_definition[:clauses] || [])
                  .select { _1[:rhs].nil? || !_1[:rhs][:name].nil? } # remove the constant conditions
                  .map { _1[:name].to_s }
                  .uniq

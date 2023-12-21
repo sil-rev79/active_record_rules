@@ -165,7 +165,7 @@ module ActiveRecordRules
         constraints = Set.new
 
         parsed.each_with_index.map do |condition_definition, index|
-          (condition_definition[:parts] || []).each do |cond|
+          (condition_definition[:clauses] || []).each do |cond|
             case cond
             in { name:, op: "=", rhs: { name: rhs } }
               names[rhs.to_s] << ["cond#{index + 1}", name.to_s]
