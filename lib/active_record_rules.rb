@@ -29,6 +29,7 @@ require "active_record_rules/rule_match"
 # system.
 module ActiveRecordRules
   cattr_accessor :logger, :execution_context
+  cattr_accessor :default_batch_size, default: 1000
 
   class << self
     def load_rules(*filenames, trigger_matches: false, trigger_unmatches: false)
@@ -76,7 +77,7 @@ module ActiveRecordRules
       raw_delete_rule(rule, trigger_rules: trigger_rules, cleanup: true)
     end
 
-    def trigger_all(*klasses)
+    def trigger_all(*klasses, batch_size: 1000)
       conditions = if klasses.empty?
                      Condition.all
                    else
@@ -85,7 +86,7 @@ module ActiveRecordRules
                      end
                    end
       ActiveRecord::Base.transaction do
-        conditions.each(&:activate_all)
+        conditions.each { _1.activate_all(batch_size: batch_size) }
       end
     end
 
@@ -103,7 +104,7 @@ module ActiveRecordRules
 
     private
 
-    def raw_define_rule(definition, trigger_rules:)
+    def raw_define_rule(definition, trigger_rules:, batch_size: 1000)
       new_conditions = []
 
       extractor_keys, condition_strings = definition[:conditions].each_with_index.map do |condition_definition, index|
@@ -181,7 +182,8 @@ module ActiveRecordRules
         new_conditions.each do |condition|
           # Only trigger rules on the last condition, to minimise the
           # number of times we re-assess the rule records.
-          condition.activate_all(trigger_rules: trigger_rules && condition == new_conditions.last)
+          condition.activate_all(trigger_rules: trigger_rules && condition == new_conditions.last,
+                                 batch_size: batch_size)
         end
       elsif trigger_rules
         # If we don't have any new conditions then we've already got

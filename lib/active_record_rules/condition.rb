@@ -42,48 +42,27 @@ module ActiveRecordRules
     }
     scope :includes_for_activate, -> { includes(extractors: { extractor_keys: { rule: { extractor_keys: {} } } }) }
 
-    def activate_all(trigger_rules: true)
-      all_matching_objects = clauses.reduce(match_class.all) do |relation, clause|
-        relation.where(clause_arel(clause))
-      end
-
-      updating = condition_matches.where(entry_id: all_matching_objects).pluck(:id).to_set
-      updating, activating = all_matching_objects.partition { updating.include?(_1.id) }
-      condition_matches.insert_all!(activating.map { { entry_id: _1.id } }) if activating.any?
-
-      all_ids_arel = match_class.all.arel.tap do |arel|
-        arel.projections = [match_class.arel_table[:id]]
-      end
-      deactivating = condition_matches
-                     .where.not(entry_id: all_matching_objects)
-                     .where(entry_id: match_class.all)
-                     .pluck(:entry_id, ConditionMatch.arel_table[:entry_id].in(all_ids_arel))
-                     .map { [match_class.new(id: _1), _2] }
-      condition_matches.delete_by(entry_id: deactivating.map(&:first).pluck(:id)) if deactivating.any?
-
-      activating.each do |object|
-        logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (matched)" }
-      end
-      extractors.each { _1.activate(activating, trigger_rules: trigger_rules) } unless activating.empty?
-
-      updating.each do |object|
-        logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (updated)" }
-      end
-      extractors.each { _1.update(updating, trigger_rules: trigger_rules) } unless updating.empty?
-
-      deactivating.each do |object, still_exists|
-        logger&.info do
-          if still_exists
-            "Condition(#{id}): unmatched for #{object.class}(#{object.id}) (ceased to match)"
-          else
-            "Condition(#{id}): unmatched for #{object.class}(#{object.id}) (deleted)"
-          end
-        end
-      end
-      unless deactivating.empty?
+    def activate_all(trigger_rules: true, batch_size: ActiveRecordRules.default_batch_size)
+      deactivating_matches.select(:id, :entry_id).in_batches(of: batch_size) do |matches|
+        object_ids = matches.pluck(:entry_id)
+        logger&.info { "Condition(#{id}): unmatched for #{match_class}(#{object_ids.join(", ")})" }
+        condition_matches.delete_by(entry_id: object_ids)
         extractors.each do |extractor|
-          extractor.deactivate(deactivating.map(&:first), trigger_rules: trigger_rules)
+          extractor.deactivate(object_ids.map { match_class.new(id: _1) }, trigger_rules: trigger_rules)
         end
+      end
+
+      interesting_fields = extractor_fields + ["id"]
+
+      updating_objects.select(*interesting_fields).in_batches(of: batch_size) do |objects|
+        logger&.info { "Condition(#{id}): matched by #{match_class}(#{objects.pluck(:id).join(", ")}) (updated)" }
+        extractors.each { _1.update(objects, trigger_rules: trigger_rules) }
+      end
+
+      activating_objects.select(*interesting_fields).in_batches(of: batch_size) do |objects|
+        logger&.info { "Condition(#{id}): matched by #{match_class}(#{objects.pluck(:id).join(", ")}) (matched)" }
+        extractors.each { _1.activate(objects, trigger_rules: trigger_rules) }
+        condition_matches.insert_all!(objects.map { { entry_id: _1.id } })
       end
 
       nil
@@ -159,6 +138,28 @@ module ActiveRecordRules
     end
 
     private
+
+    def all_matching_objects
+      clauses.reduce(match_class.all) do |relation, clause|
+        relation.where(clause_arel(clause))
+      end
+    end
+
+    def activating_objects
+      all_matching_objects.where.not(id: condition_matches.select("entry_id"))
+    end
+
+    def updating_objects
+      all_matching_objects.where(id: condition_matches.select("entry_id"))
+    end
+
+    def deactivating_matches
+      condition_matches.where.not(entry_id: all_matching_objects.select("id"))
+    end
+
+    def extractor_fields
+      extractors.pluck(:fields).map { _1["names"] }.map(&:to_set).reduce(&:+)
+    end
 
     def clauses
       @clauses ||= begin
