@@ -162,44 +162,18 @@ module ActiveRecordRules
 
         names = Hash.new { _1[_2] = [] }
 
-        constraints = Set.new
-
-        parsed.each_with_index.map do |condition_definition, index|
-          (condition_definition[:clauses] || []).each do |cond|
-            case cond
-            in { name:, op: "=", rhs: { name: rhs } }
-              names[rhs.to_s] << ["cond#{index + 1}", name.to_s]
-            in { name:, op:, rhs: { number: rhs } }
-              constraints << [op, ["cond#{index + 1}", name.to_s], rhs.to_i]
-            in { name:, op:, rhs: { string: rhs } }
-              constraints << [op, ["cond#{index + 1}", name.to_s], rhs.to_s]
-            in { name:, op:, rhs: { boolean: rhs } }
-              constraints << [op, ["cond#{index + 1}", name.to_s], rhs.to_s == "true"]
-            in { name:, op:, rhs: { nil: _ } }
-              constraints << [op, ["cond#{index + 1}", name.to_s], nil]
-            in { name:, op:, rhs: { name: rhs } }
-              fields = names[rhs.to_s]
-              raise "Right-hand side name does not have a value in constraint: #{name} #{op} #{fields}" if fields.empty?
-
-              fields.each do |field|
-                constraints << [op, ["cond#{index + 1}", name.to_s], field]
-              end
-            in { name: }
-              names[name.to_s] << ["cond#{index + 1}", name.to_s]
-            else
-              raise "Unknown constraint format: #{cond}"
+        clauses = parsed.each_with_index.flat_map do |condition_definition, index|
+          (condition_definition[:clauses] || []).map do |clause|
+            parsed = Clause.parse(clause)
+            parsed.to_bindings.each do |name, value|
+              names[name] << ["cond#{index + 1}", value]
             end
-          end
-        end
-
-        names.each_value do |fields|
-          fields[1..].zip(fields).each do |lhs, rhs|
-            constraints << ["=", lhs, rhs]
+            ["cond#{index + 1}", parsed]
           end
         end
 
         { names: names,
-          constraints: constraints }
+          clauses: clauses }
       end
     rescue Parslet::ParseFailed => e
       raise e.parse_failure_cause.ascii_tree
@@ -279,7 +253,7 @@ module ActiveRecordRules
     end
 
     def fetch_ids_and_arguments_for(key, objects, exclude_ids: nil, old_values: {})
-      parsed_definition => { names:, constraints: }
+      parsed_definition => { names:, clauses: }
 
       binds = []
 
@@ -298,35 +272,30 @@ module ActiveRecordRules
 
       close_names = names.transform_values do |definitions|
         if (definition = definitions.find { _1[0] == key })
-          definition[1] # get the field name
+          definition[1] # get the field clause
         end
       end.compact
 
       other_names = names.without(*close_names.keys).transform_values do |definition,|
-        "#{definition[0]}.\"values\"->>'#{definition[1]}'"
-      end.to_a
+        definition[1].to_rule_sql(definition[0], {}).first # assume names don't have bindings
+      end
 
-      clauses = constraints.map do |op, lhs, rhs|
-        case [lhs, rhs]
-        in [[left_key, left_field], [right_key, right_field]]
-          "#{left_key}.\"values\"->>'#{left_field}' #{op} #{right_key}.\"values\"->>'#{right_field}'"
+      where_clauses = []
 
-        else
-          # The above represent all the clause formats that are
-          # relationships between objects. The only things that remain
-          # are constant clauses, which have already been handled by
-          # the Condition object record activation process, so we can
-          # ignore them here.
-          nil
-        end
+      bindings = other_names.merge(close_names.transform_values { _1.to_rule_sql(key, {}).first })
+      clauses.reject { _2.binding_variables.empty? }.each do |table_name, clause|
+        next unless (clause_sql, clause_binds = clause.to_rule_sql(table_name, bindings))
+
+        where_clauses << clause_sql
+        binds += clause_binds
       end.compact
 
-      where_clause = clauses.join(" and ")
+      where_clause = where_clauses.join(" and ")
 
       query_result = ActiveRecord::Base.connection.select_all(<<~SQL.squish, nil, binds).rows
         with #{key}(entry_id, "values") as (#{matches[key]})
         select #{matches.keys.map { "#{_1}.entry_id" }.join(", ")}
-               #{other_names.map(&:second).map { ", #{_1}" }.join}
+               #{other_names.values.map { ", #{_1}" }.join}
           from #{key}#{matches.without(key).map { ", (#{_2}) as #{_1}" }.join}
          #{where_clause.presence && "where #{where_clause}"}
       SQL
@@ -337,14 +306,14 @@ module ActiveRecordRules
         # TODO: add this to the WHERE clause with JSON_OBJECT and NOT IN
         next if exclude_ids&.include?(ids)
 
-        other_values = other_names.map(&:first).zip(row[matches.size..]).to_h
+        other_values = other_names.keys.zip(row[matches.size..]).to_h
 
         our_values = objects[ids[key]]
         our_old_values = old_values[ids[key]]
 
-        final_values = other_values.merge(close_names.transform_values { our_values[_1] })
+        final_values = other_values.merge(close_names.transform_values { _1.evaluate(our_values) })
         old_final_values = if our_old_values
-                             other_values.merge(close_names.transform_values { our_old_values[_1] })
+                             other_values.merge(close_names.transform_values { _1.evaluate(our_old_values) })
                            else
                              {}
                            end
@@ -357,36 +326,31 @@ module ActiveRecordRules
     # above. I'm sure there's some helpful refactoring of them that
     # could be done, but I'll have to return to it later.
     def fetch_all_ids_and_arguments(exclude_ids: nil)
-      parsed_definition => { names:, constraints: }
+      parsed_definition => { names:, clauses: }
+
+      binds = []
 
       matches = extractor_keys.to_h do |match|
         [match.key, match.extractor_matches.to_sql]
       end
 
       sql_names = names.transform_values do |definition,|
-        "#{definition[0]}.\"values\"->>'#{definition[1]}'"
-      end.to_a
+        definition[1].to_rule_sql(definition[0], {}).first # assume names don't have bindings
+      end
 
-      clauses = constraints.map do |op, lhs, rhs|
-        case [lhs, rhs]
-        in [[left_key, left_field], [right_key, right_field]]
-          "#{left_key}.\"values\"->>'#{left_field}' #{op} #{right_key}.\"values\"->>'#{right_field}'"
+      where_clauses = []
+      clauses.reject { _2.binding_variables.empty? }.each do |table_name, clause|
+        next unless (clause_sql, clause_binds = clause.to_rule_sql(table_name, sql_names))
 
-        else
-          # The above represent all the clause formats that are
-          # relationships between objects. The only things that remain
-          # are constant clauses, which have already been handled by
-          # the Condition object record activation process, so we can
-          # ignore them here.
-          nil
-        end
+        where_clauses << clause_sql
+        binds += clause_binds
       end.compact
 
-      where_clause = clauses.join(" and ")
+      where_clause = where_clauses.join(" and ")
 
-      query_result = ActiveRecord::Base.connection.select_all(<<~SQL.squish, nil).rows
+      query_result = ActiveRecord::Base.connection.select_all(<<~SQL.squish, nil, binds).rows
         select #{matches.keys.map { "#{_1}.entry_id" }.join(", ")}
-               #{sql_names.map(&:second).map { ", #{_1}" }.join}
+               #{sql_names.values.map { ", #{_1}" }.join}
           from #{matches.map { "(#{_2}) as #{_1}" }.join(",")}
          #{where_clause.presence && "where #{where_clause}"}
       SQL
@@ -397,7 +361,7 @@ module ActiveRecordRules
         # TODO: add this to the WHERE clause with JSON_OBJECT and NOT IN
         next if exclude_ids&.include?(ids)
 
-        values = sql_names.map(&:first).zip(row[matches.size..]).to_h
+        values = sql_names.keys.zip(row[matches.size..]).to_h
 
         [ids, names.keys.map { values[_1] }]
       end.compact.to_h

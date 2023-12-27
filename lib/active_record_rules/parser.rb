@@ -47,20 +47,26 @@ module ActiveRecordRules
     end
 
     rule(:expression) do
-      boolean | string | number | nil_expr | (str("<") >> name.as(:name) >> str(">"))
+      boolean |
+        string |
+        number |
+        nil_expr |
+        (str("<") >> name.as(:binding_name) >> str(">")) |
+        name.as(:record_name)
     end
 
-    rule(:operation) do
+    rule(:operator) do
       (str("=") | str("!=") | str("<=") | str("<") | str(">=") | str(">")).as(:op)
     end
 
     rule(:clause) do
       (str("<") >> name.as(:name) >> str(">")) |
-        (name.as(:name) >> whitespace.maybe >> operation >> whitespace.maybe >> expression.as(:rhs))
+        (expression.as(:lhs) >> whitespace.maybe >> operator >> whitespace.maybe >> expression.as(:rhs))
     end
 
     rule(:condition) do
-      class_name.as(:class_name) >>
+      (str("not") >> whitespace).maybe.as(:negated) >>
+        class_name.as(:class_name) >>
         str("(") >>
         (
           (

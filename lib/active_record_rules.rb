@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "active_record_rules/clause"
 require "active_record_rules/condition"
 require "active_record_rules/condition_match"
 require "active_record_rules/extractor"
@@ -108,31 +109,8 @@ module ActiveRecordRules
       new_conditions = []
 
       extractor_keys, condition_strings = definition[:conditions].each_with_index.map do |condition_definition, index|
-        constant_clauses = (condition_definition[:clauses] || []).map do |cond|
-          case cond
-          in { name:, op:, rhs: { string: } }
-            "#{name} #{op} #{string.to_s.to_json}"
-          in { name:, op:, rhs: { number: } }
-            "#{name} #{op} #{number}"
-          in { name:, op:, rhs: { boolean: } }
-            "#{name} #{op} #{boolean}"
-          in { name:, op:, rhs: { nil: _ } }
-            "#{name} #{op} nil"
-          else
-            nil
-          end
-        end.compact
-
-        variable_clauses = (condition_definition[:clauses] || []).map do |cond|
-          case cond
-          in { name:, op:, rhs: { name: rhs } }
-            "#{name} #{op} <#{rhs}>"
-          in { name: }
-            "<#{name}>"
-          else
-            nil
-          end
-        end.compact
+        clauses = (condition_definition[:clauses] || []).map { Clause.parse(_1) }
+        constant_clauses, variable_clauses = clauses.partition { _1.binding_variables.empty? }
 
         condition = Condition.find_or_initialize_by(
           match_class_name: condition_definition[:class_name].to_s,
@@ -140,15 +118,12 @@ module ActiveRecordRules
           # because querying with an array at the toplevel turns
           # into an ActiveRecord IN query, which ruins everything.
           # Using an object here simplifies things a lot.
-          match_conditions: { "clauses" => constant_clauses }
+          match_conditions: { "clauses" => constant_clauses.map(&:unparse) }
         )
         condition.validate!
         new_conditions << condition unless condition.persisted?
 
-        fields = (condition_definition[:clauses] || [])
-                 .select { _1[:rhs].nil? || !_1[:rhs][:name].nil? } # remove the constant conditions
-                 .map { _1[:name].to_s }
-                 .uniq
+        fields = variable_clauses.map(&:record_variables).reduce(&:+)
 
         extractor = Extractor.find_or_initialize_by(
           condition: condition,
@@ -165,7 +140,7 @@ module ActiveRecordRules
             extractor: extractor,
             key: "cond#{index + 1}"
           ),
-          "#{condition_definition[:class_name]}(#{variable_clauses.join(", ")})"
+          "#{condition_definition[:class_name]}(#{variable_clauses.map(&:unparse).join(", ")})"
         ]
       end.transpose
 

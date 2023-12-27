@@ -162,55 +162,24 @@ module ActiveRecordRules
     end
 
     def clauses
-      @clauses ||= begin
-        parser = Parser.new.clause
-        match_conditions["clauses"].map do |text|
-          { parsed: parser.parse(text),
-            text: text }
-        end
-      end
+      @clauses ||= match_conditions["clauses"].map { Clause.parse(_1) }
     end
 
     def matches_clause?(clause, object)
-      lhs, op, rhs = case clause[:parsed]
-                     in { name:, op:, rhs: { string: } }
-                       [object[name], (op == "=" ? "==" : op), string.to_s]
-                     in { name:, op:, rhs: { number: } }
-                       [object[name], (op == "=" ? "==" : op), number.to_i]
-                     in { name:, op:, rhs: { boolean: } }
-                       [object[name], (op == "=" ? "==" : op), (boolean.to_s == "true")]
-                     in { name:, op:, rhs: { nil: _ } }
-                       [object[name], (op == "=" ? "==" : op), nil]
-                     else
-                       raise "Non-constant test in Condition(#{id}): #{clause[:text]}"
-                     end
-      result = lhs.public_send(op, rhs)
+      result = clause.evaluate(object)
       logger&.debug do
+        # TODO: print these expressions with values in-place
         if result
-          "Condition(#{id}): #{lhs.inspect} #{op} #{rhs.inspect} (#{clause[:text]}) matches"
+          "Condition(#{id}): #{clause.unparse} matches"
         else
-          "Condition(#{id}): #{lhs.inspect} #{op} #{rhs.inspect} (#{clause[:text]}) does not match"
+          "Condition(#{id}): #{clause.unparse} does not match"
         end
       end
       result
     end
 
     def clause_arel(clause)
-      table = match_class.arel_table
-      op_method = { "=" => :eq, "!=" => :not_eq, "<" => :lt, "<=" => :lte, ">" => :gt, ">=" => :gte }
-      lhs, op, rhs = case clause[:parsed]
-                     in { name:, op:, rhs: { string: } }
-                       [table[name], op_method[op.to_s], string.to_s]
-                     in { name:, op:, rhs: { number: } }
-                       [table[name], op_method[op.to_s], number.to_i]
-                     in { name:, op:, rhs: { boolean: } }
-                       [table[name], op_method[op.to_s], (boolean.to_s == "true")]
-                     in { name:, op:, rhs: { nil: _ } }
-                       [table[name], op_method[op.to_s], Arel.sql("null")]
-                     else
-                       raise "Non-constant test in Condition(#{id}): #{clause[:text]}"
-                     end
-      lhs.public_send(op, rhs)
+      clause.to_arel(match_class.arel_table, {})
     end
 
     def logger
