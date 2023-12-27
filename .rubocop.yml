@@ -12,6 +12,9 @@ AllCops:
     - 'vendor/**/*'
     - 'gems/**/*'
 
+Style/Documentation:
+  Enabled: false
+
 # Disable all the cops about length/complexity, because they're pretty
 # noisy.
 Metrics:
