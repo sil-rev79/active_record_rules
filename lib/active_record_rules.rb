@@ -71,6 +71,8 @@ module ActiveRecordRules
     def define_rule(definition_string, trigger_rules: true)
       definition = Parser.new.definition.parse(definition_string, reporter: Parslet::ErrorReporter::Deepest.new)
       raw_define_rule(definition, trigger_rules: trigger_rules)
+    rescue Parslet::ParseFailed => e
+      raise e.parse_failure_cause.ascii_tree
     end
 
     def delete_rule(rule_name, trigger_rules: true)

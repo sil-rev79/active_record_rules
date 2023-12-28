@@ -47,12 +47,17 @@ module ActiveRecordRules
     end
 
     rule(:expression) do
-      boolean |
-        string |
-        number |
-        nil_expr |
-        (str("<") >> name.as(:binding_name) >> str(">")) |
-        name.as(:record_name)
+      infix_expression(
+        ((str("(") >> expression >> str(")")) |
+         (str("<") >> name.as(:binding_name) >> str(">")) |
+         boolean |
+         string |
+         number |
+         nil_expr |
+         name.as(:record_name)),
+        [whitespace.maybe >> match("[+-]").as(:op) >> whitespace.maybe, 1, :left],
+        [whitespace.maybe >> match("[*/]").as(:op) >> whitespace.maybe, 2, :left]
+      ) { |l, o, r| { lhs: l, op: o[:op], rhs: r } }
     end
 
     rule(:operator) do
@@ -60,8 +65,8 @@ module ActiveRecordRules
     end
 
     rule(:clause) do
-      (str("<") >> name.as(:name) >> str(">")) |
-        (expression.as(:lhs) >> whitespace.maybe >> operator >> whitespace.maybe >> expression.as(:rhs))
+      (expression.as(:lhs) >> whitespace.maybe >> operator >> whitespace.maybe >> expression.as(:rhs)) |
+        (str("<") >> name.as(:name) >> str(">"))
     end
 
     rule(:condition) do

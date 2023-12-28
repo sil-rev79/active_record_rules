@@ -288,7 +288,7 @@ module ActiveRecordRules
 
         where_clauses << clause_sql
         binds += clause_binds
-      end.compact
+      end
 
       where_clause = where_clauses.join(" and ")
 
@@ -344,7 +344,7 @@ module ActiveRecordRules
 
         where_clauses << clause_sql
         binds += clause_binds
-      end.compact
+      end
 
       where_clause = where_clauses.join(" and ")
 

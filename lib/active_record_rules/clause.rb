@@ -96,13 +96,26 @@ module ActiveRecordRules
       return unless (left_sql, left_binds = left.to_rule_sql(table_name, bindings))
       return unless (right_sql, right_binds = right.to_rule_sql(table_name, bindings))
 
-      ["#{left_sql} #{operator} #{right_sql}", left_binds + right_binds]
+      op = if operator == "++"
+             "||"
+           else
+             operator
+           end
+
+      ["(#{left_sql} #{op} #{right_sql})", left_binds + right_binds]
     end
 
     def evaluate(object)
       left_object = left.evaluate(object)
       right_object = right.evaluate(object)
-      left_object.public_send((operator == "=" ? "==" : operator), right_object)
+      op_method = if operator == "="
+                    "=="
+                  elsif operator == "++"
+                    "+"
+                  else
+                    operator
+                  end
+      left_object.public_send(op_method, right_object)
     end
 
     def unparse = "#{left.unparse} #{operator} #{right.unparse}"
@@ -156,9 +169,10 @@ module ActiveRecordRules
       @value = value
     end
 
-    def to_arel(_table, _bindings) = value.nil? ? Arel.sql("null") : value
+    def to_arel(_table, _bindings) = Arel::Nodes.build_quoted(value)
 
-    def to_rule_sql(_table_name, _bindings) = ["?", value]
+    # def to_rule_sql(_table_name, _bindings) = ["?", [value]]
+    def to_rule_sql(_table_name, _bindings) = [Arel::Nodes.build_quoted(value).to_sql, []]
 
     def evaluate(_object) = value
 

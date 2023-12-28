@@ -16,7 +16,8 @@ RSpec.describe ActiveRecordRules::Clause do
       "9=x" => "9 = x",
       "x=true" => "x = true",
       "false=<x>" => "false = <x>",
-      "x=nil" => "x = nil"
+      "x=nil" => "x = nil",
+      "<x>=y+1" => "<x> = y + 1"
     }.each do |input, output|
       context "with input {#{input}}" do
         let(:input) { input }
