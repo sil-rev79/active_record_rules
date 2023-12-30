@@ -46,7 +46,7 @@ module ActiveRecordRules
 
       parsed_definition => { names: }
 
-      rule_matches.where(awaiting_execution: true).in_batches do |batch|
+      rule_matches.where(awaiting_execution: { "action" => "match" }).in_batches do |batch|
         all_ids = batch.pluck(:ids)
 
         # Fetch all of the related values needed for this batch
@@ -70,7 +70,7 @@ module ActiveRecordRules
         end
 
         # Then mark them as being done
-        batch.update_all(awaiting_execution: false)
+        batch.update_all(awaiting_execution: { "action" => "none" })
       end
     end
 
@@ -416,7 +416,7 @@ module ActiveRecordRules
       <<~SQL.squish
         select #{ActiveRecord::Base.sanitize_sql(id)},
                '{#{matches.keys.map { "\"#{_1}\":' || #{_1}.entry_id || '" }.join(",")}}',
-               true
+               '{"action":"match"}'
           from #{matches.map { "(#{_2}) as #{_1}" }.join(",")}
          #{where_clause.presence && "where #{where_clause}"}
       SQL
