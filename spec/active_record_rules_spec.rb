@@ -416,7 +416,7 @@ RSpec.describe ActiveRecordRules do
           record[1] = name.new
           record[2] += 1
         on unmatch
-          TestHelper.matches.delete! { _1 == greeting && _2 == name }
+          TestHelper.matches.delete_at(TestHelper.matches.index { _1 == greeting && _2 == name })
       RULE
 
       TestHelper.matches = []

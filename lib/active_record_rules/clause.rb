@@ -172,7 +172,7 @@ module ActiveRecordRules
     def to_arel(_table, _bindings) = Arel::Nodes.build_quoted(value)
 
     # def to_rule_sql(_table_name, _bindings) = ["?", [value]]
-    def to_rule_sql(_table_name, _bindings) = [Arel::Nodes.build_quoted(value).to_sql, []]
+    def to_rule_sql(_table_name, _bindings) = [ActiveRecord::Base.sanitize_sql(value), []]
 
     def evaluate(_object) = value
 
