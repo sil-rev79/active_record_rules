@@ -30,8 +30,6 @@ module ActiveRecordRules
     has_many :conditions, through: :extractors
     has_many :rule_matches, dependent: :delete_all
 
-    class RuleSyntaxError < StandardError; end
-
     # @param key [String] The Extractor key that is being updated
     # @param objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
     def activate(key, objects, trigger_rules: true)
