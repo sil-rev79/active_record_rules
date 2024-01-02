@@ -89,7 +89,7 @@ module ActiveRecordRules
                      end
                    end
       ActiveRecord::Base.transaction do
-        conditions.each { _1.activate_all(batch_size: batch_size) }
+        conditions.each { _1.activate(batch_size: batch_size) }
       end
     end
 
@@ -99,7 +99,7 @@ module ActiveRecordRules
           conditions = Condition.for_class(klass).includes_for_activate
 
           conditions.each do |condition|
-            condition.activate(objects)
+            condition.activate(ids: objects.pluck(:id))
           end
         end
       end
@@ -159,8 +159,8 @@ module ActiveRecordRules
         new_conditions.each do |condition|
           # Only trigger rules on the last condition, to minimise the
           # number of times we re-assess the rule records.
-          condition.activate_all(trigger_rules: trigger_rules && condition == new_conditions.last,
-                                 batch_size: batch_size)
+          condition.activate(trigger_rules: trigger_rules && condition == new_conditions.last,
+                             batch_size: batch_size)
         end
       elsif trigger_rules
         # If we don't have any new conditions then we've already got

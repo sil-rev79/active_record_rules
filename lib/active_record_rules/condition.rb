@@ -42,8 +42,8 @@ module ActiveRecordRules
     }
     scope :includes_for_activate, -> { includes(extractors: { extractor_keys: { rule: { extractor_keys: {} } } }) }
 
-    def activate_all(trigger_rules: true, batch_size: ActiveRecordRules.default_batch_size)
-      deactivating_matches.select(:id, :entry_id).in_batches(of: batch_size) do |matches|
+    def activate(ids: nil, trigger_rules: true, batch_size: ActiveRecordRules.default_batch_size)
+      deactivating_matches(ids).select(:id, :entry_id).in_batches(of: batch_size) do |matches|
         object_ids = matches.pluck(:entry_id)
         logger&.info { "Condition(#{id}): unmatched for #{match_class}(#{object_ids.join(", ")})" }
         condition_matches.delete_by(entry_id: object_ids)
@@ -54,86 +54,17 @@ module ActiveRecordRules
 
       interesting_fields = extractor_fields + ["id"]
 
-      updating_objects.select(*interesting_fields).in_batches(of: batch_size) do |objects|
+      updating_objects(ids).select(*interesting_fields).in_batches(of: batch_size) do |objects|
         logger&.info { "Condition(#{id}): matched by #{match_class}(#{objects.pluck(:id).join(", ")}) (updated)" }
         extractors.each { _1.update(objects, trigger_rules: trigger_rules) }
       end
 
-      activating_objects.select(*interesting_fields).in_batches(of: batch_size) do |objects|
+      activating_objects(ids).select(*interesting_fields).in_batches(of: batch_size) do |objects|
         logger&.info { "Condition(#{id}): matched by #{match_class}(#{objects.pluck(:id).join(", ")}) (matched)" }
         extractors.each { _1.activate(objects, trigger_rules: trigger_rules) }
         condition_matches.insert_all!(objects.map { { entry_id: _1.id } })
       end
 
-      nil
-    end
-
-    def activate(objects)
-      unless objects.all? { match_class_name == _1.class.name }
-        raise "Objects must all be of class #{match_class_name}, but saw #{objects.map(&:class).uniq.join(", ")}"
-      end
-
-      # First, do the basic matching to work out which objects match,
-      # and which ones don't. This basically requires us to go object
-      # by object, but it's all in-memory and constant.
-      matching_objects, non_matching_objects = objects.partition do |object|
-        logger&.debug { "Condition(#{id}): checking #{object.class}(#{object.id})" }
-        object.persisted? && clauses.all? { matches_clause?(_1, object) }
-      end
-
-      # For the matching objects, we need to further divide them into
-      # "activating" (i.e. newly matching) and "updating". This
-      # requires two database queries: one to fetch the existing
-      # records, and then one to insert the new records.
-      updated_ids = condition_matches.where(entry_id: matching_objects).pluck(:entry_id).to_set
-      updating_objects, activating_objects = matching_objects.partition { updated_ids.include?(_1.id) }
-      condition_matches.insert_all!(activating_objects.map { { entry_id: _1.id } }) if activating_objects.any?
-
-      # For the non-matching objects, we need to further divide them
-      # into "deactivating" (i.e. newly non-matching) and "never
-      # matched" records. This also requires two database queries: one
-      # to find the ids of existing records, and the other to delete
-      # them.
-      deactivating_ids = condition_matches.where(entry_id: non_matching_objects).pluck(:entry_id).to_set
-      condition_matches.delete_by(entry_id: deactivating_ids) if deactivating_ids.any?
-      deactivating_objects, never_matched_objects = non_matching_objects.partition { deactivating_ids.include?(_1.id) }
-
-      # By this point, we have updated the database's record of our
-      # matches, and we've separated our objects into four categories:
-      # "activating", "updating", "deactivating", and "never
-      # matched". Now we need to log that information, and pass these
-      # objects on to any relevant extractors.
-
-      activating_objects.each do |object|
-        logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (matched)" }
-      end
-      extractors.each { _1.activate(activating_objects) } unless activating_objects.empty?
-
-      updating_objects.each do |object|
-        logger&.info { "Condition(#{id}): matched by #{object.class}(#{object.id}) (updated)" }
-      end
-      extractors.each { _1.update(updating_objects) } unless updating_objects.empty?
-
-      deactivating_objects.each do |object|
-        logger&.info do
-          if object.persisted?
-            "Condition(#{id}): unmatched for #{object.class}(#{object.id}) (ceased to match)"
-          else
-            "Condition(#{id}): unmatched for #{object.class}(#{object.id}) (deleted)"
-          end
-        end
-      end
-      extractors.each { _1.deactivate(deactivating_objects) } unless deactivating_objects.empty?
-
-      # Never matched objects don't actually do anything, but we debug
-      # long them in case it's useful.
-      never_matched_objects.each do |object|
-        logger&.debug do
-          "Condition(#{id}): not matched for #{object.class}(#{object.id}) (never matched)"
-        end
-      end
-
-      # Explicitly return no useful value.
       nil
     end
 
@@ -145,16 +76,16 @@ module ActiveRecordRules
       end
     end
 
-    def activating_objects
-      all_matching_objects.where.not(id: condition_matches.select("entry_id"))
+    def activating_objects(ids)
+      all_matching_objects.where.not(id: condition_matches.select("entry_id")).where({ id: ids }.compact)
     end
 
-    def updating_objects
-      all_matching_objects.where(id: condition_matches.select("entry_id"))
+    def updating_objects(ids)
+      all_matching_objects.where(id: condition_matches.select("entry_id")).where({ id: ids }.compact)
     end
 
-    def deactivating_matches
-      condition_matches.where.not(entry_id: all_matching_objects.select("id"))
+    def deactivating_matches(ids)
+      condition_matches.where.not(entry_id: all_matching_objects.select("id")).where({ entry_id: ids }.compact)
     end
 
     def extractor_fields
@@ -163,19 +94,6 @@ module ActiveRecordRules
 
     def clauses
       @clauses ||= match_conditions["clauses"].map { Clause.parse(_1) }
-    end
-
-    def matches_clause?(clause, object)
-      result = clause.evaluate(object)
-      logger&.debug do
-        # TODO: print these expressions with values in-place
-        if result
-          "Condition(#{id}): #{clause.unparse} matches"
-        else
-          "Condition(#{id}): #{clause.unparse} does not match"
-        end
-      end
-      result
     end
 
     def clause_arel(clause)
