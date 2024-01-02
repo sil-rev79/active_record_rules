@@ -1,3 +1,4 @@
+# -*- ruby -*-
 class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_version %>
   def change
     create_table :arr__conditions do |t|
@@ -42,8 +43,10 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
     create_table :arr__rule_matches do |t|
       t.references :rule, foreign_key: { to_table: :arr__rules }
       t.<%= @json_type %> :ids
-      t.<%= @json_type %> :awaiting_execution
+      t.integer :awaiting_execution
+      t.<%= @json_type %> :stored_arguments
       t.index [:rule_id, :ids], unique: true, name: 'rule_match_uniqueness'
+      t.index :awaiting_execution, name: 'rule_match_awaiting_execution'
     end
   end
 end

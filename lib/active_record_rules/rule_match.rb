@@ -18,6 +18,12 @@ module ActiveRecordRules
   class RuleMatch < ActiveRecord::Base
     self.table_name = :arr__rule_matches
 
+    enum awaiting_execution: {
+      match: 1,
+      update: 2,
+      unmatch: 3
+    }, _prefix: "awaiting_"
+
     belongs_to :rule
   end
 end
