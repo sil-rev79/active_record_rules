@@ -61,7 +61,7 @@ module ActiveRecordRules
 
       activating_objects(ids).select(*interesting_fields).in_batches(of: batch_size) do |objects|
         logger&.info { "Condition(#{id}): matched by #{match_class}(#{objects.pluck(:id).join(", ")}) (matched)" }
-        extractors.each { _1.activate(objects, trigger_rules: trigger_rules) }
+        extractors.each { _1.activate(objects) }
         condition_matches.insert_all!(objects.map { { entry_id: _1.id } })
       end
 

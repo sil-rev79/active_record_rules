@@ -90,6 +90,9 @@ module ActiveRecordRules
                    end
       ActiveRecord::Base.transaction do
         conditions.each { _1.activate(batch_size: batch_size) }
+
+        Rule.where(id: RuleMatch.where.not(awaiting_execution: nil).pluck("rule_id"))
+            .each(&:run_pending_executions)
       end
     end
 
@@ -102,6 +105,9 @@ module ActiveRecordRules
             condition.activate(ids: objects.pluck(:id))
           end
         end
+
+        Rule.where(id: RuleMatch.where.not(awaiting_execution: nil).pluck("rule_id"))
+            .each(&:run_pending_executions)
       end
     end
 
@@ -167,6 +173,12 @@ module ActiveRecordRules
         # all the condition/extractor records we need, so we can just
         # trigger the rule.
         rule.match_all
+      end
+
+      if trigger_rules
+        rule.run_pending_executions
+      else
+        rule.ignore_pending_executions
       end
 
       rule

@@ -30,18 +30,7 @@ module ActiveRecordRules
     has_many :conditions, through: :extractors
     has_many :rule_matches, dependent: :delete_all
 
-    # @param key [String] The Extractor key that is being updated
-    # @param objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
-    def activate(key, objects, trigger_rules: true)
-      return if objects.empty?
-
-      # Run pure SQL to insert new records (i.e. do not load the
-      # records themselves into Ruby).
-      ActiveRecord::Base.connection.execute(<<~SQL.squish)
-        insert into arr__rule_matches(rule_id, ids, awaiting_execution)
-          #{new_matches_query(key, objects.keys)}
-      SQL
-
+    def run_pending_executions
       parsed_definition => { names: }
 
       rule_matches.where(awaiting_execution: "match").in_batches do |batch|
@@ -64,12 +53,29 @@ module ActiveRecordRules
           logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
           logger&.debug { "Rule(#{id}): matched with arguments #{pretty_arguments(arguments).to_json}" }
 
-          execute_match(arguments) if trigger_rules
+          execute_match(arguments)
         end
 
         # Then mark them as being done
         batch.update_all(awaiting_execution: nil)
       end
+    end
+
+    def ignore_pending_executions
+      rule_matches.update_all(awaiting_execution: nil)
+    end
+
+    # @param key [String] The Extractor key that is being updated
+    # @param objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
+    def activate(key, objects)
+      return if objects.empty?
+
+      # Run pure SQL to insert new records (i.e. do not load the
+      # records themselves into Ruby).
+      ActiveRecord::Base.connection.execute(<<~SQL.squish)
+        insert into arr__rule_matches(rule_id, ids, awaiting_execution)
+          #{new_matches_query(key, objects.keys)}
+      SQL
     end
 
     # @param key [String] The Extractor key that is being updated

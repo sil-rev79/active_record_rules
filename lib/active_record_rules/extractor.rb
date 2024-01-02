@@ -11,7 +11,7 @@ module ActiveRecordRules
     has_many :extractor_matches, dependent: :delete_all
     has_many :extractor_keys, dependent: :delete_all
 
-    def activate(objects, trigger_rules: true)
+    def activate(objects)
       id_to_values = objects.to_h do |object|
         [object.id, fields["names"].to_h { [_1, object[_1]] }]
       end
@@ -27,7 +27,7 @@ module ActiveRecordRules
         logger&.debug { "Extractor(#{id}): matched with values #{id_to_values[object.id]}" }
       end
 
-      extractor_keys.each { _1.activate(id_to_values, trigger_rules: trigger_rules) }
+      extractor_keys.each { _1.activate(id_to_values) }
     end
 
     def update(objects, trigger_rules: true)
