@@ -17,12 +17,12 @@ module ActiveRecordRules
       rule.activate(key, objects)
     end
 
-    def update(old_objects, new_objects, trigger_rules: true)
-      rule.update(key, old_objects, new_objects, trigger_rules: trigger_rules)
+    def update(old_objects, new_objects)
+      rule.update(key, old_objects, new_objects)
     end
 
-    def deactivate(objects, trigger_rules: true)
-      rule.deactivate(key, objects, trigger_rules: trigger_rules)
+    def deactivate(objects)
+      rule.deactivate(key, objects)
     end
 
     private

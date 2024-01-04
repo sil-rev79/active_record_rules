@@ -92,9 +92,10 @@ module ActiveRecordRules
       left_arel.send(op_method, right_arel)
     end
 
-    def to_rule_sql(table_name, bindings)
-      return unless (left_sql, left_binds = left.to_rule_sql(table_name, bindings))
-      return unless (right_sql, right_binds = right.to_rule_sql(table_name, bindings))
+    def to_rule_sql(json_field, bindings)
+      return unless (left_sql = left.to_rule_sql(json_field, bindings))
+      return unless (right_sql = right.to_rule_sql(json_field, bindings))
+      return if operator == "=" && left_sql == right_sql
 
       op = if operator == "++"
              "||"
@@ -102,7 +103,7 @@ module ActiveRecordRules
              operator
            end
 
-      ["(#{left_sql} #{op} #{right_sql})", left_binds + right_binds]
+      "(#{left_sql} #{op} #{right_sql})"
     end
 
     def evaluate(object)
@@ -133,7 +134,7 @@ module ActiveRecordRules
 
     def to_arel(_table, bindings) = bindings[name]
 
-    def to_rule_sql(_table_name, bindings) = bindings[name] ? [bindings[name], []] : nil
+    def to_rule_sql(_json_field, bindings) = bindings[name] || nil
 
     def evaluate(_object)
       raise "Can't evaluate BindingVariable(#{name})"
@@ -154,7 +155,7 @@ module ActiveRecordRules
 
     def to_arel(table, _bindings) = table[name]
 
-    def to_rule_sql(table_name, _bindings) = ["#{table_name}.\"values\"->>'#{name}'", []]
+    def to_rule_sql(json_field, _bindings) = "#{json_field}->>'#{name}'"
 
     def evaluate(object) = object[name]
 
@@ -171,8 +172,7 @@ module ActiveRecordRules
 
     def to_arel(_table, _bindings) = Arel::Nodes.build_quoted(value)
 
-    # def to_rule_sql(_table_name, _bindings) = ["?", [value]]
-    def to_rule_sql(_table_name, _bindings) = [ActiveRecord::Base.sanitize_sql(value), []]
+    def to_rule_sql(_json_field, _bindings) = ActiveRecord::Base.sanitize_sql(value)
 
     def evaluate(_object) = value
 

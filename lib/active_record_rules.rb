@@ -165,8 +165,7 @@ module ActiveRecordRules
         new_conditions.each do |condition|
           # Only trigger rules on the last condition, to minimise the
           # number of times we re-assess the rule records.
-          condition.activate(trigger_rules: trigger_rules && condition == new_conditions.last,
-                             batch_size: batch_size)
+          condition.activate(batch_size: batch_size)
         end
       elsif trigger_rules
         # If we don't have any new conditions then we've already got

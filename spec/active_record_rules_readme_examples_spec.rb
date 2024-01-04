@@ -205,20 +205,14 @@ RSpec.describe ActiveRecordRules do
             User(<name2> = name, <post_count> = post_count + 1)
           on match
             TestHelper.matches << [name1, name2]
-          on unmatch
-            # This unmatch clause is a bit annoying. We need this to
-            # remove things because the above can match the same user
-            # in both clauses, because it gets propagated through one
-            # extractor without the other. This causes it to match the
-            # same object with different values, which is a bit.
-            # TODO: fix things so we don't need this unmatch clause
-            TestHelper.matches.delete([name1, name2])
         RULE
 
         TestHelper.matches = []
 
         Post.create!(author_id: user.id, status: "published")
         User.create!(name: "Jane")
+        # The rule which changes the post counts uses increment, which
+        # doesn't trigger callbacks, so we have to do this ourselves.
         described_class.trigger_all
       end
 

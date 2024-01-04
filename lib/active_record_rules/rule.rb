@@ -33,6 +33,57 @@ module ActiveRecordRules
     def run_pending_executions
       parsed_definition => { names: }
 
+      rule_matches.delete_by(awaiting_execution: "delete")
+
+      rule_matches.where(awaiting_execution: "unmatch").in_batches do |batch|
+        all_rows = batch.pluck(:ids, :stored_arguments)
+
+        # Go through each record and run the unmatch code
+        all_rows.map do |ids, old_values|
+          arguments = names.keys.map { old_values[_1] }
+
+          logger&.info { "Rule(#{id}): unmatched for #{ids.to_json}" }
+          logger&.debug { "Rule(#{id}): unmatched with arguments #{pretty_arguments(arguments).to_json}" }
+
+          execute_unmatch(arguments)
+        end
+
+        # Then remove them
+        batch.delete_all
+      end
+
+      rule_matches.where(awaiting_execution: "update").in_batches do |batch|
+        all_rows = batch.pluck(:ids, :stored_arguments)
+
+        # Fetch all of the current values needed for this batch
+        values_lookup = extractor_keys.to_h do |match|
+          [match.key, match.extractor_matches
+                           .where(entry_id: all_rows.map(&:first).pluck(match.key))
+                           .pluck(:entry_id, :stored_values)
+                           .to_h]
+        end
+
+        # Go through each record and run the update code
+        all_rows.map do |ids, old_values|
+          old_arguments = names.keys.map { old_values[_1] }
+
+          arguments = names.map do |_, ((k, var))|
+            values_lookup[k][ids[k]][var.name]
+          end
+
+          logger&.info { "Rule(#{id}): updated for #{ids.to_json}" }
+          logger&.debug do
+            "Rule(#{id}): updating from #{pretty_arguments(old_arguments).to_json} " \
+              "=> #{pretty_arguments(arguments).to_json}"
+          end
+
+          execute_update(old_arguments, arguments)
+        end
+
+        # Then mark them as being done
+        batch.update_all(awaiting_execution: nil, stored_arguments: nil)
+      end
+
       rule_matches.where(awaiting_execution: "match").in_batches do |batch|
         all_ids = batch.pluck(:ids)
 
@@ -40,7 +91,7 @@ module ActiveRecordRules
         values_lookup = extractor_keys.to_h do |match|
           [match.key, match.extractor_matches
                            .where(entry_id: all_ids.pluck(match.key))
-                           .pluck(:entry_id, :values)
+                           .pluck(:entry_id, :stored_values)
                            .to_h]
         end
 
@@ -74,75 +125,91 @@ module ActiveRecordRules
       # records themselves into Ruby).
       ActiveRecord::Base.connection.execute(<<~SQL.squish)
         insert into arr__rule_matches(rule_id, ids, awaiting_execution)
-          #{new_matches_query(key, objects.keys)}
+          select #{ActiveRecord::Base.sanitize_sql(id)},
+                 query.ids,
+                 #{RuleMatch.awaiting_executions["match"]}
+            from (#{all_matches_query(key, objects.keys)}) as query
       SQL
     end
 
     # @param key [String] The Extractor key that is being updated
     # @param old_objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
     # @param new_objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
-    def update(key, old_objects, new_objects, trigger_rules: true)
-      all_matches = fetch_ids_and_arguments_for(key, new_objects, old_values: old_objects)
+    def update(key, old_objects, _new_objects)
+      return if old_objects.empty?
 
-      # We have to construct an Arel here for the query because
-      # otherwise ActiveRecord double-encodes our hashes as JSON.
-      # That is: rule_matches.where(ids: all_matches.keys) writes a
-      # condition like "ids in (?, ?, ...)" where the parameters are
-      # bound to "\"{\\\"key\\\":10}\"". Note that this is similar to
-      # doing ids.to_json.to_json, which means the database can't find
-      # the right records.
-      #
-      # Arel correctly encodes the parameter as "{\"key\":10}".
-      already_matched_ids = rule_matches.where(RuleMatch.arel_table[:ids].in(all_matches.keys)).pluck(:ids).to_set
-
-      updating, matching = all_matches.partition do |ids, _|
-        already_matched_ids.include?(ids)
-      end
-      if matching.any?
-        rule_matches.insert_all!(
-          matching.map do |ids, _|
-            { ids: ids }
-          end
-        )
-      end
-
-      unmatching = fetch_ids_and_arguments_for(key, old_objects, exclude_ids: already_matched_ids)
-      # See comment above for why we're dropping to Arel here.
-      rule_matches.delete_by(RuleMatch.arel_table[:ids].in(unmatching.keys))
-
-      unmatching.each do |ids, (arguments, _)|
-        logger&.info { "Rule(#{id}): unmatched for #{ids.to_json} (set no longer matches rule)" }
-        logger&.debug { "Rule(#{id}): unmatched with arguments #{pretty_arguments(arguments).to_json}" }
-        execute_unmatch(arguments) if trigger_rules
-      end
-
-      updating.each do |ids, (arguments, old_arguments)|
-        logger&.info { "Rule(#{id}): re-matched for #{ids.to_json}" }
-        logger&.debug { "Rule(#{id}): re-matched with arguments #{pretty_arguments(arguments).to_json}" }
-        execute_update(old_arguments, arguments) if trigger_rules
-      end
-
-      matching.each do |ids, (arguments, _)|
-        logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
-        logger&.debug { "Rule(#{id}): matched with arguments #{pretty_arguments(arguments).to_json}" }
-        execute_match(arguments) if trigger_rules
-      end
+      # Run pure SQL to update existing records (i.e. do not load the
+      # records themselves into Ruby).
+      ActiveRecord::Base.connection.execute(<<~SQL.squish)
+        insert into arr__rule_matches(rule_id, ids, awaiting_execution, stored_arguments)
+          select #{ActiveRecord::Base.sanitize_sql(id)},
+                 coalesce(query.ids, old_query.ids),
+                 case
+                   when query.ids is null then
+                     #{RuleMatch.awaiting_executions["unmatch"]}
+                   when old_query.ids is null then
+                     #{RuleMatch.awaiting_executions["match"]}
+                   else
+                     #{RuleMatch.awaiting_executions["update"]}
+                 end,
+                 old_query.arguments
+            from (#{all_matches_query(key, old_objects.keys)}) as query
+            full outer join
+              (#{all_matches_query(key, old_objects.keys, values_column: "previous_stored_values")}) as old_query
+              on query.ids = old_query.ids
+           where true
+          on conflict(rule_id, ids) do update
+            set "awaiting_execution" = (case
+                                          when awaiting_execution = #{RuleMatch.awaiting_executions["match"]}
+                                               and excluded.awaiting_execution = #{RuleMatch.awaiting_executions["unmatch"]} then
+                                            #{RuleMatch.awaiting_executions["delete"]}
+                                          when awaiting_execution in (#{RuleMatch.awaiting_executions["match"]},
+                                                                      #{RuleMatch.awaiting_executions["unmatch"]}) then
+                                            awaiting_execution
+                                          else
+                                            excluded.awaiting_execution
+                                        end),
+                "stored_arguments" = (case
+                                        when awaiting_execution in (#{RuleMatch.awaiting_executions["match"]},
+                                                                    #{RuleMatch.awaiting_executions["unmatch"]}) then
+                                          stored_arguments
+                                        else
+                                          excluded.stored_arguments
+                                      end)
+      SQL
     end
 
     # @param key [String] The Extractor key that is being updated
     # @param objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
-    def deactivate(key, objects, trigger_rules: true)
-      destroyed_ids = rule_matches.where("ids->>? = ?", key, objects.keys).pluck(:ids)
-      rule_matches.delete_by("ids->>? = ?", key, objects.keys)
-      arguments_by_ids = fetch_ids_and_arguments_for(key, objects)
+    def deactivate(key, objects)
+      return if objects.empty?
 
-      destroyed_ids.each do |ids|
-        arguments, = arguments_by_ids[ids]
-        logger&.info { "Rule(#{id}): unmatched for #{ids.to_json} (entry removed by condition)" }
-        logger&.debug { "Rule(#{id}): unmatched with arguments #{pretty_arguments(arguments).to_json}" }
+      parsed_definition => { names:, clauses: }
 
-        execute_unmatch(arguments) if trigger_rules
+      matches = extractor_keys.to_h do |extractor_key|
+        [extractor_key.key, extractor_key.extractor_matches.to_sql]
       end
+
+      where_clauses = extractor_keys.map do |extractor_key|
+        "#{extractor_key.key}.entry_id = ids->>'#{extractor_key.key}'"
+      end
+
+      names_sql = names.map do |name, ((k, var))|
+        definition = var.to_rule_sql("#{k}.stored_values", {})
+        "'#{name}', #{definition}"
+      end.join(", ")
+
+      # Run pure SQL to update existing records (i.e. do not load the
+      # records themselves into Ruby).
+      ActiveRecord::Base.connection.execute(<<~SQL.squish)
+        update arr__rule_matches
+           set "awaiting_execution" = #{RuleMatch.awaiting_executions["unmatch"]},
+               "stored_arguments" = json_object(#{names_sql})
+          from #{matches.map { "(#{_2}) as #{_1}" }.join(",")}
+         where rule_id = #{ActiveRecord::Base.sanitize_sql(id)}
+           and ids->>'#{key}' in (#{objects.keys.map { ActiveRecord::Base.sanitize_sql(_1) }.join(", ")})
+           #{where_clauses.map { " and #{_1}" }.join}
+      SQL
     end
 
     def match_all
@@ -282,103 +349,30 @@ module ActiveRecordRules
       end
     end
 
-    def fetch_ids_and_arguments_for(key, objects, exclude_ids: nil, old_values: {})
-      parsed_definition => { names:, clauses: }
-
-      binds = []
-
-      matches = extractor_keys.to_h do |match|
-        if match.key == key
-          rows = objects.map do |object_id, values|
-            binds << object_id
-            binds << values.to_json
-            "(?, ?)"
-          end
-          [match.key, "values #{rows.join(", ")}"]
-        else
-          [match.key, match.extractor_matches.to_sql]
-        end
-      end
-
-      close_names = names.transform_values do |definitions|
-        if (definition = definitions.find { _1[0] == key })
-          definition[1] # get the field clause
-        end
-      end.compact
-
-      other_names = names.without(*close_names.keys).transform_values do |definition,|
-        definition[1].to_rule_sql(definition[0], {}).first # assume names don't have bindings
-      end
-
-      where_clauses = []
-
-      bindings = other_names.merge(close_names.transform_values { _1.to_rule_sql(key, {}).first })
-      clauses.reject { _2.binding_variables.empty? }.each do |table_name, clause|
-        next unless (clause_sql, clause_binds = clause.to_rule_sql(table_name, bindings))
-
-        where_clauses << clause_sql
-        binds += clause_binds
-      end
-
-      where_clause = where_clauses.join(" and ")
-
-      query_result = ActiveRecord::Base.connection.select_all(<<~SQL.squish, nil, binds).rows
-        with #{key}(entry_id, "values") as (#{matches[key]})
-        select #{matches.keys.map { "#{_1}.entry_id" }.join(", ")}
-               #{other_names.values.map { ", #{_1}" }.join}
-          from #{key}#{matches.without(key).map { ", (#{_2}) as #{_1}" }.join}
-         #{where_clause.presence && "where #{where_clause}"}
-      SQL
-
-      query_result.map do |row|
-        ids = matches.keys.zip(row[..matches.size]).sort_by(&:first).to_h
-
-        # TODO: add this to the WHERE clause with JSON_OBJECT and NOT IN
-        next if exclude_ids&.include?(ids)
-
-        other_values = other_names.keys.zip(row[matches.size..]).to_h
-
-        our_values = objects[ids[key]]
-        our_old_values = old_values[ids[key]]
-
-        final_values = other_values.merge(close_names.transform_values { _1.evaluate(our_values) })
-        old_final_values = if our_old_values
-                             other_values.merge(close_names.transform_values { _1.evaluate(our_old_values) })
-                           else
-                             {}
-                           end
-
-        [ids, [names.keys.map { final_values[_1] }, names.keys.map { old_final_values[_1] }]]
-      end.compact.to_h
-    end
-
     # This is a simplification of `fetch_ids_and_arguments_for',
     # above. I'm sure there's some helpful refactoring of them that
     # could be done, but I'll have to return to it later.
     def fetch_all_ids_and_arguments(exclude_ids: nil)
       parsed_definition => { names:, clauses: }
 
-      binds = []
-
       matches = extractor_keys.to_h do |match|
         [match.key, match.extractor_matches.to_sql]
       end
 
       sql_names = names.transform_values do |definition,|
-        definition[1].to_rule_sql(definition[0], {}).first # assume names don't have bindings
+        definition[1].to_rule_sql("#{definition[0]}.stored_values", {})
       end
 
       where_clauses = []
       clauses.reject { _2.binding_variables.empty? }.each do |table_name, clause|
-        next unless (clause_sql, clause_binds = clause.to_rule_sql(table_name, sql_names))
+        next unless (clause_sql = clause.to_rule_sql("#{table_name}.stored_values", sql_names))
 
         where_clauses << clause_sql
-        binds += clause_binds
       end
 
       where_clause = where_clauses.join(" and ")
 
-      query_result = ActiveRecord::Base.connection.select_all(<<~SQL.squish, nil, binds).rows
+      query_result = ActiveRecord::Base.connection.select_all(<<~SQL.squish).rows
         select #{matches.keys.map { "#{_1}.entry_id" }.join(", ")}
                #{sql_names.values.map { ", #{_1}" }.join}
           from #{matches.map { "(#{_2}) as #{_1}" }.join(",")}
@@ -397,7 +391,7 @@ module ActiveRecordRules
       end.compact.to_h
     end
 
-    def new_matches_query(key, ids)
+    def all_matches_query(key, ids, values_column: "stored_values")
       parsed_definition => { names:, clauses: }
 
       matches = extractor_keys.to_h do |match|
@@ -405,22 +399,30 @@ module ActiveRecordRules
       end
 
       sql_names = names.transform_values do |definition,|
-        definition[1].to_rule_sql(definition[0], {}).first # assume names don't have bindings
+        definition[1].to_rule_sql("coalesce(#{definition[0]}.#{values_column}, #{definition[0]}.stored_values)", {})
       end
 
-      where_clauses = ["#{key}.entry_id in (#{ids.map { ActiveRecord::Base.sanitize_sql(_1) }.join(", ")})"]
-      clauses.reject { _2.binding_variables.empty? }.each do |table_name, clause|
-        next unless (sql, = clause.to_rule_sql(table_name, sql_names))
+      ids_sql = matches.keys.map do |name|
+        "'#{name}', #{name}.entry_id"
+      end.join(", ")
 
-        where_clauses << sql
-      end
+      names_sql = names.map do |name, ((k, var))|
+        definition = var.to_rule_sql("coalesce(#{k}.#{values_column}, #{k}.stored_values)", {})
+        "'#{name}', #{definition}"
+      end.join(", ")
 
-      where_clause = where_clauses.join(" and ")
+      where_clause = [
+        "#{key}.entry_id in (#{ids.map { ActiveRecord::Base.sanitize_sql(_1) }.join(", ")})",
+        *clauses.map do |table_name, clause|
+          next if clause.binding_variables.empty?
+
+          clause.to_rule_sql("coalesce(#{table_name}.#{values_column}, #{table_name}.stored_values)", sql_names)
+        end.compact
+      ].join(" and ")
 
       <<~SQL.squish
-        select #{ActiveRecord::Base.sanitize_sql(id)},
-               '{#{matches.keys.map { "\"#{_1}\":' || #{_1}.entry_id || '" }.join(",")}}',
-               #{RuleMatch.awaiting_executions["match"]}
+        select json_object(#{ids_sql}) as ids,
+               json_object(#{names_sql}) as arguments
           from #{matches.map { "(#{_2}) as #{_1}" }.join(",")}
          #{where_clause.presence && "where #{where_clause}"}
       SQL

@@ -36,7 +36,8 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
     create_table :arr__extractor_matches do |t|
       t.references :extractor, foreign_key: { to_table: :arr__extractors }
       t.<%= @id_type %> :entry_id
-      t.<%= @json_type %> :values
+      t.<%= @json_type %> :stored_values
+      t.<%= @json_type %> :previous_stored_values
       t.index [:extractor_id, :entry_id], unique: true, name: 'extractor_match_uniqueness' # Note that named_values is *not* included in the uniqueness constraints
     end
 

@@ -42,13 +42,13 @@ module ActiveRecordRules
     }
     scope :includes_for_activate, -> { includes(extractors: { extractor_keys: { rule: { extractor_keys: {} } } }) }
 
-    def activate(ids: nil, trigger_rules: true, batch_size: ActiveRecordRules.default_batch_size)
+    def activate(ids: nil, batch_size: ActiveRecordRules.default_batch_size)
       deactivating_matches(ids).select(:id, :entry_id).in_batches(of: batch_size) do |matches|
         object_ids = matches.pluck(:entry_id)
         logger&.info { "Condition(#{id}): unmatched for #{match_class}(#{object_ids.join(", ")})" }
         condition_matches.delete_by(entry_id: object_ids)
         extractors.each do |extractor|
-          extractor.deactivate(object_ids.map { match_class.new(id: _1) }, trigger_rules: trigger_rules)
+          extractor.deactivate(object_ids.map { match_class.new(id: _1) })
         end
       end
 
@@ -56,7 +56,7 @@ module ActiveRecordRules
 
       updating_objects(ids).select(*interesting_fields).in_batches(of: batch_size) do |objects|
         logger&.info { "Condition(#{id}): matched by #{match_class}(#{objects.pluck(:id).join(", ")}) (updated)" }
-        extractors.each { _1.update(objects, trigger_rules: trigger_rules) }
+        extractors.each { _1.update(objects) }
       end
 
       activating_objects(ids).select(*interesting_fields).in_batches(of: batch_size) do |objects|

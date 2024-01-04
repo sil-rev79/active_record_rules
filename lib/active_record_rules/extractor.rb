@@ -18,7 +18,7 @@ module ActiveRecordRules
 
       extractor_matches.insert_all!(
         id_to_values.map do |object_id, values|
-          { entry_id: object_id, values: values }
+          { entry_id: object_id, stored_values: values }
         end
       )
 
@@ -30,8 +30,8 @@ module ActiveRecordRules
       extractor_keys.each { _1.activate(id_to_values) }
     end
 
-    def update(objects, trigger_rules: true)
-      records = extractor_matches.where(entry_id: objects.pluck(:id)).pluck(:entry_id, :values).to_h
+    def update(objects)
+      records = extractor_matches.where(entry_id: objects.pluck(:id)).pluck(:entry_id, :stored_values).to_h
 
       new_objects = {}
       old_objects = {}
@@ -46,6 +46,11 @@ module ActiveRecordRules
 
         new_objects[object.id] = values
         old_objects[object.id] = old_values
+
+        logger&.info { "Extractor(#{id}): updated for #{object.class}(#{object.id})" }
+        logger&.debug do
+          "Extractor(#{id}): updated for #{new_objects[object.id]} (previously: #{old_objects[object.id]})"
+        end
       end
 
       # Bail out early if no objects actually got updated
@@ -53,7 +58,7 @@ module ActiveRecordRules
 
       extractor_matches.upsert_all(
         new_objects.map do |id, values|
-          { entry_id: id, values: values }
+          { entry_id: id, stored_values: values, previous_stored_values: old_objects[id] }
         end,
         # I'm not entirely sure why we need this. The documentation
         # says this is SQLite and Postgres only, so I'd like to remove
@@ -62,32 +67,29 @@ module ActiveRecordRules
         unique_by: [:extractor_id, :entry_id]
       )
 
-      objects.each do |object|
-        logger&.info { "Extractor(#{id}): updated for #{object.class}(#{object.id})" }
-        logger&.debug do
-          "Extractor(#{id}): updated for #{new_objects[object.id]} (previously: #{old_objects[object.id]})"
-        end
-      end
+      extractor_keys.each { _1.update(old_objects, new_objects) }
 
-      extractor_keys.each { _1.update(old_objects, new_objects, trigger_rules: trigger_rules) }
+      # Clear out the "previous stored values", because now they
+      # should be in the rule matches that need them.
+      extractor_matches.where.not(previous_stored_values: nil).update_all(previous_stored_values: nil)
     end
 
-    def deactivate(objects, trigger_rules: true)
-      records = extractor_matches.where(entry_id: objects.pluck(:id)).pluck(:entry_id, :values).to_h
+    def deactivate(objects)
+      records = extractor_matches.where(entry_id: objects.pluck(:id)).pluck(:entry_id, :stored_values).to_h
       if records.size < objects.size
         logger&.warn do
           "Extractor(#{id}): unexpected number of deactivations - #{records.size} found, #{objects.size} expected"
         end
       end
 
-      extractor_matches.delete_by(entry_id: records.keys)
-
       objects.each do |object|
         logger&.debug do
           "Extractor(#{id}): unmatched for #{object.class}(#{object.id}) (condition no longer matches)"
         end
       end
-      extractor_keys.each { _1.deactivate(records, trigger_rules: trigger_rules) }
+      extractor_keys.each { _1.deactivate(records) }
+
+      extractor_matches.delete_by(entry_id: records.keys)
     end
 
     private
