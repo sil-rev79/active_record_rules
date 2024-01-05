@@ -116,10 +116,8 @@ module ActiveRecordRules
       rule_matches.update_all(awaiting_execution: nil)
     end
 
-    # @param key [String] The Extractor key that is being updated
-    # @param objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
-    def activate(key, objects)
-      return if objects.empty?
+    def activate(key, object_ids)
+      return if object_ids.empty?
 
       # Run pure SQL to insert new records (i.e. do not load the
       # records themselves into Ruby).
@@ -128,15 +126,12 @@ module ActiveRecordRules
           select #{ActiveRecord::Base.sanitize_sql(id)},
                  query.ids,
                  #{RuleMatch.awaiting_executions["match"]}
-            from (#{all_matches_query(key, objects.keys)}) as query
+            from (#{all_matches_query(key, object_ids)}) as query
       SQL
     end
 
-    # @param key [String] The Extractor key that is being updated
-    # @param old_objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
-    # @param new_objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
-    def update(key, old_objects, _new_objects)
-      return if old_objects.empty?
+    def update(key, object_ids)
+      return if object_ids.empty?
 
       # Run pure SQL to update existing records (i.e. do not load the
       # records themselves into Ruby).
@@ -153,9 +148,9 @@ module ActiveRecordRules
                      #{RuleMatch.awaiting_executions["update"]}
                  end,
                  old_query.arguments
-            from (#{all_matches_query(key, old_objects.keys)}) as query
+            from (#{all_matches_query(key, object_ids)}) as query
             full outer join
-              (#{all_matches_query(key, old_objects.keys, values_column: "previous_stored_values")}) as old_query
+              (#{all_matches_query(key, object_ids, values_column: "previous_stored_values")}) as old_query
               on query.ids = old_query.ids
            where true
           on conflict(rule_id, ids) do update
@@ -179,10 +174,8 @@ module ActiveRecordRules
       SQL
     end
 
-    # @param key [String] The Extractor key that is being updated
-    # @param objects [Hash{String => Hash}] An {id => values} mapping of objects to field values
-    def deactivate(key, objects)
-      return if objects.empty?
+    def deactivate(key, object_ids)
+      return if object_ids.empty?
 
       parsed_definition => { names:, clauses: }
 
@@ -207,7 +200,7 @@ module ActiveRecordRules
                "stored_arguments" = json_object(#{names_sql})
           from #{matches.map { "(#{_2}) as #{_1}" }.join(",")}
          where rule_id = #{ActiveRecord::Base.sanitize_sql(id)}
-           and ids->>'#{key}' in (#{objects.keys.map { ActiveRecord::Base.sanitize_sql(_1) }.join(", ")})
+           and ids->>'#{key}' in (#{object_ids.map { ActiveRecord::Base.sanitize_sql(_1) }.join(", ")})
            #{where_clauses.map { " and #{_1}" }.join}
       SQL
     end

@@ -27,7 +27,7 @@ module ActiveRecordRules
         logger&.debug { "Extractor(#{id}): matched with values #{id_to_values[object.id]}" }
       end
 
-      extractor_keys.each { _1.activate(id_to_values) }
+      extractor_keys.each { _1.activate(id_to_values.keys) }
     end
 
     def update(objects)
@@ -67,7 +67,7 @@ module ActiveRecordRules
         unique_by: [:extractor_id, :entry_id]
       )
 
-      extractor_keys.each { _1.update(old_objects, new_objects) }
+      extractor_keys.each { _1.update(new_objects.keys) }
 
       # Clear out the "previous stored values", because now they
       # should be in the rule matches that need them.
@@ -75,21 +75,14 @@ module ActiveRecordRules
     end
 
     def deactivate(objects)
-      records = extractor_matches.where(entry_id: objects.pluck(:id)).pluck(:entry_id, :stored_values).to_h
-      if records.size < objects.size
-        logger&.warn do
-          "Extractor(#{id}): unexpected number of deactivations - #{records.size} found, #{objects.size} expected"
-        end
-      end
-
       objects.each do |object|
         logger&.debug do
           "Extractor(#{id}): unmatched for #{object.class}(#{object.id}) (condition no longer matches)"
         end
       end
-      extractor_keys.each { _1.deactivate(records) }
+      extractor_keys.each { _1.deactivate(objects.pluck(:id)) }
 
-      extractor_matches.delete_by(entry_id: records.keys)
+      extractor_matches.delete_by(entry_id: objects.pluck(:id))
     end
 
     private
