@@ -17,8 +17,7 @@ RSpec.describe ActiveRecordRules do
           representatives: array(string(length: 5..)).map(&:uniq),
           support_requests: array(one_of("low", "medium", "high"))
         )
-      ),
-      batch_size: int(1..100)
+      )
     )
 
     before do
@@ -60,7 +59,7 @@ RSpec.describe ActiveRecordRules do
           end
         end
       end
-      described_class.trigger_all(batch_size: batch_size)
+      described_class.trigger_all
       expect(TestHelper.matches.sort).to eq(expected_matches.sort)
     end
   end

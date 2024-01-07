@@ -4,8 +4,6 @@ require "active_record_rules/clause"
 require "active_record_rules/condition"
 require "active_record_rules/condition_match"
 require "active_record_rules/extractor"
-require "active_record_rules/extractor_match"
-require "active_record_rules/extractor_key"
 require "active_record_rules/parser"
 require "active_record_rules/rule"
 require "active_record_rules/rule_match"
@@ -30,7 +28,6 @@ require "active_record_rules/rule_match"
 # system.
 module ActiveRecordRules
   cattr_accessor :logger, :execution_context
-  cattr_accessor :default_batch_size, default: 1000
 
   class << self
     def load_rules(*filenames, trigger_matches: false, trigger_unmatches: false)
@@ -63,7 +60,6 @@ module ActiveRecordRules
       end
 
       cleanup_conditions
-      cleanup_extractors
 
       definitions.keys
     end
@@ -80,7 +76,7 @@ module ActiveRecordRules
       raw_delete_rule(rule, trigger_rules: trigger_rules, cleanup: true)
     end
 
-    def trigger_all(*klasses, batch_size: 1000)
+    def trigger_all(*klasses)
       conditions = if klasses.empty?
                      Condition.all
                    else
@@ -88,35 +84,57 @@ module ActiveRecordRules
                        relation.or(Condition.for_class(klass))
                      end
                    end
-      ActiveRecord::Base.transaction do
-        conditions.each { _1.activate(batch_size: batch_size) }
+      rules = Rule.joins(:conditions).where(conditions: { id: conditions }).distinct
 
-        Rule.where(id: RuleMatch.where.not(awaiting_execution: nil).pluck("rule_id"))
-            .each(&:run_pending_executions)
+      ActiveRecord::Base.transaction do
+        conditions.each(&:activate)
+        rules.each(&:activate)
+        conditions.each(&:cleanup)
+        rules.where(id: RuleMatch.where.not(awaiting_execution: nil).select("rule_id"))
+             .each(&:run_pending_executions)
       end
     end
 
     def trigger(all_objects)
       ActiveRecord::Base.transaction do
-        all_objects.group_by(&:class).each do |klass, objects|
-          conditions = Condition.for_class(klass).includes_for_activate
+        groups = all_objects.group_by(&:class)
+        conditions = groups.keys.index_with { Condition.for_class(_1).includes_for_activate }
 
-          conditions.each do |condition|
-            condition.activate(ids: objects.pluck(:id))
+        rules_to_activate = Hash.new do |h, k|
+          h[k] = Hash.new { _1[_2] = [] }
+        end
+
+        groups.each do |klass, objects|
+          conditions[klass].each do |condition|
+            condition.activate(ids: objects.pluck(:id)).each do |rule, keys_to_ids|
+              keys_to_ids.each do |key, ids|
+                rules_to_activate[rule][key] += ids
+              end
+            end
           end
         end
 
-        Rule.where(id: RuleMatch.where.not(awaiting_execution: nil).pluck("rule_id"))
-            .each(&:run_pending_executions)
+        rules = Rule.find(rules_to_activate.keys).index_by(&:id)
+        rules_to_activate.each do |rule_id, keys_to_ids|
+          rules[rule_id].activate(keys_to_ids)
+        end
+
+        groups.each do |klass, objects|
+          conditions[klass].each do |condition|
+            condition.cleanup(ids: objects.pluck(:id))
+          end
+        end
+
+        rules.each_value(&:run_pending_executions)
       end
     end
 
     private
 
-    def raw_define_rule(definition, trigger_rules:, batch_size: 1000)
+    def raw_define_rule(definition, trigger_rules:)
       new_conditions = []
 
-      extractor_keys, condition_strings = definition[:conditions].each_with_index.map do |condition_definition, index|
+      extractors, condition_strings = definition[:conditions].each_with_index.map do |condition_definition, index|
         clauses = (condition_definition[:clauses] || []).map { Clause.parse(_1) }
         constant_clauses, variable_clauses = clauses.partition { _1.binding_variables.empty? }
 
@@ -133,27 +151,25 @@ module ActiveRecordRules
 
         fields = variable_clauses.map(&:record_variables).reduce(&:+)
 
-        extractor = Extractor.find_or_initialize_by(
+        extractor = Extractor.new(
           condition: condition,
           # We have to wrap the fields in this fake object because
           # querying with an array at the toplevel turns into an
           # ActiveRecord IN query, which ruins everything.  Using an
           # object here simplifies things a lot.
-          fields: { "names" => fields }
+          fields: { "names" => fields },
+          key: "cond#{index + 1}"
         )
         extractor.validate!
 
         [
-          ExtractorKey.new(
-            extractor: extractor,
-            key: "cond#{index + 1}"
-          ),
+          extractor,
           "#{condition_definition[:class_name]}(#{variable_clauses.map(&:unparse).join(", ")})"
         ]
       end.transpose
 
       rule = Rule.create!(
-        extractor_keys: extractor_keys,
+        extractors: extractors,
         name: definition[:name].to_s,
         variable_conditions: condition_strings.map { "  #{_1}\n" }.join,
         on_match: definition[:on_match]&.pluck(:line)&.join("\n  "),
@@ -161,18 +177,8 @@ module ActiveRecordRules
         on_unmatch: definition[:on_unmatch]&.pluck(:line)&.join("\n  ")
       )
 
-      if new_conditions.any?
-        new_conditions.each do |condition|
-          # Only trigger rules on the last condition, to minimise the
-          # number of times we re-assess the rule records.
-          condition.activate(batch_size: batch_size)
-        end
-      elsif trigger_rules
-        # If we don't have any new conditions then we've already got
-        # all the condition/extractor records we need, so we can just
-        # trigger the rule.
-        rule.match_all
-      end
+      new_conditions.each(&:activate)
+      rule.activate
 
       if trigger_rules
         rule.run_pending_executions
@@ -187,30 +193,21 @@ module ActiveRecordRules
       raw_delete_rule(rule, trigger_rules: trigger_unmatches, cleanup: false)
       rule = raw_define_rule(definition, trigger_rules: trigger_matches)
 
-      cleanup_extractors
       cleanup_conditions
 
       rule
     end
 
     def raw_delete_rule(rule, trigger_rules:, cleanup:)
-      rule.unmatch_all if trigger_rules
+      if trigger_rules
+        rule.unmatch_all
+        rule.run_pending_executions
+      end
       rule.destroy!
 
-      unless cleanup
-        cleanup_extractors
-        cleanup_conditions
-      end
+      cleanup_conditions if cleanup
 
       rule
-    end
-
-    def cleanup_extractors
-      empty_extractors = Extractor.joins(:extractor_keys)
-                                  .group(:id)
-                                  .having(Arel.sql("count").eq(0))
-                                  .pluck(:id, "count(arr__extractor_keys.id) as count")
-      Extractor.where(id: empty_extractors).destroy_all unless empty_extractors.empty?
     end
 
     def cleanup_conditions

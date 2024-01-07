@@ -40,35 +40,80 @@ module ActiveRecordRules
     scope :for_class, lambda { |c|
       where(match_class_name: c.ancestors.select { _1 < ActiveRecord::Base }.map(&:name))
     }
-    scope :includes_for_activate, -> { includes(extractors: { extractor_keys: { rule: { extractor_keys: {} } } }) }
+    scope :includes_for_activate, -> { includes(extractors: { rule: { extractors: {} } }) }
 
-    def activate(ids: nil, batch_size: ActiveRecordRules.default_batch_size)
-      deactivating_matches(ids).select(:id, :entry_id).in_batches(of: batch_size) do |matches|
-        object_ids = matches.pluck(:entry_id)
-        logger&.info { "Condition(#{id}): unmatched for #{match_class}(#{object_ids.join(", ")})" }
-        condition_matches.delete_by(entry_id: object_ids)
-        extractors.each do |extractor|
-          extractor.deactivate(object_ids.map { match_class.new(id: _1) })
+    def activate(ids: nil)
+      ActiveRecord::Base.connection.execute(<<~SQL.squish)
+        insert into arr__condition_matches(condition_id, entry_id, stored_values, previous_stored_values)
+          select #{ActiveRecord::Base.sanitize_sql(id)},
+                 coalesce(record.id, match.entry_id),
+                 case when record.id then
+                   json_object(#{extractor_fields.map { "'#{_1}', record.#{_1}" }.join(",")})
+                 end,
+                 match.stored_values
+            from (#{all_matching_objects.where({ id: ids }.compact).to_sql}) as record
+            full outer join
+              (#{condition_matches.where({ entry_id: ids }.compact).to_sql}) as match
+              on record.id = match.entry_id
+           where true
+          on conflict(condition_id, entry_id) do update
+            set stored_values = excluded.stored_values,
+                previous_stored_values = excluded.previous_stored_values
+      SQL
+
+      if logger&.debug?
+        unmatched_ids = condition_matches.where({ entry_id: ids }.compact)
+                                         .where("stored_values is null")
+                                         .pluck(:entry_id)
+        unmatched_ids.each do |entry_id|
+          logger.debug("Condition(#{id}): unmatched #{match_class_name}(#{entry_id})")
+        end
+
+        # The logic here is that previous_stored_values is only null
+        # for newly processed records, after the above. That is: if
+        # the above query fired for an object, then
+        # previous_stored_values will not be null.
+        matched_ids = condition_matches.where({ entry_id: ids }.compact)
+                                       .where("previous_stored_values is null")
+                                       .pluck(:entry_id)
+        matched_ids.each do |entry_id|
+          logger.debug("Condition(#{id}): matched #{match_class_name}(#{entry_id})")
         end
       end
 
-      interesting_fields = extractor_fields + ["id"]
+      return unless ids
 
-      updating_objects(ids).select(*interesting_fields).in_batches(of: batch_size) do |objects|
-        logger&.info { "Condition(#{id}): matched by #{match_class}(#{objects.pluck(:id).join(", ")}) (updated)" }
-        extractors.each { _1.update(objects) }
+      extractors.pluck(:rule_id, :key).to_h.transform_values do |key|
+        { key => ids }
       end
+    end
 
-      activating_objects(ids).select(*interesting_fields).in_batches(of: batch_size) do |objects|
-        logger&.info { "Condition(#{id}): matched by #{match_class}(#{objects.pluck(:id).join(", ")}) (matched)" }
-        extractors.each { _1.activate(objects) }
-        condition_matches.insert_all!(objects.map { { entry_id: _1.id } })
-      end
+    def cleanup(ids: nil)
+      ActiveRecord::Base.connection.execute(<<~SQL.squish)
+        delete from arr__condition_matches
+         where condition_id = #{ActiveRecord::Base.sanitize_sql(id)}
+           and stored_values is null
+           and #{id_clause("entry_id", ids)}
+      SQL
 
-      nil
+      ActiveRecord::Base.connection.execute(<<~SQL.squish)
+        update arr__condition_matches
+           set previous_stored_values = null
+         where condition_id = #{ActiveRecord::Base.sanitize_sql(id)}
+           and #{id_clause("entry_id", ids)}
+      SQL
     end
 
     private
+
+    def id_clause(field, ids)
+      if ids
+        ids_sql = ids.map { ActiveRecord::Base.sanitize_sql(_1) }.join(",")
+        "#{field} in (#{ids_sql})"
+      else
+        "true"
+      end
+    end
 
     def all_matching_objects
       clauses.reduce(match_class.all) do |relation, clause|
