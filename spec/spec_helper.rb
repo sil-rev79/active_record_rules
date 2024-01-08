@@ -63,15 +63,35 @@ RSpec.configure do |config|
   end
 
   config.around do |example|
-    ActiveRecord::Base.establish_connection(
-      adapter: "sqlite3",
-      database: ":memory:"
-    )
+    if ENV["ARR_DATABASE"] == "postgresql"
+      # Connect to the postgres and drop+create the database we want to use
+      ActiveRecord::Base.establish_connection(
+        adapter: "postgresql",
+        database: "postgres",
+        user: "postgres"
+      )
+      ActiveRecord::Base.connection.drop_database("active_record_rules")
+      ActiveRecord::Base.connection.create_database("active_record_rules")
+
+      # Then re-connect to connect to the fresh database
+      ActiveRecord::Base.establish_connection(
+        adapter: "postgresql",
+        database: "active_record_rules",
+        user: "postgres"
+      )
+    else
+      ActiveRecord::Base.establish_connection(
+        adapter: "sqlite3",
+        database: ":memory:"
+      )
+    end
 
     Dir.mktmpdir do |dir|
       Rails::Generators.invoke(
         "active_record_rules:install",
-        ["--id_type=integer", "--quiet"],
+        ["--id_type=integer",
+         ("--json_type=jsonb" if ENV["ARR_DATABASE"] == "postgresql"),
+         "--quiet"].compact,
         destination_root: dir
       )
 
