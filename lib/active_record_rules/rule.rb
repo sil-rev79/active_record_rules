@@ -135,7 +135,7 @@ module ActiveRecordRules
       parsed_definition => { names: }
       left_joins = extractors.map do |extractor|
         " left join (#{extractor.condition_matches.to_sql}) as #{extractor.key} " \
-          "on #{extractor.key}.entry_id = match.ids->>'#{extractor.key}'"
+        "on #{extractor.key}.entry_id = " + id_cast("match.ids->>'#{extractor.key}'")
       end
       names_pairs = names.map do |name, ((k, var))|
         definition = var.to_rule_sql("coalesce(#{k}.previous_stored_values, #{k}.stored_values)", {})
@@ -149,7 +149,8 @@ module ActiveRecordRules
                    else
                      keys_to_ids.flat_map do |key, ids|
                        ["query.ids", "match.ids"].map do |field|
-                         "#{field}->>'#{key}' in (#{ids.map { ActiveRecord::Base.sanitize_sql(_1) }.join(", ")})"
+                         id_cast("#{field}->>'#{key}'") +
+                           " in (#{ids.map { ActiveRecord::Base.sanitize_sql(_1) }.join(", ")})"
                        end
                      end.join(" or ")
                    end
@@ -165,7 +166,7 @@ module ActiveRecordRules
                      #{RuleMatch.awaiting_executions["unmatch"]}
                    when match.ids is null then
                      #{RuleMatch.awaiting_executions["match"]}
-                   when query.arguments = json_object(#{names_pairs.flatten.join(",")}) then
+                   when query.arguments = #{json_object_function}(#{names_pairs.flatten.join(",")}) then
                      null
                    else
                      #{RuleMatch.awaiting_executions["update"]}
@@ -173,10 +174,10 @@ module ActiveRecordRules
                  case
                    when match.ids is null then
                      null
-                   when query.arguments = json_object(#{names_pairs.flatten.join(",")}) then
+                   when query.arguments = #{json_object_function}(#{names_pairs.flatten.join(",")}) then
                      null
                    else
-                     json_object(#{names_pairs.flatten.join(",")})
+                     #{json_object_function}(#{names_pairs.flatten.join(",")})
                  end
             from (#{all_matches_query(keys_to_ids)}) as query
             full outer join
@@ -186,23 +187,19 @@ module ActiveRecordRules
            where #{ids_clause}
           on conflict(rule_id, ids) do update
             set "awaiting_execution" = (case
-                                          when awaiting_execution is null then
-                                            excluded.awaiting_execution
-                                          when awaiting_execution = #{RuleMatch.awaiting_executions["match"]}
+                                          when arr__rule_matches.awaiting_execution = #{RuleMatch.awaiting_executions["match"]}
                                                and excluded.awaiting_execution = #{RuleMatch.awaiting_executions["unmatch"]} then
                                             #{RuleMatch.awaiting_executions["delete"]}
-                                          when awaiting_execution in (#{RuleMatch.awaiting_executions["match"]},
-                                                                      #{RuleMatch.awaiting_executions["unmatch"]}) then
-                                            awaiting_execution
+                                          when arr__rule_matches.awaiting_execution in (#{RuleMatch.awaiting_executions["match"]},
+                                                                                        #{RuleMatch.awaiting_executions["unmatch"]}) then
+                                            arr__rule_matches.awaiting_execution
                                           else
                                             excluded.awaiting_execution
                                         end),
                 "stored_arguments" = (case
-                                        when awaiting_execution is null then
-                                          excluded.stored_arguments
-                                        when awaiting_execution in (#{RuleMatch.awaiting_executions["match"]},
-                                                                    #{RuleMatch.awaiting_executions["unmatch"]}) then
-                                          stored_arguments
+                                        when arr__rule_matches.awaiting_execution in (#{RuleMatch.awaiting_executions["match"]},
+                                                                                      #{RuleMatch.awaiting_executions["unmatch"]}) then
+                                          arr__rule_matches.stored_arguments
                                         else
                                           excluded.stored_arguments
                                       end)
@@ -213,7 +210,7 @@ module ActiveRecordRules
       parsed_definition => { names: }
       left_joins = extractors.map do |extractor|
         " left join (#{extractor.condition_matches.to_sql}) as #{extractor.key} " \
-          "on #{extractor.key}.entry_id = match.ids->>'#{extractor.key}'"
+        "on #{extractor.key}.entry_id = " + id_cast("match.ids->>'#{extractor.key}'")
       end
       names_pairs = names.map do |name, ((k, var))|
         definition = var.to_rule_sql("coalesce(#{k}.previous_stored_values, #{k}.stored_values)", {})
@@ -227,24 +224,44 @@ module ActiveRecordRules
           select #{ActiveRecord::Base.sanitize_sql(id)},
                  match.ids,
                  #{RuleMatch.awaiting_executions["unmatch"]},
-                 json_object(#{names_pairs.flatten.join(",")})
+                 #{json_object_function}(#{names_pairs.flatten.join(",")})
             from (#{rule_matches.to_sql}) as match
             #{left_joins.join}
            where true
           on conflict(rule_id, ids) do update
             set "awaiting_execution" = (case
-                                          when awaiting_execution is null then
+                                          when arr__rule_matches.awaiting_execution is null then
                                             excluded.awaiting_execution
-                                          when awaiting_execution = #{RuleMatch.awaiting_executions["match"]} then
+                                          when arr__rule_matches.awaiting_execution = #{RuleMatch.awaiting_executions["match"]} then
                                             #{RuleMatch.awaiting_executions["delete"]}
                                           else
                                             excluded.awaiting_execution
                                         end),
-                "stored_arguments" = coalesce(stored_arguments, excluded.stored_arguments)
+                "stored_arguments" = coalesce(arr__rule_matches.stored_arguments, excluded.stored_arguments)
       SQL
     end
 
     private
+
+    def json_object_function
+      if ActiveRecordRules.dialect == :sqlite
+        "json_object"
+      elsif ActiveRecordRules.dialect == :postgres
+        "jsonb_build_object"
+      else
+        raise "Unknown dialect: #{ActiveRecordRules.dialect}"
+      end
+    end
+
+    def id_cast(object)
+      if ActiveRecordRules.dialect == :sqlite
+        object # no need to cast in sqlite!
+      elsif ActiveRecordRules.dialect == :postgres
+        "(#{object}) :: #{ActiveRecordRules.id_type}"
+      else
+        raise "Unknown dialect: #{ActiveRecordRules.dialect}"
+      end
+    end
 
     def logger
       ActiveRecordRules.logger
@@ -431,8 +448,8 @@ module ActiveRecordRules
       ].compact.join(" and ")
 
       <<~SQL.squish
-        select json_object(#{ids_sql}) as ids,
-               json_object(#{names_pairs.flatten.join(",")}) as arguments
+        select #{json_object_function}(#{ids_sql}) as ids,
+               #{json_object_function}(#{names_pairs.flatten.join(",")}) as arguments
           from #{matches.map { "(#{_2}) as #{_1}" }.join(",")}
          #{where_clause.presence && "where #{where_clause}"}
       SQL

@@ -28,6 +28,9 @@ require "active_record_rules/rule_match"
 # system.
 module ActiveRecordRules
   cattr_accessor :logger, :execution_context
+  # We default to the SQLite dialect, but we also support :postgres
+  cattr_accessor :dialect, default: :sqlite
+  cattr_accessor :id_type, default: "integer"
 
   class << self
     def load_rules(*filenames, trigger_matches: false, trigger_unmatches: false)
@@ -213,7 +216,7 @@ module ActiveRecordRules
     def cleanup_conditions
       empty_conditions = Condition.joins(:extractors)
                                   .group(:id)
-                                  .having(Arel.sql("count").eq(0))
+                                  .having(Arel.sql("count(arr__extractors.id)").eq(0))
                                   .pluck(:id, "count(arr__extractors.id) as count")
       Condition.where(id: empty_conditions).destroy_all unless empty_conditions.empty?
     end

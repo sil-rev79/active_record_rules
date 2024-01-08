@@ -47,8 +47,8 @@ module ActiveRecordRules
         insert into arr__condition_matches(condition_id, entry_id, stored_values, previous_stored_values)
           select #{ActiveRecord::Base.sanitize_sql(id)},
                  coalesce(record.id, match.entry_id),
-                 case when record.id then
-                   json_object(#{extractor_fields.map { "'#{_1}', record.#{_1}" }.join(",")})
+                 case when record.id is not null then
+                   #{json_object_function}(#{extractor_fields.map { "'#{_1}', record.#{_1}" }.join(",")})
                  end,
                  match.stored_values
             from (#{all_matching_objects.where({ id: ids }.compact).to_sql}) as record
@@ -105,6 +105,16 @@ module ActiveRecordRules
     end
 
     private
+
+    def json_object_function
+      if ActiveRecordRules.dialect == :sqlite
+        "json_object"
+      elsif ActiveRecordRules.dialect == :postgres
+        "jsonb_build_object"
+      else
+        raise "Unknown dialect: #{ActiveRecordRules.dialect}"
+      end
+    end
 
     def id_clause(field, ids)
       if ids

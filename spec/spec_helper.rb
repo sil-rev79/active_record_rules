@@ -64,6 +64,8 @@ RSpec.configure do |config|
 
   config.around do |example|
     if ENV["ARR_DATABASE"] == "postgresql"
+      ActiveRecordRules.dialect = :postgres
+
       # Connect to the postgres and drop+create the database we want to use
       ActiveRecord::Base.establish_connection(
         adapter: "postgresql",
@@ -80,6 +82,8 @@ RSpec.configure do |config|
         user: "postgres"
       )
     else
+      ActiveRecordRules.dialect = :sqlite
+
       ActiveRecord::Base.establish_connection(
         adapter: "sqlite3",
         database: ":memory:"

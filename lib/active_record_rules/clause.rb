@@ -103,6 +103,16 @@ module ActiveRecordRules
              operator
            end
 
+      if ["+", "-", "*", "/"].include?(op)
+        left_sql = cast(left_sql, "numeric")
+        right_sql = cast(right_sql, "numeric")
+      end
+
+      if ["=", "!="].include?(op)
+        left_sql = cast(left_sql, "text")
+        right_sql = cast(right_sql, "text")
+      end
+
       "(#{left_sql} #{op} #{right_sql})"
     end
 
@@ -117,6 +127,16 @@ module ActiveRecordRules
                     operator
                   end
       left_object.public_send(op_method, right_object)
+    end
+
+    def cast(object, type)
+      if ActiveRecordRules.dialect == :sqlite
+        object # no need to cast in sqlite!
+      elsif ActiveRecordRules.dialect == :postgres
+        "(#{object}) :: #{type}"
+      else
+        raise "Unknown dialect: #{ActiveRecordRules.dialect}"
+      end
     end
 
     def unparse = "#{left.unparse} #{operator} #{right.unparse}"
@@ -155,7 +175,7 @@ module ActiveRecordRules
 
     def to_arel(table, _bindings) = table[name]
 
-    def to_rule_sql(json_field, _bindings) = "#{json_field}->>'#{name}'"
+    def to_rule_sql(json_field, _bindings) = "(#{json_field}->>'#{name}')"
 
     def evaluate(object) = object[name]
 
