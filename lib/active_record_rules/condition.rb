@@ -83,9 +83,15 @@ module ActiveRecordRules
 
       return unless ids
 
-      extractors.pluck(:rule_id, :key).to_h.transform_values do |key|
-        { key => ids }
+      rules_to_activate = Hash.new do |h, k|
+        h[k] = Hash.new { _1[_2] = [] }
       end
+
+      extractors.pluck(:rule_id, :key).each do |rule_id, key|
+        rules_to_activate[rule_id][key] += ids
+      end
+
+      rules_to_activate
     end
 
     def cleanup(ids: nil)

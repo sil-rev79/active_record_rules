@@ -141,16 +141,25 @@ module ActiveRecordRules
         clauses = (condition_definition[:clauses] || []).map { Clause.parse(_1) }
         constant_clauses, variable_clauses = clauses.partition { _1.binding_variables.empty? }
 
-        condition = Condition.find_or_initialize_by(
-          match_class_name: condition_definition[:class_name].to_s,
-          # We have to wrap the conditions in this fake object
-          # because querying with an array at the toplevel turns
-          # into an ActiveRecord IN query, which ruins everything.
-          # Using an object here simplifies things a lot.
-          match_conditions: { "clauses" => constant_clauses.map(&:unparse) }
-        )
-        condition.validate!
-        new_conditions << condition unless condition.persisted?
+        # first, try to find the condition in the conditions that we are already creating.
+        condition = new_conditions.find do |c|
+          c.match_class_name == condition_definition[:class_name].to_s &&
+            c.match_conditions == { "clauses" => constant_clauses.map(&:unparse) }
+        end
+        unless condition
+          # If we fail there, then fall back to checking the database,
+          # or creating a new one.
+          condition = Condition.find_or_initialize_by(
+            match_class_name: condition_definition[:class_name].to_s,
+            # We have to wrap the conditions in this fake object
+            # because querying with an array at the toplevel turns
+            # into an ActiveRecord IN query, which ruins everything.
+            # Using an object here simplifies things a lot.
+            match_conditions: { "clauses" => constant_clauses.map(&:unparse) }
+          )
+          condition.validate!
+          new_conditions << condition unless condition.persisted?
+        end
 
         fields = variable_clauses.map(&:record_variables).reduce(&:+)
 
