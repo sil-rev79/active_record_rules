@@ -19,6 +19,7 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
       t.references :rule, foreign_key: { to_table: :arr__rules }
       t.string :key
       t.<%= @json_type %> :fields
+      t.boolean :negated
       t.index [:rule_id, :key], unique: true, name: 'extractor_keys_uniqueness'
     end
 

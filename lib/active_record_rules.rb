@@ -163,6 +163,8 @@ module ActiveRecordRules
 
         fields = variable_clauses.map(&:record_variables).reduce(&:+)
 
+        negated = !!condition_definition[:negated] # rubocop:disable Style/DoubleNegation
+
         extractor = Extractor.new(
           condition: condition,
           # We have to wrap the fields in this fake object because
@@ -170,13 +172,20 @@ module ActiveRecordRules
           # ActiveRecord IN query, which ruins everything.  Using an
           # object here simplifies things a lot.
           fields: { "names" => fields },
-          key: "cond#{index + 1}"
+          key: "cond#{index + 1}",
+          negated: negated
         )
         extractor.validate!
 
         [
           extractor,
-          "#{condition_definition[:class_name]}(#{variable_clauses.map(&:unparse).join(", ")})"
+          [
+            ("not " if negated),
+            condition_definition[:class_name],
+            "(",
+            variable_clauses.map(&:unparse).join(", "),
+            ")"
+          ].join
         ]
       end.transpose
 

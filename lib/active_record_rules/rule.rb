@@ -57,7 +57,7 @@ module ActiveRecordRules
         all_rows = batch.pluck(:ids, :stored_arguments)
 
         # Fetch all of the current values needed for this batch
-        values_lookup = extractors.to_h do |match|
+        values_lookup = positive_extractors.to_h do |match|
           [match.key, match.condition_matches
                            .where(entry_id: all_rows.map(&:first).pluck(match.key))
                            .pluck(:entry_id, :stored_values)
@@ -96,7 +96,7 @@ module ActiveRecordRules
         all_ids = batch.pluck(:ids)
 
         # Fetch all of the related values needed for this batch
-        values_lookup = extractors.to_h do |match|
+        values_lookup = positive_extractors.to_h do |match|
           [match.key, match.condition_matches
                            .where(entry_id: all_ids.pluck(match.key))
                            .pluck(:entry_id, :stored_values)
@@ -133,7 +133,8 @@ module ActiveRecordRules
 
     def activate(keys_to_ids = nil)
       parsed_definition => { names: }
-      left_joins = extractors.map do |extractor|
+
+      left_joins = positive_extractors.map do |extractor|
         " left join (#{extractor.condition_matches.to_sql}) as #{extractor.key} " \
         "on #{extractor.key}.entry_id = " + id_cast("match.ids->>'#{extractor.key}'")
       end
@@ -144,15 +145,23 @@ module ActiveRecordRules
 
       ids_clause = if keys_to_ids.nil?
                      "true"
+                   elsif negative_extractors.any? { keys_to_ids.key?(_1.key) } # rubocop:disable Lint/DuplicateBranch
+                     # If the updated objects are used in any negative
+                     # conditions then we essentially need to
+                     # re-evaluate everything.
+                     # TODO: refine this substantially
+                     "true"
                    elsif keys_to_ids.empty?
                      "false"
                    else
                      keys_to_ids.flat_map do |key, ids|
+                       next unless positive_extractors.find { _1.key == key }
+
                        ["query.ids", "match.ids"].map do |field|
                          id_cast("#{field}->>'#{key}'") +
                            " in (#{ids.map { ActiveRecord::Base.sanitize_sql(_1) }.join(", ")})"
                        end
-                     end.join(" or ")
+                     end.compact.join(" or ")
                    end
 
       # Run pure SQL to update existing records (i.e. do not load the
@@ -263,6 +272,9 @@ module ActiveRecordRules
       end
     end
 
+    def positive_extractors = extractors.reject(&:negated)
+    def negative_extractors = extractors.select(&:negated)
+
     def logger
       ActiveRecordRules.logger
     end
@@ -279,8 +291,10 @@ module ActiveRecordRules
         clauses = parsed.each_with_index.flat_map do |condition_definition, index|
           (condition_definition[:clauses] || []).map do |clause|
             parsed = Clause.parse(clause)
-            parsed.to_bindings.each do |name, value|
-              names[name] << ["cond#{index + 1}", value]
+            unless condition_definition[:negated]
+              parsed.to_bindings.each do |name, value|
+                names[name] << ["cond#{index + 1}", value]
+              end
             end
             ["cond#{index + 1}", parsed]
           end
@@ -366,52 +380,10 @@ module ActiveRecordRules
       end
     end
 
-    # This is a simplification of `fetch_ids_and_arguments_for',
-    # above. I'm sure there's some helpful refactoring of them that
-    # could be done, but I'll have to return to it later.
-    def fetch_all_ids_and_arguments(exclude_ids: nil)
-      parsed_definition => { names:, clauses: }
-
-      matches = extractors.to_h do |match|
-        [match.key, match.condition_matches.to_sql]
-      end
-
-      sql_names = names.transform_values do |definition,|
-        definition[1].to_rule_sql("#{definition[0]}.stored_values", {})
-      end
-
-      where_clauses = []
-      clauses.reject { _2.binding_variables.empty? }.each do |table_name, clause|
-        next unless (clause_sql = clause.to_rule_sql("#{table_name}.stored_values", sql_names))
-
-        where_clauses << clause_sql
-      end
-
-      where_clause = where_clauses.join(" and ")
-
-      query_result = ActiveRecord::Base.connection.select_all(<<~SQL.squish).rows
-        select #{matches.keys.map { "#{_1}.entry_id" }.join(", ")}
-               #{sql_names.values.map { ", #{_1}" }.join}
-          from #{matches.map { "(#{_2}) as #{_1}" }.join(",")}
-         #{where_clause.presence && "where #{where_clause}"}
-      SQL
-
-      query_result.map do |row|
-        ids = matches.keys.zip(row[..matches.size]).sort_by(&:first).to_h
-
-        # TODO: add this to the WHERE clause with JSON_OBJECT and NOT IN
-        next if exclude_ids&.include?(ids)
-
-        values = sql_names.keys.zip(row[matches.size..]).to_h
-
-        [ids, names.keys.map { values[_1] }]
-      end.compact.to_h
-    end
-
     def all_matches_query(keys_to_ids)
       parsed_definition => { names:, clauses: }
 
-      matches = extractors.to_h do |match|
+      matches = positive_extractors.to_h do |match|
         [match.key, match.condition_matches.to_sql]
       end
 
@@ -431,9 +403,14 @@ module ActiveRecordRules
         ["'#{name}'", definition]
       end
 
-      ids_clause = keys_to_ids&.map do |key, ids|
-        "#{key}.entry_id in (#{ids.map { ActiveRecord::Base.sanitize_sql(_1) }.join(", ")})"
-      end&.join(" or ")
+      ids_clause =
+        if keys_to_ids && (keys_to_ids.keys.to_set < matches.keys.to_set)
+          keys_to_ids&.map do |key, ids|
+            next unless matches.key?(key) # I'm not sure how to write this filter for negative clauses
+
+            "#{key}.entry_id in (#{ids.map { ActiveRecord::Base.sanitize_sql(_1) }.join(", ")})"
+          end&.compact&.join(" or ")
+        end
 
       where_clause = [
         ids_clause && "(#{ids_clause})",
@@ -442,8 +419,23 @@ module ActiveRecordRules
 
         *clauses.map do |table_name, clause|
           next if clause.binding_variables.empty?
+          next unless matches.key?(table_name)
 
           clause.to_rule_sql("#{table_name}.stored_values", bindings)
+        end,
+
+        *negative_extractors.map do |extractor|
+          negative_clause = clauses.map do |table_name, clause|
+            next if clause.binding_variables.empty?
+            next unless extractor.key == table_name
+
+            clause.to_rule_sql("#{table_name}.stored_values", bindings)
+          end.compact.join(" and ")
+          <<~SQL
+            (not exists (select 1
+                           from (#{extractor.condition_matches.to_sql}) as #{extractor.key}
+                          where #{negative_clause.presence || "true"}))
+          SQL
         end
       ].compact.join(" and ")
 
