@@ -383,15 +383,27 @@ module ActiveRecordRules
     def all_matches_query(keys_to_ids)
       parsed_definition => { names:, clauses: }
 
-      matches = positive_extractors.to_h do |match|
-        [match.key, match.condition_matches.to_sql]
-      end
-
       bindings = names.transform_values do |definition,|
         definition[1].to_rule_sql(
           "#{definition[0]}.stored_values",
           {}
         )
+      end
+
+      matches = positive_extractors.to_h do |extractor|
+        [extractor.key, extractor.condition_matches.to_sql]
+      end
+
+      negative_joins = negative_extractors.to_h do |extractor|
+        on_clause = clauses.map do |table_name, clause|
+          next if clause.binding_variables.empty?
+          next unless extractor.key == table_name
+
+          clause.to_rule_sql("#{table_name}.stored_values", bindings)
+        end.compact.join(" and ")
+
+        [extractor.key,
+         " left join (#{extractor.condition_matches.to_sql}) as #{extractor.key} on #{on_clause}"]
       end
 
       ids_sql = matches.keys.map do |name|
@@ -424,18 +436,8 @@ module ActiveRecordRules
           clause.to_rule_sql("#{table_name}.stored_values", bindings)
         end,
 
-        *negative_extractors.map do |extractor|
-          negative_clause = clauses.map do |table_name, clause|
-            next if clause.binding_variables.empty?
-            next unless extractor.key == table_name
-
-            clause.to_rule_sql("#{table_name}.stored_values", bindings)
-          end.compact.join(" and ")
-          <<~SQL
-            (not exists (select 1
-                           from (#{extractor.condition_matches.to_sql}) as #{extractor.key}
-                          where #{negative_clause.presence || "true"}))
-          SQL
+        *negative_joins.map do |key, _|
+          "#{key}.id is null"
         end
       ].compact.join(" and ")
 
@@ -443,6 +445,7 @@ module ActiveRecordRules
         select #{json_object_function}(#{ids_sql}) as ids,
                #{json_object_function}(#{names_pairs.flatten.join(",")}) as arguments
           from #{matches.map { "(#{_2}) as #{_1}" }.join(",")}
+               #{negative_joins.map(&:second).join}
          #{where_clause.presence && "where #{where_clause}"}
       SQL
     end

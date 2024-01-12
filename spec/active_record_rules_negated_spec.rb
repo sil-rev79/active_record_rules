@@ -92,8 +92,10 @@ RSpec.describe ActiveRecordRules do
       generate(times: array(int(0..100), length: 1..).map(&:uniq))
 
       before do
+        # We want to avoid triggering on each rule, to avoid making
+        # this test take forever. Since we work on the database level,
+        # we can use a different Ruby model and it still works.
         times.each { RacerNoTrigger.create!(race_time: _1) }
-        # Since we work on database values, this still works!
         described_class.trigger_all(Racer)
       end
 
