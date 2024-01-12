@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+# Create a temporary directory so we can share a Unix domain
+# socket. It's easier than figuring our how to get an unused port.
+tempdir=$(mktemp -d)
+trap "rmdir $tempdir" EXIT
+
+# Start a Docker container with Postgres in it, configured as we need
+# it to be.
+name=$(basename "$tempdir")
+docker run                                      \
+       --rm                                     \
+       --name="arr_test_${name}"                \
+       --env POSTGRES_HOST_AUTH_METHOD=trust    \
+       --volume "$tempdir":/var/run/postgresql  \
+       postgres >/dev/null 2>&1 &
+pid="$?"
+trap "kill ${pid}" EXIT
+
+# Wait for the database to become ready, then run the tests.
+while ! docker exec "arr_test_${name}" pg_isready -U postgres >/dev/null 2>&1; do
+    sleep 1
+done
+export ARR_DATABASE="postgres:///active_record_rules?host=${tempdir}&user=postgres"
+"$@"

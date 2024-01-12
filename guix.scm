@@ -96,6 +96,7 @@ with tight integration with RSpec.")
  (native-inputs (list bundler
                       ruby-rake
                       ruby-rails
+                      ruby-pg
                       ruby-rspec
                       ruby-rubocop
                       ruby-rubocop-rspec
