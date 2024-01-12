@@ -22,5 +22,5 @@ tasks:
   - postgres-test: |
       cd active_record_rules
       sudo -u postgres createuser active_record_rules
-      export ARR_DATABASE=postgresql
+      export ARR_DATABASE="postgres:///active_record_rules?host=/var/run/postgresql"
       sudo -Eu postgres bundle exec rspec

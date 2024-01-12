@@ -63,38 +63,32 @@ RSpec.configure do |config|
   end
 
   config.around do |example|
-    if ENV["ARR_DATABASE"] == "postgresql"
-      ActiveRecordRules.dialect = :postgres
+    connection_string = ENV.fetch("ARR_DATABASE", "sqlite3::memory:")
 
-      # Connect to the postgres and drop+create the database we want to use
-      ActiveRecord::Base.establish_connection(
-        adapter: "postgresql",
-        database: "postgres",
-        user: "postgres"
-      )
-      ActiveRecord::Base.connection.drop_database("active_record_rules")
-      ActiveRecord::Base.connection.create_database("active_record_rules")
+    ActiveRecordRules.dialect = if connection_string.start_with?("postgres")
+                                  :postgres
+                                elsif connection_string.start_with?("sqlite")
+                                  :sqlite
+                                else
+                                  raise "We only support Postgres and SQLite for now. Sorry!"
+                                end
 
-      # Then re-connect to connect to the fresh database
-      ActiveRecord::Base.establish_connection(
-        adapter: "postgresql",
-        database: "active_record_rules",
-        user: "postgres"
-      )
-    else
-      ActiveRecordRules.dialect = :sqlite
-
-      ActiveRecord::Base.establish_connection(
-        adapter: "sqlite3",
-        database: ":memory:"
-      )
+    if ActiveRecordRules.dialect == :postgres
+      # Connect to the "postgres" database and drop+create the
+      # database we want to use
+      db_name = connection_string.match(%r{/([^/]*)(\?|$)})[1]
+      ActiveRecord::Base.establish_connection(connection_string.gsub("/#{db_name}", "/postgres"))
+      ActiveRecord::Base.connection.drop_database(db_name)
+      ActiveRecord::Base.connection.create_database(db_name)
     end
+
+    ActiveRecord::Base.establish_connection(connection_string)
 
     Dir.mktmpdir do |dir|
       Rails::Generators.invoke(
         "active_record_rules:install",
         ["--id_type=integer",
-         ("--json_type=jsonb" if ENV["ARR_DATABASE"] == "postgresql"),
+         ("--json_type=jsonb" if ActiveRecordRules.dialect == :postgres),
          "--quiet"].compact,
         destination_root: dir
       )
