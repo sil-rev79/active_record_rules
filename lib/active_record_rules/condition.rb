@@ -154,7 +154,7 @@ module ActiveRecordRules
     end
 
     def clauses
-      @clauses ||= match_conditions["clauses"].map { Clause.parse(_1) }
+      @clauses ||= match_conditions["clauses"].map { Clause.parse(_1, match_class) }
     end
 
     def clause_arel(clause)

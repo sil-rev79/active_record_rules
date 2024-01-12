@@ -3,19 +3,19 @@
 module ActiveRecordRules
   class Clause
     class << self
-      def parse(input)
+      def parse(input, record_class = nil)
         input = Parser.new.clause.parse(input) if input.is_a?(String)
 
         case input
         in { lhs:, op:, rhs: }
           BinaryOperatorExpression.new(
-            process_expr(lhs),
+            process_expr(lhs, record_class),
             op.to_s,
-            process_expr(rhs)
+            process_expr(rhs, record_class)
           )
         in { name: }
           BinaryOperatorExpression.new(
-            RecordVariable.new(name.to_s),
+            RecordVariable.new(name.to_s, record_class),
             "=",
             BindingVariable.new(name.to_s)
           )
@@ -24,18 +24,18 @@ module ActiveRecordRules
 
       private
 
-      def process_expr(expr)
+      def process_expr(expr, record_class)
         case expr
         in { lhs:, op:, rhs: }
           BinaryOperatorExpression.new(
-            process_expr(lhs),
+            process_expr(lhs, record_class),
             op.to_s,
-            process_expr(rhs)
+            process_expr(rhs, record_class)
           )
         in { binding_name: }
           BindingVariable.new(binding_name.to_s)
         in { record_name: }
-          RecordVariable.new(record_name.to_s)
+          RecordVariable.new(record_name.to_s, record_class)
         in { boolean: }
           Constant.new(boolean.to_s == "true")
         in { string: }
@@ -48,8 +48,31 @@ module ActiveRecordRules
       end
     end
 
-    def binding_variables = Set.new
+    def binds_variables? = false
     def record_variables = Set.new
+
+    private
+
+    def cast(object, type)
+      if ActiveRecordRules.dialect == :sqlite
+        object # no need to cast in sqlite!
+      elsif ActiveRecordRules.dialect == :postgres
+        # TODO: make this mapping more reasonable
+        sql_type = case type
+                   in :integer | :float
+                     "numeric"
+                   in :string
+                     "text"
+                   in :datetime
+                     "timestamp"
+                   else
+                     type || "any"
+                   end
+        "(#{object}) :: #{sql_type}"
+      else
+        raise "Unknown dialect: #{ActiveRecordRules.dialect}"
+      end
+    end
   end
 
   class BinaryOperatorExpression < Clause
@@ -62,7 +85,7 @@ module ActiveRecordRules
       @right = right
     end
 
-    def binding_variables = @left.binding_variables + @right.binding_variables
+    def binds_variables? = @left.binds_variables? || @right.binds_variables?
     def record_variables = @left.record_variables + @right.record_variables
 
     def to_bindings
@@ -103,16 +126,6 @@ module ActiveRecordRules
              operator
            end
 
-      if ["+", "-", "*", "/"].include?(op)
-        left_sql = cast(left_sql, "numeric")
-        right_sql = cast(right_sql, "numeric")
-      end
-
-      if ["=", "!="].include?(op)
-        left_sql = cast(left_sql, "text")
-        right_sql = cast(right_sql, "text")
-      end
-
       "(#{left_sql} #{op} #{right_sql})"
     end
 
@@ -129,16 +142,6 @@ module ActiveRecordRules
       left_object.public_send(op_method, right_object)
     end
 
-    def cast(object, type)
-      if ActiveRecordRules.dialect == :sqlite
-        object # no need to cast in sqlite!
-      elsif ActiveRecordRules.dialect == :postgres
-        "(#{object}) :: #{type}"
-      else
-        raise "Unknown dialect: #{ActiveRecordRules.dialect}"
-      end
-    end
-
     def unparse = "#{left.unparse} #{operator} #{right.unparse}"
   end
 
@@ -150,7 +153,7 @@ module ActiveRecordRules
       @name = name
     end
 
-    def binding_variables = Set.new([name])
+    def binds_variables? = true
 
     def to_arel(_table, bindings) = bindings[name]
 
@@ -164,18 +167,19 @@ module ActiveRecordRules
   end
 
   class RecordVariable < Clause
-    attr_reader :name
+    attr_reader :name, :type
 
-    def initialize(name)
+    def initialize(name, record_class)
       super()
       @name = name
+      @type = record_class&.attribute_types&.[](name)&.type
     end
 
     def record_variables = Set.new([name])
 
     def to_arel(table, _bindings) = table[name]
 
-    def to_rule_sql(json_field, _bindings) = "(#{json_field}->>'#{name}')"
+    def to_rule_sql(json_field, _bindings) = cast("(#{json_field}->>'#{name}')", type)
 
     def evaluate(object) = object[name]
 

@@ -289,8 +289,9 @@ module ActiveRecordRules
         names = Hash.new { _1[_2] = [] }
 
         clauses = parsed.each_with_index.flat_map do |condition_definition, index|
+          match_class = condition_definition[:class_name].to_s.constantize
           (condition_definition[:clauses] || []).map do |clause|
-            parsed = Clause.parse(clause)
+            parsed = Clause.parse(clause, match_class)
             unless condition_definition[:negated]
               parsed.to_bindings.each do |name, value|
                 names[name] << ["cond#{index + 1}", value]
@@ -396,7 +397,7 @@ module ActiveRecordRules
 
       negative_joins = negative_extractors.to_h do |extractor|
         on_clause = clauses.map do |table_name, clause|
-          next if clause.binding_variables.empty?
+          next unless clause.binds_variables?
           next unless extractor.key == table_name
 
           clause.to_rule_sql("#{table_name}.stored_values", bindings)
@@ -430,7 +431,7 @@ module ActiveRecordRules
         *matches.keys.map { "#{_1}.stored_values is not null" },
 
         *clauses.map do |table_name, clause|
-          next if clause.binding_variables.empty?
+          next unless clause.binds_variables?
           next unless matches.key?(table_name)
 
           clause.to_rule_sql("#{table_name}.stored_values", bindings)

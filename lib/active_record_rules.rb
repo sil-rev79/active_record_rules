@@ -138,8 +138,9 @@ module ActiveRecordRules
       new_conditions = []
 
       extractors, condition_strings = definition[:conditions].each_with_index.map do |condition_definition, index|
-        clauses = (condition_definition[:clauses] || []).map { Clause.parse(_1) }
-        constant_clauses, variable_clauses = clauses.partition { _1.binding_variables.empty? }
+        match_class = condition_definition[:class_name].to_s.constantize
+        clauses = (condition_definition[:clauses] || []).map { Clause.parse(_1, match_class) }
+        variable_clauses, constant_clauses = clauses.partition(&:binds_variables?)
 
         # first, try to find the condition in the conditions that we are already creating.
         condition = new_conditions.find do |c|
