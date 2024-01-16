@@ -9,13 +9,13 @@ A [production system][] within ActiveRecord to execute code when matching rule c
 Include `active_record_rules` in your `Gemfile`, then run:
 
 ```shell
-# "jsonb" is the most appropriate Postgres JSON type, use "json" for SQLite
-# "integer" is the default Rails id type, but your application might customise this
-rails generate active_record_rules:install --json_type=jsonb --id_type=integer
+rails generate active_record_rules:install postgres # or sqlite
 rails db:migrate
 ```
 
-If you'd like logging, you can set `ActiveRecordRules.logger` to a logger of your choosing (e.g. `Rails.logger`). Messages about `Condition` and `Rule` matching/unmatching will be logged at `info` level, and detailed information about specific tests will be logged at `debug` level.
+This will install and run the necessary migrations to `db/migrate` to store rule matching information. This will also install a Rails configuration file to set the SQL dialect to use.
+
+At the moment only Postgres and SQLite are supported. Contributions are welcome to add support for other database engines.
 
 ## Usage
 

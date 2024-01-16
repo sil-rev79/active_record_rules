@@ -3,7 +3,7 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
   def change
     create_table :arr__conditions do |t|
       t.string :match_class_name
-      t.<%= @json_type %> :match_conditions
+      t.<%= json_type %> :match_conditions
     end
 
     create_table :arr__rules do |t|
@@ -18,24 +18,24 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
       t.references :condition, foreign_key: { to_table: :arr__conditions }
       t.references :rule, foreign_key: { to_table: :arr__rules }
       t.string :key
-      t.<%= @json_type %> :fields
+      t.<%= json_type %> :fields
       t.boolean :negated
       t.index [:rule_id, :key], unique: true, name: 'extractor_keys_uniqueness'
     end
 
     create_table :arr__condition_matches do |t|
       t.references :condition, foreign_key: { to_table: :arr__conditions }
-      t.<%= @id_type %> :entry_id
-      t.<%= @json_type %> :stored_values
-      t.<%= @json_type %> :previous_stored_values
+      t.<%= primary_key_type %> :entry_id
+      t.<%= json_type %> :stored_values
+      t.<%= json_type %> :previous_stored_values
       t.index [:condition_id, :entry_id], unique: true, name: 'condition_match_uniqueness'
     end
 
     create_table :arr__rule_matches do |t|
       t.references :rule, foreign_key: { to_table: :arr__rules }
-      t.<%= @json_type %> :ids
+      t.<%= json_type %> :ids
       t.integer :awaiting_execution
-      t.<%= @json_type %> :stored_arguments
+      t.<%= json_type %> :stored_arguments
       t.index [:rule_id, :ids], unique: true, name: 'rule_match_uniqueness'
       t.index :awaiting_execution, name: 'rule_match_awaiting_execution'
     end

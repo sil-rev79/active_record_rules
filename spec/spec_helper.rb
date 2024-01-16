@@ -87,9 +87,7 @@ RSpec.configure do |config|
     Dir.mktmpdir do |dir|
       Rails::Generators.invoke(
         "active_record_rules:install",
-        ["--id_type=integer",
-         ("--json_type=jsonb" if ActiveRecordRules.dialect == :postgres),
-         "--quiet"].compact,
+        [ActiveRecordRules.dialect.to_s, "--quiet"],
         destination_root: dir
       )
 
