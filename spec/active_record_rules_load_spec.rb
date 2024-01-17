@@ -37,7 +37,7 @@ RSpec.describe ActiveRecordRules do
 
     context "when updating rules, with default settings" do
       before do
-        described_class.load_rules("#{__dir__}/rules-initial.rrb")
+        described_class.load_rules("#{__dir__}/rules-update.rrb")
       end
 
       it { is_expected.to eq(["Hi, John", "Hi, Jane"]) }
@@ -49,6 +49,14 @@ RSpec.describe ActiveRecordRules do
       end
 
       it { is_expected.to eq(["Hi, John", "Hi, Jane", "Hi there, John", "Hi there, Jane"]) }
+    end
+
+    context "when re-defining rules the same, with trigger_matches: true" do
+      before do
+        described_class.load_rules("#{__dir__}/rules-initial.rrb", trigger_matches: true)
+      end
+
+      it { is_expected.to eq(["Hi, John", "Hi, Jane"]) }
     end
 
     context "when updating rules, with trigger_unmatches: true" do

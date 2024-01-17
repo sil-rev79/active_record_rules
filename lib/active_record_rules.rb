@@ -134,7 +134,7 @@ module ActiveRecordRules
 
     private
 
-    def raw_define_rule(definition, trigger_rules:)
+    def build_rule(definition)
       new_conditions = []
 
       extractors, condition_strings = definition[:conditions].each_with_index.map do |condition_definition, index|
@@ -190,15 +190,23 @@ module ActiveRecordRules
         ]
       end.transpose
 
-      rule = Rule.create!(
-        extractors: extractors,
-        name: definition[:name].to_s,
-        variable_conditions: condition_strings.map { "  #{_1}\n" }.join,
-        on_match: definition[:on_match]&.pluck(:line)&.join("\n  "),
-        on_update: definition[:on_update]&.pluck(:line)&.join("\n  "),
-        on_unmatch: definition[:on_unmatch]&.pluck(:line)&.join("\n  ")
-      )
+      [
+        Rule.new(
+          extractors: extractors,
+          name: definition[:name].to_s,
+          variable_conditions: condition_strings.map { "  #{_1}\n" }.join,
+          on_match: definition[:on_match]&.pluck(:line)&.join("\n  "),
+          on_update: definition[:on_update]&.pluck(:line)&.join("\n  "),
+          on_unmatch: definition[:on_unmatch]&.pluck(:line)&.join("\n  ")
+        ),
+        new_conditions
+      ]
+    end
 
+    def raw_define_rule(definition, trigger_rules:)
+      rule, new_conditions = build_rule(definition)
+
+      rule.save!
       new_conditions.each(&:activate)
       rule.activate
 
@@ -211,7 +219,28 @@ module ActiveRecordRules
       rule
     end
 
+    def rules_equal?(left, right)
+      left.attributes.without("id") == right.attributes.without("id") &&
+        left.extractors.length == right.extractors.length &&
+        left.extractors.zip(right.extractors).all? { extractors_equal?(_1, _2) }
+    end
+
+    def extractors_equal?(left, right)
+      left.key == right.key &&
+        left.fields.to_set == right.fields.to_set &&
+        conditions_equal?(left.condition, right.condition)
+    end
+
+    def conditions_equal?(left, right)
+      left.match_class_name == right.match_class_name &&
+        left.match_conditions == right.match_conditions
+    end
+
     def raw_update_rule(rule, definition, trigger_matches:, trigger_unmatches:)
+      new_rule, = build_rule(definition)
+
+      return rule if rules_equal?(rule, new_rule)
+
       raw_delete_rule(rule, trigger_rules: trigger_unmatches, cleanup: false)
       rule = raw_define_rule(definition, trigger_rules: trigger_matches)
 
