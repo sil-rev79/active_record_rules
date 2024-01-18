@@ -16,7 +16,7 @@ module ActiveRecordRules
     source_root __dir__
 
     def apply_dialect_template
-      template "set_dialect.rb.erb", "config/initializers/active_record_rules.rb"
+      template "rails_config.rb.erb", "config/initializers/active_record_rules.rb"
     end
 
     def apply_migration_templates
