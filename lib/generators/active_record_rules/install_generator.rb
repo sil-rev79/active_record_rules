@@ -8,11 +8,6 @@ module ActiveRecordRules
   class InstallGenerator < ActiveRecord::Generators::Base # :nodoc:
     desc "Generates a migration for ActiveRecordRules models."
 
-    class_option :id_type, type: :string, default: "integer", desc: <<~DESC
-      The column type to use to track record ids. This can be any
-      type, but common values are integer (Rails' default) or uuid.
-    DESC
-
     source_root __dir__
 
     def apply_dialect_template
