@@ -7,6 +7,7 @@ require "active_record_rules/extractor"
 require "active_record_rules/parser"
 require "active_record_rules/rule"
 require "active_record_rules/rule_match"
+require "active_record_rules/railtie" if defined?(Rails)
 
 # A production rule system for ActiveRecord objects.
 #
@@ -34,6 +35,9 @@ module ActiveRecordRules
 
   class << self
     def load_rules(*filenames, trigger_matches: false, trigger_unmatches: false)
+      # Flatten any arrays in the arguments
+      filenames = filenames.flat_map { _1.is_a?(Array) ? _1 : [_1] }
+
       parser = Parser.new.definitions
       definition_hashes = filenames.flat_map do |filename|
         File.open(filename) do |file|
