@@ -149,7 +149,7 @@ module ActiveRecordRules
                      # If the updated objects are used in any negative
                      # conditions then we essentially need to
                      # re-evaluate everything.
-                     # TODO: refine this substantially
+                     # TODO: refine this substantially, if we can
                      "true"
                    elsif keys_to_ids.empty?
                      "false"
@@ -159,7 +159,7 @@ module ActiveRecordRules
 
                        ["query.ids", "match.ids"].map do |field|
                          id_cast("#{field}->>'#{key}'") +
-                           " in (#{ids.map { ActiveRecord::Base.sanitize_sql(_1) }.join(", ")})"
+                           " in (#{ids.map { ActiveRecord::Base.connection.quote(_1) }.join(", ")})"
                        end
                      end.compact.join(" or ")
                    end
@@ -168,7 +168,7 @@ module ActiveRecordRules
       # records themselves into Ruby).
       ActiveRecord::Base.connection.execute(<<~SQL.squish)
         insert into arr__rule_matches(rule_id, ids, awaiting_execution, stored_arguments)
-          select #{ActiveRecord::Base.sanitize_sql(id)},
+          select #{ActiveRecord::Base.connection.quote(id)},
                  coalesce(query.ids, match.ids),
                  case
                    when query.ids is null then
@@ -230,7 +230,7 @@ module ActiveRecordRules
       # records themselves into Ruby).
       ActiveRecord::Base.connection.execute(<<~SQL.squish)
         insert into arr__rule_matches(rule_id, ids, awaiting_execution, stored_arguments)
-          select #{ActiveRecord::Base.sanitize_sql(id)},
+          select #{ActiveRecord::Base.connection.quote(id)},
                  match.ids,
                  #{RuleMatch.awaiting_executions["unmatch"]},
                  #{json_object_function}(#{names_pairs.flatten.join(",")})
@@ -421,7 +421,7 @@ module ActiveRecordRules
           keys_to_ids&.map do |key, ids|
             next unless matches.key?(key) # I'm not sure how to write this filter for negative clauses
 
-            "#{key}.entry_id in (#{ids.map { ActiveRecord::Base.sanitize_sql(_1) }.join(", ")})"
+            "#{key}.entry_id in (#{ids.map { ActiveRecord::Base.connection.quote(_1) }.join(", ")})"
           end&.compact&.join(" or ")
         end
 

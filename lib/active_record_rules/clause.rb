@@ -196,7 +196,7 @@ module ActiveRecordRules
 
     def to_arel(_table, _bindings) = Arel::Nodes.build_quoted(value)
 
-    def to_rule_sql(_json_field, _bindings) = ActiveRecord::Base.sanitize_sql(value)
+    def to_rule_sql(_json_field, _bindings) = ActiveRecord::Base.connection.quote(value)
 
     def evaluate(_object) = value
 

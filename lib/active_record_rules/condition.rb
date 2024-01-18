@@ -45,7 +45,7 @@ module ActiveRecordRules
     def activate(ids: nil)
       ActiveRecord::Base.connection.execute(<<~SQL.squish)
         insert into arr__condition_matches(condition_id, entry_id, stored_values, previous_stored_values)
-          select #{ActiveRecord::Base.sanitize_sql(id)},
+          select #{ActiveRecord::Base.connection.quote(id)},
                  coalesce(record.id, match.entry_id),
                  case when record.id is not null then
                    #{json_object_function}(#{extractor_fields.map { "'#{_1}', record.#{_1}" }.join(",")})
@@ -97,7 +97,7 @@ module ActiveRecordRules
     def cleanup(ids: nil)
       ActiveRecord::Base.connection.execute(<<~SQL.squish)
         delete from arr__condition_matches
-         where condition_id = #{ActiveRecord::Base.sanitize_sql(id)}
+         where condition_id = #{ActiveRecord::Base.connection.quote(id)}
            and stored_values is null
            and #{id_clause("entry_id", ids)}
       SQL
@@ -105,7 +105,7 @@ module ActiveRecordRules
       ActiveRecord::Base.connection.execute(<<~SQL.squish)
         update arr__condition_matches
            set previous_stored_values = null
-         where condition_id = #{ActiveRecord::Base.sanitize_sql(id)}
+         where condition_id = #{ActiveRecord::Base.connection.quote(id)}
            and #{id_clause("entry_id", ids)}
       SQL
     end
@@ -124,7 +124,7 @@ module ActiveRecordRules
 
     def id_clause(field, ids)
       if ids
-        ids_sql = ids.map { ActiveRecord::Base.sanitize_sql(_1) }.join(",")
+        ids_sql = ids.map { ActiveRecord::Base.connection.quote(_1) }.join(",")
         "#{field} in (#{ids_sql})"
       else
         "true"
