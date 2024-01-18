@@ -266,11 +266,9 @@ module ActiveRecordRules
     end
 
     def cleanup_conditions
-      empty_conditions = Condition.joins(:extractors)
-                                  .group(:id)
-                                  .having(Arel.sql("count(arr__extractors.id)").eq(0))
-                                  .pluck(:id, "count(arr__extractors.id) as count")
-      Condition.where(id: empty_conditions).destroy_all unless empty_conditions.empty?
+      Condition
+        .where("not exists(select 1 from arr__extractors where arr__extractors.condition_id = arr__conditions.id)")
+        .destroy_all
     end
   end
 end
