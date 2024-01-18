@@ -32,6 +32,9 @@ module ActiveRecordRules
   # We default to the SQLite dialect, but we also support :postgres
   cattr_accessor :dialect, default: :sqlite
   cattr_accessor :id_type, default: "integer"
+  cattr_accessor :load_rules_after_migrations, default: false
+
+  def self.config = (yield self)
 
   class << self
     def load_rules(*filenames, trigger_matches: false, trigger_unmatches: false)

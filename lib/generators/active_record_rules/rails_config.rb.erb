@@ -1,3 +1,6 @@
-ActiveRecordRules.dialect = :<%= dialect %>
-ActiveRecordRules.logger = Rails.logger
-ActiveRecordRules.id_type = :<%= primary_key_type %>
+ActiveRecordRules.config do |c|
+  c.dialect = :<%= dialect %>
+  c.logger = Rails.logger
+  c.id_type = :<%= primary_key_type %>
+  c.load_rules_after_migrations = true
+end
