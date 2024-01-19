@@ -2,5 +2,6 @@ ActiveRecordRules.config do |c|
   c.dialect = :<%= dialect %>
   c.logger = Rails.logger
   c.id_type = :<%= primary_key_type %>
-  c.load_rules_after_migrations = true
+
+  c.load_after_migration(Rails.root.join('app', '**', '*.rules'))
 end

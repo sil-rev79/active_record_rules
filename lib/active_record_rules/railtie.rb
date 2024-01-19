@@ -6,9 +6,9 @@ module ActiveRecordRules
   class Railtie < Rails::Railtie
     rake_tasks do
       task :load_rules do
-        if ActiveRecordRules.load_rules_after_migrations
+        if ActiveRecordRules.automatic_load_paths
           ActiveRecordRules.load_rules(
-            Dir[Rails.root.join("app", "**", "*.rules")]
+            *ActiveRecordRules.automatic_load_paths.map { Dir[_1] }
           )
         end
       end
