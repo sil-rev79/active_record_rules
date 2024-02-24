@@ -7,7 +7,7 @@ module ActiveRecordRules
     rule(:whitespace) { match('[ \t]').repeat(1) }
 
     rule(:eol) do
-      str("\r\n") | str("\n")
+      str("\r\n") | str("\n") | str(";") # treat semicolons like newlines!
     end
 
     rule(:newline) do
