@@ -69,8 +69,8 @@ module ActiveRecordRules
           old_arguments = names.keys.map { old_values[_1] }
           logger&.info { "Rule(#{id}): updated for #{ids.to_json}" }
 
-          arguments = names.map do |_, ((k, var))|
-            values = values_lookup[k][ids[k]]
+          arguments = names.map do |_, ((_klass, key, var))|
+            values = values_lookup[key][ids[key]]
             raise ValuesNotFound unless values
 
             values[var.name]
@@ -106,8 +106,8 @@ module ActiveRecordRules
         # Go through each record and run the match code
         all_ids.map do |ids|
           logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
-          arguments = names.map do |_, ((k, var))|
-            values = values_lookup[k][ids[k]]
+          arguments = names.map do |_, ((_klass, key, var))|
+            values = values_lookup[key][ids[key]]
             raise ValuesNotFound unless values
 
             values[var.name]
@@ -138,8 +138,8 @@ module ActiveRecordRules
         " left join (#{extractor.condition_matches.to_sql}) as #{extractor.key} " \
         "on #{extractor.key}.entry_id = " + id_cast("match.ids->>'#{extractor.key}'")
       end
-      names_pairs = names.map do |name, ((k, var))|
-        definition = var.to_rule_sql("coalesce(#{k}.previous_stored_values, #{k}.stored_values)", {})
+      names_pairs = names.map do |name, ((klass, key, var))|
+        definition = var.to_rule_sql(klass, "coalesce(#{key}.previous_stored_values, #{key}.stored_values)", {})
         ["'#{name}'", definition]
       end
 
@@ -221,8 +221,8 @@ module ActiveRecordRules
         " left join (#{extractor.condition_matches.to_sql}) as #{extractor.key} " \
         "on #{extractor.key}.entry_id = " + id_cast("match.ids->>'#{extractor.key}'")
       end
-      names_pairs = names.map do |name, ((k, var))|
-        definition = var.to_rule_sql("coalesce(#{k}.previous_stored_values, #{k}.stored_values)", {})
+      names_pairs = names.map do |name, ((klass, key, var))|
+        definition = var.to_rule_sql(klass, "coalesce(#{key}.previous_stored_values, #{key}.stored_values)", {})
         ["'#{name}'", definition]
       end
 
@@ -281,31 +281,30 @@ module ActiveRecordRules
 
     def parsed_definition
       @parsed_definition ||= begin
-        parsed = Parser.new.conditions.parse(
-          variable_conditions,
-          reporter: Parslet::ErrorReporter::Deepest.new
-        )
-
         names = Hash.new { _1[_2] = [] }
 
-        clauses = parsed.each_with_index.flat_map do |condition_definition, index|
-          match_class = condition_definition[:class_name].to_s.constantize
-          (condition_definition[:clauses] || []).map do |clause|
-            parsed = Clause.parse(clause, match_class)
-            unless condition_definition[:negated]
-              parsed.to_bindings.each do |name, value|
-                names[name] << ["cond#{index + 1}", value]
+        clauses = Parse.constraints(variable_conditions).each_with_index.flat_map do |constraint, index|
+          if constraint.is_a?(Parse::Ast::Comparison)
+            constraint.bindings.each { names[_1] << [nil, nil, _2] }
+            next [constraint]
+          end
+
+          match_class = constraint.class_name.constantize
+          constraint.clauses.map do |clause|
+            unless constraint.negated
+              # Positive clauses bind names that can be referred to in
+              # other clauses.
+              clause.bound_variables.each do |name, value|
+                names[name] << [match_class, "cond#{index + 1}", value]
               end
             end
-            ["cond#{index + 1}", parsed]
+            [match_class, "cond#{index + 1}", clause]
           end
         end
 
         { names: names,
           clauses: clauses }
       end
-    rescue Parslet::ParseFailed => e
-      raise e.parse_failure_cause.ascii_tree
     end
 
     def on_match_proc
@@ -384,9 +383,10 @@ module ActiveRecordRules
     def all_matches_query(keys_to_ids)
       parsed_definition => { names:, clauses: }
 
-      bindings = names.transform_values do |definition,|
-        definition[1].to_rule_sql(
-          "#{definition[0]}.stored_values",
+      bindings = names.transform_values do |(klass, key, var),|
+        var.to_rule_sql(
+          klass,
+          "#{key}.stored_values",
           {}
         )
       end
@@ -396,11 +396,10 @@ module ActiveRecordRules
       end
 
       negative_joins = negative_extractors.to_h do |extractor|
-        on_clause = clauses.map do |table_name, clause|
-          next unless clause.binds_variables?
+        on_clause = clauses.map do |klass, table_name, clause|
           next unless extractor.key == table_name
 
-          clause.to_rule_sql("#{table_name}.stored_values", bindings)
+          clause.to_rule_sql(klass, "#{table_name}.stored_values", bindings)
         end.compact.join(" and ")
 
         [extractor.key,
@@ -411,8 +410,8 @@ module ActiveRecordRules
         "'#{name}', #{name}.entry_id"
       end.join(", ")
 
-      names_pairs = names.map do |name, ((k, var))|
-        definition = var.to_rule_sql("#{k}.stored_values", bindings)
+      names_pairs = names.map do |name, ((klass, key, var))|
+        definition = var.to_rule_sql(klass, "#{key}.stored_values", bindings)
         ["'#{name}'", definition]
       end
 
@@ -430,11 +429,11 @@ module ActiveRecordRules
 
         *matches.keys.map { "#{_1}.stored_values is not null" },
 
-        *clauses.map do |table_name, clause|
-          next unless clause.binds_variables?
+        *clauses.map do |klass, table_name, clause|
+          # next if clause.bound_variables.empty?
           next unless matches.key?(table_name)
 
-          clause.to_rule_sql("#{table_name}.stored_values", bindings)
+          clause.to_rule_sql(klass, "#{table_name}.stored_values", bindings)
         end,
 
         *negative_joins.map do |key, _|

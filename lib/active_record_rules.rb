@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-require "active_record_rules/clause"
+require "active_record"
 require "active_record_rules/condition"
 require "active_record_rules/condition_match"
 require "active_record_rules/extractor"
-require "active_record_rules/parser"
+require "active_record_rules/parse"
 require "active_record_rules/rule"
 require "active_record_rules/rule_match"
 require "active_record_rules/railtie" if defined?(Rails)
@@ -45,11 +45,10 @@ module ActiveRecordRules
       # Flatten any arrays in the arguments
       filenames = filenames.flat_map { _1.is_a?(Array) ? _1 : [_1] }
 
-      parser = Parser.new.definitions
       definition_hashes = filenames.flat_map do |filename|
         File.open(filename) do |file|
-          parser.parse(file.read, reporter: Parslet::ErrorReporter::Deepest.new).map do |parsed|
-            { parsed[:definition][:name].to_s => [parsed[:definition], filename] }
+          Parse.definitions(file.read).map do |definition|
+            { definition.name => [definition, filename] }
           end
         end
       end
@@ -62,7 +61,7 @@ module ActiveRecordRules
         end
       end
 
-      definitions.each do |name, (definition, _filename)|
+      definitions.each do |name, (definition, _)|
         if (rule = Rule.find_by(name: name))
           raw_update_rule(rule, definition, trigger_matches: trigger_matches, trigger_unmatches: trigger_unmatches)
         else
@@ -79,10 +78,8 @@ module ActiveRecordRules
     end
 
     def define_rule(definition_string, trigger_rules: true)
-      definition = Parser.new.definition.parse(definition_string, reporter: Parslet::ErrorReporter::Deepest.new)
+      definition = Parse.definition(definition_string)
       raw_define_rule(definition, trigger_rules: trigger_rules)
-    rescue Parslet::ParseFailed => e
-      raise e.parse_failure_cause.ascii_tree
     end
 
     def delete_rule(rule_name, trigger_rules: true)
@@ -148,21 +145,21 @@ module ActiveRecordRules
     def build_rule(definition)
       new_conditions = []
 
-      extractors, condition_strings = definition[:conditions].each_with_index.map do |condition_definition, index|
-        match_class = condition_definition[:class_name].to_s.constantize
-        clauses = (condition_definition[:clauses] || []).map { Clause.parse(_1, match_class) }
-        variable_clauses, constant_clauses = clauses.partition(&:binds_variables?)
+      extractors, constraints = definition.constraints.each_with_index.map do |constraint, index|
+        next [nil, constraint] if constraint.is_a?(Parse::Ast::Comparison)
+
+        constant_clauses = constraint.only_simple_clauses.clauses
 
         # first, try to find the condition in the conditions that we are already creating.
         condition = new_conditions.find do |c|
-          c.match_class_name == condition_definition[:class_name].to_s &&
+          c.match_class_name == constraint.class_name &&
             c.match_conditions == { "clauses" => constant_clauses.map(&:unparse) }
         end
         unless condition
           # If we fail there, then fall back to checking the database,
           # or creating a new one.
           condition = Condition.find_or_initialize_by(
-            match_class_name: condition_definition[:class_name].to_s,
+            match_class_name: constraint.class_name,
             # We have to wrap the conditions in this fake object
             # because querying with an array at the toplevel turns
             # into an ActiveRecord IN query, which ruins everything.
@@ -173,42 +170,29 @@ module ActiveRecordRules
           new_conditions << condition unless condition.persisted?
         end
 
-        fields = variable_clauses.map(&:record_variables).reduce(&:+)
-
-        negated = !!condition_definition[:negated] # rubocop:disable Style/DoubleNegation
-
         extractor = Extractor.new(
           condition: condition,
           # We have to wrap the fields in this fake object because
           # querying with an array at the toplevel turns into an
           # ActiveRecord IN query, which ruins everything.  Using an
           # object here simplifies things a lot.
-          fields: { "names" => fields },
+          fields: { "names" => constraint.record_names },
           key: "cond#{index + 1}",
-          negated: negated
+          negated: constraint.negated
         )
         extractor.validate!
 
-        [
-          extractor,
-          [
-            ("not " if negated),
-            condition_definition[:class_name],
-            "(",
-            variable_clauses.map(&:unparse).join(", "),
-            ")"
-          ].join
-        ]
+        [extractor, constraint.only_complex_clauses]
       end.transpose
 
       [
         Rule.new(
-          extractors: extractors,
-          name: definition[:name].to_s,
-          variable_conditions: condition_strings.map { "  #{_1}\n" }.join,
-          on_match: definition[:on_match]&.pluck(:line)&.join("\n  "),
-          on_update: definition[:on_update]&.pluck(:line)&.join("\n  "),
-          on_unmatch: definition[:on_unmatch]&.pluck(:line)&.join("\n  ")
+          extractors: extractors.compact,
+          name: definition.name,
+          variable_conditions: constraints.map { "  #{_1.unparse}\n" }.join,
+          on_match: definition.on_match,
+          on_update: definition.on_update,
+          on_unmatch: definition.on_unmatch
         ),
         new_conditions
       ]
