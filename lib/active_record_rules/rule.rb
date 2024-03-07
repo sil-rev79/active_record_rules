@@ -285,8 +285,8 @@ module ActiveRecordRules
 
         clauses = Parse.constraints(variable_conditions).each_with_index.flat_map do |constraint, index|
           if constraint.is_a?(Parse::Ast::Comparison)
-            constraint.bindings.each { names[_1] << [nil, nil, _2] }
-            next [constraint]
+            constraint.bound_variables.each_key { names[_1] << [nil, nil, _2] }
+            next [[nil, nil, constraint]]
           end
 
           match_class = constraint.class_name.constantize
@@ -430,8 +430,7 @@ module ActiveRecordRules
         *matches.keys.map { "#{_1}.stored_values is not null" },
 
         *clauses.map do |klass, table_name, clause|
-          # next if clause.bound_variables.empty?
-          next unless matches.key?(table_name)
+          next unless table_name.nil? || matches.key?(table_name)
 
           clause.to_rule_sql(klass, "#{table_name}.stored_values", bindings)
         end,

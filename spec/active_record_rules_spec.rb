@@ -581,4 +581,40 @@ RSpec.describe ActiveRecordRules do
       expect(result.total).to be < 0.05
     end
   end
+
+  describe "top-level expression constraints" do
+    before do
+      described_class.define_rule(<<~RULE)
+        rule find salutations with "hello" as their greeting
+          Salutation(<id>, <greeting>)
+          "hello" = <greeting>
+        on match
+          TestHelper.matches.add(id)
+        on unmatch
+          TestHelper.matches.delete(id)
+      RULE
+      TestHelper.matches = Set.new
+    end
+
+    context "with a salutation of \"hello\"" do
+      let!(:salutation) { Salutation.create!(greeting: "hello") }
+
+      it "marks the salutation" do
+        expect(TestHelper.matches).to include(salutation.id)
+      end
+
+      it "unmarks the salutation after changing the salutation" do
+        salutation.update!(greeting: "salut")
+        expect(TestHelper.matches).not_to include(salutation.id)
+      end
+    end
+
+    context "with a salutation of \"hi\"" do
+      let!(:salutation) { Salutation.create!(greeting: "hi") }
+
+      it "does not mark the salutation" do
+        expect(TestHelper.matches).not_to include(salutation.id)
+      end
+    end
+  end
 end
