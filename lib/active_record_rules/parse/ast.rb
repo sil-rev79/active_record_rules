@@ -28,7 +28,7 @@ module ActiveRecordRules
         end
 
         def to_arel(_) = Arel::Nodes.build_quoted(@value)
-        def to_rule_sql(_klass, _json_field, _bindings) = ActiveRecord::Base.connection.quote(@value)
+        def to_sql(_klass, _json_field, _bindings) = ActiveRecord::Base.connection.quote(@value)
         def unparse = @value.nil? ? "nil" : @value.to_json
       end
 
@@ -41,7 +41,7 @@ module ActiveRecordRules
         end
 
         def to_arel(_) = (raise "Variables cannot be evaluated during Condition filtering. You've found a bug!")
-        def to_rule_sql(_klass, _json_field, bindings) = bindings[name] || nil
+        def to_sql(_klass, _json_field, bindings) = bindings[name] || nil
         def read_variables = Set.new([name])
         def unparse = "<#{@name}>"
       end
@@ -54,7 +54,7 @@ module ActiveRecordRules
           @name = name
         end
 
-        def to_rule_sql(klass, json_field, _bindings)
+        def to_sql(klass, json_field, _bindings)
           cast(
             "(#{json_field}->>'#{@name}')",
             klass&.attribute_types&.[](@name)&.type
@@ -105,9 +105,9 @@ module ActiveRecordRules
                            @rhs.to_arel(table))
         end
 
-        def to_rule_sql(klass, json_field, bindings)
-          return unless (lhs_sql = @lhs.to_rule_sql(klass, json_field, bindings))
-          return unless (rhs_sql = @rhs.to_rule_sql(klass, json_field, bindings))
+        def to_sql(klass, json_field, bindings)
+          return unless (lhs_sql = @lhs.to_sql(klass, json_field, bindings))
+          return unless (rhs_sql = @rhs.to_sql(klass, json_field, bindings))
 
           "(#{lhs_sql} #{@operator} #{rhs_sql})"
         end
@@ -117,7 +117,7 @@ module ActiveRecordRules
         def unparse = "#{@lhs.unparse} #{@operator} #{@rhs.unparse}"
       end
 
-      class Comparison < Node
+      class Comparison < ExpressionNode
         attr_reader :lhs, :comparison, :rhs
 
         def initialize(lhs, comparison, rhs)
@@ -133,9 +133,9 @@ module ActiveRecordRules
                            @rhs.to_arel(table))
         end
 
-        def to_rule_sql(klass, json_field, bindings)
-          return unless (lhs_sql = @lhs.to_rule_sql(klass, json_field, bindings))
-          return unless (rhs_sql = @rhs.to_rule_sql(klass, json_field, bindings))
+        def to_sql(klass, json_field, bindings)
+          return unless (lhs_sql = @lhs.to_sql(klass, json_field, bindings))
+          return unless (rhs_sql = @rhs.to_sql(klass, json_field, bindings))
           return if @comparison == "=" && lhs_sql == rhs_sql
 
           "(#{lhs_sql} #{@comparison} #{rhs_sql})"
@@ -145,8 +145,8 @@ module ActiveRecordRules
           @bound_variables ||=
             case [@lhs, @comparison, @rhs]
             in [Variable, "=", Variable]
-              { @lhs.name => @rhs.name,
-                @rhs.name => @lhs.name }
+              { @lhs.name => @rhs,
+                @rhs.name => @lhs }
             in [Variable, "=", value]
               { @lhs.name => value }
             in [value, "=", Variable]
