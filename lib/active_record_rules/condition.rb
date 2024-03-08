@@ -158,7 +158,7 @@ module ActiveRecordRules
     end
 
     def clause_arel(clause)
-      clause.to_arel(match_class.arel_table, {})
+      clause.to_arel(match_class.arel_table)
     end
 
     def logger

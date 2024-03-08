@@ -16,6 +16,7 @@ module ActiveRecordRules
       class ExpressionNode < Node
         def read_variables = Set.new
         def record_names = Set.new
+        def to_arel(_) = (raise NotImplementedError, "No to_arel method defined on #{self.class}")
       end
 
       class Constant < ExpressionNode
@@ -26,7 +27,7 @@ module ActiveRecordRules
           @value = value
         end
 
-        def to_arel(_table, _bindings) = Arel::Nodes.build_quoted(@value)
+        def to_arel(_) = Arel::Nodes.build_quoted(@value)
         def to_rule_sql(_klass, _json_field, _bindings) = ActiveRecord::Base.connection.quote(@value)
         def unparse = @value.nil? ? "nil" : @value.to_json
       end
@@ -39,7 +40,7 @@ module ActiveRecordRules
           @name = name
         end
 
-        def to_arel(_table, bindings) = bindings[@name]
+        def to_arel(_) = (raise "Variables cannot be evaluated during Condition filtering. You've found a bug!")
         def to_rule_sql(_klass, _json_field, bindings) = bindings[name] || nil
         def read_variables = Set.new([name])
         def unparse = "<#{@name}>"
@@ -60,7 +61,7 @@ module ActiveRecordRules
           )
         end
 
-        def to_arel(table, _bindings) = table[@name]
+        def to_arel(table) = table[@name]
         def record_names = Set.new([@name])
         def unparse = @name
 
@@ -98,10 +99,10 @@ module ActiveRecordRules
           @rhs = rhs
         end
 
-        def to_arel(table, bindings)
-          @lhs.to_arel(table, bindings)
+        def to_arel(table)
+          @lhs.to_arel(table)
               .public_send(@operator,
-                           @rhs.to_arel(table, bindings))
+                           @rhs.to_arel(table))
         end
 
         def to_rule_sql(klass, json_field, bindings)
@@ -126,10 +127,10 @@ module ActiveRecordRules
           @rhs = rhs
         end
 
-        def to_arel(table, bindings)
-          @lhs.to_arel(table, bindings)
+        def to_arel(table)
+          @lhs.to_arel(table)
               .public_send(comparison_method,
-                           @rhs.to_arel(table, bindings))
+                           @rhs.to_arel(table))
         end
 
         def to_rule_sql(klass, json_field, bindings)
