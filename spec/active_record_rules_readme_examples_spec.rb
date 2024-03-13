@@ -201,8 +201,8 @@ RSpec.describe ActiveRecordRules do
       before do
         described_class.define_rule(<<~RULE)
           rule Two users with close counts
-            User(<name1> = name, <post_count> = post_count)
             User(<name2> = name, <post_count> = post_count + 1)
+            User(<name1> = name, <post_count> = post_count)
           on match
             TestHelper.matches << [name1, name2]
         RULE
