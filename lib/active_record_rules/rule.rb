@@ -69,12 +69,16 @@ module ActiveRecordRules
           old_arguments = names.keys.map { old_values[_1] }
           logger&.info { "Rule(#{id}): updated for #{ids.to_json}" }
 
-          arguments = names.map do |_, (wrapped_expression)|
-            values = values_lookup[wrapped_expression.key][ids[wrapped_expression.key]]
-            raise ValuesNotFound unless values
-
-            values[wrapped_expression.name]
+          eval_results = Hash.new do |hash, key|
+            expression = names[key].first
+            record_id = ids[expression.key]
+            hash[key] = expression.eval(
+              values_lookup[expression.key][record_id],
+              hash
+            )
           end
+
+          arguments = names.keys.map { eval_results[_1] }
 
           logger&.debug do
             "Rule(#{id}): updating from #{pretty_arguments(old_arguments).to_json} " \
@@ -106,12 +110,17 @@ module ActiveRecordRules
         # Go through each record and run the match code
         all_ids.map do |ids|
           logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
-          arguments = names.map do |_, (wrapped_expression)|
-            values = values_lookup[wrapped_expression.key][ids[wrapped_expression.key]]
-            raise ValuesNotFound unless values
 
-            values[wrapped_expression.name]
+          eval_results = Hash.new do |hash, key|
+            expression = names[key].first
+            record_id = ids[expression.key]
+            hash[key] = expression.eval(
+              values_lookup[expression.key][record_id],
+              hash
+            )
           end
+
+          arguments = names.keys.map { eval_results[_1] }
 
           logger&.debug { "Rule(#{id}): matched with arguments #{pretty_arguments(arguments).to_json}" }
 
@@ -277,12 +286,13 @@ module ActiveRecordRules
       ActiveRecordRules.logger
     end
 
-    WrappedExpression = Struct.new(:comparison, :klass, :key) do
+    WrappedExpression = Struct.new(:expression, :klass, :key) do
       def to_sql(field, bindings)
-        comparison.to_sql(klass, key ? field.gsub("{}", key) : nil, bindings)
+        expression.to_sql(klass, key ? field.gsub("{}", key) : nil, bindings)
       end
 
-      def name = comparison.name
+      def eval(record_values, bindings) = expression.eval(record_values, bindings)
+      def name = expression.name
     end
 
     def parsed_definition

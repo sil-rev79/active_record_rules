@@ -17,6 +17,7 @@ module ActiveRecordRules
         def read_variables = Set.new
         def record_names = Set.new
         def to_arel(_) = (raise NotImplementedError, "No to_arel method defined on #{self.class}")
+        def eval(_record_values, _bindings) = (raise NotImplementedError, "No eval method defined on #{self.class}")
       end
 
       class Constant < ExpressionNode
@@ -29,6 +30,7 @@ module ActiveRecordRules
 
         def to_arel(_) = Arel::Nodes.build_quoted(@value)
         def to_sql(_klass, _json_field, _bindings) = ActiveRecord::Base.connection.quote(@value)
+        def eval(_, _bindings) = @value
         def unparse = @value.nil? ? "nil" : @value.to_json
       end
 
@@ -42,6 +44,7 @@ module ActiveRecordRules
 
         def to_arel(_) = (raise "Variables cannot be evaluated during Condition filtering. You've found a bug!")
         def to_sql(_klass, _json_field, bindings) = bindings[name] || nil
+        def eval(record_variables, bindings) = bindings[name]&.eval(record_variables, bindings) || nil
         def read_variables = Set.new([name])
         def unparse = "<#{@name}>"
       end
@@ -62,6 +65,7 @@ module ActiveRecordRules
         end
 
         def to_arel(table) = table[@name]
+        def eval(record_values, _bindings) = record_values.fetch(@name)
         def record_names = Set.new([@name])
         def unparse = @name
 
@@ -99,17 +103,19 @@ module ActiveRecordRules
           @rhs = rhs
         end
 
-        def to_arel(table)
-          @lhs.to_arel(table)
-              .public_send(@operator,
-                           @rhs.to_arel(table))
-        end
-
         def to_sql(klass, json_field, bindings)
           return unless (lhs_sql = @lhs.to_sql(klass, json_field, bindings))
           return unless (rhs_sql = @rhs.to_sql(klass, json_field, bindings))
 
           "(#{lhs_sql} #{@operator} #{rhs_sql})"
+        end
+
+        def to_arel(table) = @lhs.to_arel(table).public_send(@operator, @rhs.to_arel(table))
+
+        def eval(record_variables, bindings)
+          @lhs.eval(record_variables, bindings)
+              .public_send(@operator,
+                           @rhs.eval(record_variables, bindings))
         end
 
         def read_variables = @lhs.read_variables + @rhs.read_variables
@@ -125,12 +131,6 @@ module ActiveRecordRules
           @lhs = lhs
           @comparison = comparison
           @rhs = rhs
-        end
-
-        def to_arel(table)
-          @lhs.to_arel(table)
-              .public_send(comparison_method,
-                           @rhs.to_arel(table))
         end
 
         def to_sql(klass, json_field, bindings)
@@ -154,6 +154,14 @@ module ActiveRecordRules
             else
               {}
             end
+        end
+
+        def to_arel(table) = @lhs.to_arel(table).public_send(comparison_method, @rhs.to_arel(table))
+
+        def eval(record_variables, bindings)
+          @lhs.eval(record_variables, bindings)
+              .public_send(@operator,
+                           @rhs.eval(record_variables, bindings))
         end
 
         def read_variables = @lhs.read_variables + @rhs.read_variables
