@@ -73,7 +73,7 @@ module ActiveRecordRules
             expression = names[key].first
             record_id = ids[expression.key]
             hash[key] = expression.eval(
-              values_lookup[expression.key][record_id],
+              values_lookup.dig(expression.key, record_id),
               hash
             )
           end
@@ -115,7 +115,7 @@ module ActiveRecordRules
             expression = names[key].first
             record_id = ids[expression.key]
             hash[key] = expression.eval(
-              values_lookup[expression.key][record_id],
+              values_lookup.dig(expression.key, record_id),
               hash
             )
           end
@@ -293,6 +293,7 @@ module ActiveRecordRules
 
       def eval(record_values, bindings) = expression.eval(record_values, bindings)
       def name = expression.name
+      def complexity = expression.complexity
     end
 
     def parsed_definition
@@ -318,7 +319,8 @@ module ActiveRecordRules
           end
         end
 
-        { names: names,
+        # put "simple" terms first
+        { names: names.transform_values { _1.sort_by(&:complexity) },
           clauses: clauses }
       end
     end

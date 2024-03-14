@@ -18,6 +18,7 @@ module ActiveRecordRules
         def record_names = Set.new
         def to_arel(_) = (raise NotImplementedError, "No to_arel method defined on #{self.class}")
         def eval(_record_values, _bindings) = (raise NotImplementedError, "No eval method defined on #{self.class}")
+        def complexity = (raise NotImplementedError, "No complexity method defined on #{self.class}")
       end
 
       class Constant < ExpressionNode
@@ -32,6 +33,7 @@ module ActiveRecordRules
         def to_sql(_klass, _json_field, _bindings) = ActiveRecord::Base.connection.quote(@value)
         def eval(_, _bindings) = @value
         def unparse = @value.nil? ? "nil" : @value.to_json
+        def complexity = 0
       end
 
       class Variable < ExpressionNode
@@ -47,6 +49,9 @@ module ActiveRecordRules
         def eval(record_variables, bindings) = bindings[name]&.eval(record_variables, bindings) || nil
         def read_variables = Set.new([name])
         def unparse = "<#{@name}>"
+        # This is an arbitrary choice, rather than trying to look up
+        # the right things
+        def complexity = 10
       end
 
       class RecordField < ExpressionNode
@@ -68,6 +73,7 @@ module ActiveRecordRules
         def eval(record_values, _bindings) = record_values.fetch(@name)
         def record_names = Set.new([@name])
         def unparse = @name
+        def complexity = 1
 
         private
 
@@ -121,6 +127,7 @@ module ActiveRecordRules
         def read_variables = @lhs.read_variables + @rhs.read_variables
         def record_names = @lhs.record_names + @rhs.record_names
         def unparse = "#{@lhs.unparse} #{@operator} #{@rhs.unparse}"
+        def complexity = @lhs.complexity + @rhs.complexity + 1
       end
 
       class Comparison < ExpressionNode
@@ -167,6 +174,7 @@ module ActiveRecordRules
         def read_variables = @lhs.read_variables + @rhs.read_variables
         def record_names = @lhs.record_names + @rhs.record_names
         def unparse = "#{@lhs.unparse} #{@comparison} #{@rhs.unparse}"
+        def complexity = @lhs.complexity + @rhs.complexity + 1
 
         private
 
