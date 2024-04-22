@@ -33,9 +33,13 @@ module ActiveRecordRules
         ).repeat >> (whitespace.maybe >> newline).repeat
       end
 
+      rule(:inline_constraints) do
+        (record_matcher | boolean_clause).repeat(1, 1) >>
+          ((whitespace | newline).repeat >> (record_matcher | boolean_clause)).repeat
+      end
+
       rule(:record_matcher) do
-        (str("not") >> whitespace).maybe.as(:negated) >>
-          class_name.as(:class_name) >>
+        class_name.as(:class_name) >>
           str("(") >>
           (
             (
@@ -54,6 +58,11 @@ module ActiveRecordRules
           expression.as(:rhs)
         ) | (
           str("<") >> name.as(:simple_name_clause) >> str(">")
+        ) | (
+          str("not").as(:operation) >> whitespace.maybe >>
+          str("{") >> (whitespace | newline).repeat >>
+          inline_constraints.as(:constraints) >> (whitespace | newline).repeat >>
+          str("}")
         )
       end
 
@@ -69,6 +78,8 @@ module ActiveRecordRules
         infix_expression(
           ((str("(") >> expression >> str(")")) |
            (str("<") >> name.as(:binding_name) >> str(">")) |
+           count |
+           sum |
            boolean |
            string |
            number |
@@ -111,6 +122,28 @@ module ActiveRecordRules
 
       rule(:nil_expr) do
         str("nil").as(:nil) >> match("[a-zA-Z0-9]_!?").absent?
+      end
+
+      rule(:count) do
+        str("count").as(:operation) >> whitespace.maybe >>
+          (
+            str("(") >> (whitespace | newline).repeat >>
+            expression.as(:expression) >> (whitespace | newline).repeat >>
+            str(")")
+          ).maybe >> whitespace.maybe >>
+          str("{") >> (whitespace | newline).repeat >>
+          inline_constraints.as(:constraints) >> (whitespace | newline).repeat >>
+          str("}")
+      end
+
+      rule(:sum) do
+        str("sum").as(:operation) >> whitespace.maybe >>
+          str("(") >> (whitespace | newline).repeat >>
+          expression.as(:expression) >> (whitespace | newline).repeat >>
+          str(")") >> whitespace.maybe >>
+          str("{") >> (whitespace | newline).repeat >>
+          inline_constraints.as(:constraints) >> (whitespace | newline).repeat >>
+          str("}")
       end
 
       # ===============================

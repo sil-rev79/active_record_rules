@@ -72,6 +72,8 @@ RSpec.configure do |config|
                                 else
                                   raise "We only support Postgres and SQLite for now. Sorry!"
                                 end
+    # Reset the in-memory loaded rules before each run.
+    ActiveRecordRules.loaded_rules = []
 
     if ActiveRecordRules.dialect == :postgres
       # Connect to the "postgres" database and drop+create the

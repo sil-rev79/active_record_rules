@@ -64,7 +64,7 @@ RSpec.describe ActiveRecordRules do
     end
   end
 
-  describe "rule definition" do
+  describe "rule definition" do # rubocop:disable RSpec/EmptyExampleGroup
     generate(
       steps: array(
         one_of(
@@ -95,7 +95,7 @@ RSpec.describe ActiveRecordRules do
         in [suit, rank]
           Card.create!(suit: suit, rank: rank)
         in rank
-          described_class.define_rule(<<~RULE, trigger_rules: trigger_rules)
+          described_class.define_rule(<<~RULE)
             rule counting #{rank}s
               Card(rank = "#{rank}", <rank>)
             on match
@@ -105,49 +105,23 @@ RSpec.describe ActiveRecordRules do
       end
     end
 
-    context "when not triggering on existing matches" do # rubocop:disable RSpec/EmptyExampleGroup
-      let(:trigger_rules) { false }
+    it_always "matches objects which are created later" do
+      expect(counts)
+        .to eq(
+          steps.each_with_index.map do |step, i|
+            next unless step.is_a?(String)
 
-      it_always "matches objects which are created later" do
-        expect(counts)
-          .to eq(
-            steps.each_with_index.map do |step, i|
-              next unless step.is_a?(String)
+            # Only look at the steps which come *later*
+            count = steps[i..]
+               .reject { _1.is_a?(String) }
+               .map(&:second)
+               .select { _1 == step }
+               .size
+            next if count.zero?
 
-              # Only look at the steps which come *later*
-              count = steps[i..]
-                 .reject { _1.is_a?(String) }
-                 .map(&:second)
-                 .select { _1 == step }
-                 .size
-              next if count.zero?
-
-              [step, count]
-            end.compact.to_h
-          )
-      end
-    end
-
-    context "when triggering on existing matches" do # rubocop:disable RSpec/EmptyExampleGroup
-      let(:trigger_rules) { true }
-
-      it_always "matches all objects" do
-        expect(counts)
-          .to eq(
-            steps.map do |step|
-              next unless step.is_a?(String)
-
-              count = steps
-                 .reject { _1.is_a?(String) }
-                 .map(&:second)
-                 .select { _1 == step }
-                 .size
-              next if count.zero?
-
-              [step, count]
-            end.compact.to_h
-          )
-      end
+            [step, count]
+          end.compact.to_h
+        )
     end
   end
 

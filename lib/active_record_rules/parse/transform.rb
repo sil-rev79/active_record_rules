@@ -1,36 +1,51 @@
 # frozen_string_literal: true
 
 require "parslet"
+require "active_record_rules/ast"
 
 module ActiveRecordRules
   module Parse
     class Transform < Parslet::Transform # :nodoc:
-      rule(integer: simple(:value)) { Ast::Constant.new(value.to_i) }
-      rule(number: simple(:value)) { Ast::Constant.new(value.to_f) }
-      rule(string: simple(:value)) { Ast::Constant.new(value.to_s) }
-      rule(boolean: simple(:value)) { Ast::Constant.new(value.to_s == "true") }
-      rule(nil: simple(:value)) { Ast::Constant.new(nil) }
-      rule(binding_name: simple(:value)) { Ast::Variable.new(value.to_s) }
-      rule(record_name: simple(:value)) { Ast::RecordField.new(value.to_s) }
+      include ::ActiveRecordRules::Ast
+
+      rule(integer: simple(:value)) { Constant.new(value.to_i) }
+      rule(number: simple(:value)) { Constant.new(value.to_f) }
+      rule(string: simple(:value)) { Constant.new(value.to_s) }
+      rule(boolean: simple(:value)) { Constant.new(value.to_s == "true") }
+      rule(nil: simple(:value)) { Constant.new(nil) }
+      rule(binding_name: simple(:value)) { Variable.new(value.to_s) }
+      rule(record_name: simple(:value)) { RecordField.new(value.to_s) }
+      rule(operation: "count", constraints: sequence(:constraints)) do
+        Count.new(nil, constraints)
+      end
+      rule(operation: "count", expression: simple(:expression), constraints: sequence(:constraints)) do
+        Count.new(expression, constraints)
+      end
+      rule(operation: "sum", expression: simple(:expression), constraints: sequence(:constraints)) do
+        Sum.new(expression, constraints)
+      end
+      rule(operation: "not", constraints: sequence(:constraints)) do
+        Negation.new(constraints)
+      end
 
       rule(simple_name_clause: simple(:name)) do
-        Ast::Comparison.new(
-          Ast::RecordField.new(name.to_s),
+        Comparison.new(
+          RecordField.new(name.to_s),
           "=",
-          Ast::Variable.new(name.to_s)
+          Variable.new(name.to_s)
         )
       end
 
       rule(lhs: simple(:left), comparison: simple(:comparison), rhs: simple(:right)) do
-        Ast::Comparison.new(left, comparison.to_s, right)
+        Comparison.new(left, comparison.to_s, right)
       end
 
       rule(lhs: simple(:left), op: simple(:op), rhs: simple(:right)) do
-        Ast::BinaryOperatorExpression.new(left, op.to_s, right)
+        BinaryOperatorExpression.new(left, op.to_s, right)
       end
 
-      rule(negated: simple(:negated), class_name: simple(:class_name), boolean_clauses: subtree(:clauses)) do
-        Ast::RecordMatcher.new(!negated.nil?, class_name.to_s, clauses || [])
+      rule(class_name: simple(:class_name), boolean_clauses: subtree(:clauses)) do
+        RecordMatcher.new(class_name.to_s, clauses || [])
       end
 
       rule(line: simple(:line)) do
@@ -44,7 +59,7 @@ module ActiveRecordRules
         on_update: subtree(:on_update),
         on_unmatch: subtree(:on_unmatch)
       ) do
-        Ast::Definition.new(
+        Definition.new(
           name.to_s,
           constraints,
           on_match&.join("\n"),

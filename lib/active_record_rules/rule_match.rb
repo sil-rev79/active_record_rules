@@ -19,12 +19,11 @@ module ActiveRecordRules
     self.table_name = :arr__rule_matches
 
     enum awaiting_execution: {
+      none: 0,
       match: 1,
       update: 2,
       unmatch: 3,
       delete: 4
     }, _prefix: "awaiting_"
-
-    belongs_to :rule
   end
 end

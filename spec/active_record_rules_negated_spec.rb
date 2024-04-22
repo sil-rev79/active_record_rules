@@ -18,7 +18,7 @@ RSpec.describe ActiveRecordRules do
     described_class.define_rule <<~RULE
       rule the fastest is the winner
         Racer(<id>, <race_time>)
-        not Racer(race_time < <race_time>)
+        not { Racer(race_time < <race_time>) }
       on match
         Racer.find(id).update!(winner: true)
       on unmatch

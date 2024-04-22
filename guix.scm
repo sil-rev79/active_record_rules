@@ -102,7 +102,8 @@ with tight integration with RSpec.")
                       ruby-rubocop-rspec
                       ruby-simplecov
                       ruby-solargraph
-                      ruby-properb))
+                      ruby-properb
+                      ruby-irb))
  (synopsis "Database-driven production rules in Ruby")
  (description
   "A production rule library that uses database records as its

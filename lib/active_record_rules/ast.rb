@@ -1,0 +1,15 @@
+# frozen_string_literal: true
+
+require "active_record_rules/ast/aggregate"
+require "active_record_rules/ast/binary_operator_expression"
+require "active_record_rules/ast/comparison"
+require "active_record_rules/ast/constant"
+require "active_record_rules/ast/count"
+require "active_record_rules/ast/definition"
+require "active_record_rules/ast/expression_node"
+require "active_record_rules/ast/negation"
+require "active_record_rules/ast/node"
+require "active_record_rules/ast/record_field"
+require "active_record_rules/ast/record_matcher"
+require "active_record_rules/ast/sum"
+require "active_record_rules/ast/variable"

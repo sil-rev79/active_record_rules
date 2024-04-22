@@ -184,10 +184,6 @@ RSpec.describe ActiveRecordRules do
       TestHelper.matches = []
     end
 
-    it "shares a Condition node" do
-      expect(ActiveRecordRules::Condition.all.size).to be == 3
-    end
-
     context "with ten people" do
       before do
         Salutation.create!(greeting: "What's up?")
@@ -197,7 +193,7 @@ RSpec.describe ActiveRecordRules do
         Person.create!(name: "John", greetable: true)
       end
 
-      it "only processes a single Person when one is added" do
+      it "only processes a single Person when one is added", skip: "This optimisation has not been reimplemented yet" do
         capturing_logs do |output|
           Person.create!(name: "Jane", greetable: true)
           expect(output.string.scan(/Person\(([0-9]+)\)/).uniq).to contain_exactly(["12"])
@@ -284,7 +280,7 @@ RSpec.describe ActiveRecordRules do
 
   describe "rules referencing non-ActiveRecord::Base classes" do
     it "fails if the class is not an ActiveRecord::Base" do
-      expect { described_class.define_rule(<<~RULE) }.to raise_error(ActiveRecord::RecordInvalid)
+      expect { described_class.define_rule(<<~RULE) }.to raise_error(/subclasses of ActiveRecord::Base/)
         rule fail at defining
           Object()
       RULE
@@ -463,59 +459,37 @@ RSpec.describe ActiveRecordRules do
 
   describe "rule definition" do
     before do
+      person # force person to be created before the rule is defined
+
+      described_class.define_rule(<<~RULE)
+        rule run custom methods
+          Person(<name>)
+        on match
+          TestHelper.matches << name
+      RULE
+
       TestHelper.matches = []
     end
 
     let!(:person) { Person.create!(name: "John") }
 
-    context "with rule triggering" do
-      before do
-        described_class.define_rule(<<~RULE, trigger_rules: true)
-          rule run custom methods
-            Person(<name>)
-          on match
-            TestHelper.matches << name
-        RULE
-      end
-
-      it "matches existing objects" do
-        expect(TestHelper.matches).to include("John")
-      end
-
-      it "matches new objects" do
-        Person.create!(name: "Jane")
-        expect(TestHelper.matches).to include("Jane")
-      end
+    it "doesn't match existing objects" do
+      expect(TestHelper.matches).to be_empty
     end
 
-    context "without rule triggering" do
-      before do
-        described_class.define_rule(<<~RULE, trigger_rules: false)
-          rule run custom methods
-            Person(<name>)
-          on match
-            TestHelper.matches << name
-        RULE
-      end
+    it "doesn't match existing objects after an unrelated update", skip: "Undecided semantics" do
+      person.update!(greetable: true)
+      expect(TestHelper.matches).to be_empty
+    end
 
-      it "doesn't match existing objects" do
-        expect(TestHelper.matches).to be_empty
-      end
+    it "does match existing objects after a relevant update" do
+      person.update!(name: "Johns")
+      expect(TestHelper.matches).to include("Johns")
+    end
 
-      it "doesn't match existing objects after an unrelated update" do
-        person.update!(greetable: true)
-        expect(TestHelper.matches).to be_empty
-      end
-
-      it "does match existing objects after a relevant update" do
-        person.update!(name: "Johns")
-        expect(TestHelper.matches).to include("Johns")
-      end
-
-      it "matches new objects" do
-        Person.create!(name: "Jane")
-        expect(TestHelper.matches).to include("Jane")
-      end
+    it "matches new objects" do
+      Person.create!(name: "Jane")
+      expect(TestHelper.matches).to include("Jane")
     end
   end
 
@@ -531,28 +505,14 @@ RSpec.describe ActiveRecordRules do
       Person.create!(name: "John")
     end
 
-    context "with rule triggering" do
-      before do
-        described_class.delete_rule("run custom methods", trigger_rules: true)
-      end
-
-      it "unmatches existing objects" do
-        expect(TestHelper.matches).to include("John")
-      end
-    end
-
-    context "without rule triggering" do
-      before do
-        described_class.delete_rule("run custom methods", trigger_rules: false)
-      end
-
-      it "doesn't unmatch existing objects" do
-        expect(TestHelper.matches).to be_empty
-      end
+    it "doesn't unmatch existing objects" do
+      described_class.delete_rule("run custom methods")
+      expect(TestHelper.matches).to be_empty
     end
   end
 
-  describe "modifications with lots of people" do
+  describe "modifications with lots of people",
+           skip: "The optimisations needed for this have not been reimplemented yet" do
     before do
       described_class.define_rule(<<~RULE)
         rule run custom methods

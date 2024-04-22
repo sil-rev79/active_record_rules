@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "active_record_rules/parse/ast"
+require "active_record_rules/ast"
 require "active_record_rules/parse/parser"
 require "active_record_rules/parse/transform"
 
