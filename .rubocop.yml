@@ -15,6 +15,11 @@ AllCops:
 Style/Documentation:
   Enabled: false
 
+Style/ArgumentsForwarding:
+  # I'm getting errors about this in CI, despite the fact that our
+  # TargetRubyVersion is 3.0 (where this syntax is not allowed).
+  Enabled: false
+
 # Disable all the cops about length/complexity, because they're pretty
 # noisy.
 Metrics:
