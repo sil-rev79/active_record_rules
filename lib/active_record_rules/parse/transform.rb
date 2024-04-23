@@ -24,6 +24,9 @@ module ActiveRecordRules
       rule(operation: "sum", expression: simple(:expression), constraints: sequence(:constraints)) do
         Sum.new(expression, constraints)
       end
+      rule(operation: "array", expression: simple(:expression), constraints: sequence(:constraints)) do
+        ::ActiveRecordRules::Ast::Array.new(expression, constraints)
+      end
       rule(operation: "not", constraints: sequence(:constraints)) do
         Negation.new(constraints)
       end

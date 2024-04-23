@@ -62,16 +62,18 @@ RSpec.configure do |config|
     c.syntax = :expect
   end
 
-  config.around do |example|
-    connection_string = ENV.fetch("ARR_DATABASE", "sqlite3::memory:")
+  connection_string = ENV.fetch("ARR_DATABASE", "sqlite3::memory:")
+  ActiveRecordRules.dialect = if connection_string.start_with?("postgres")
+                                :postgres
+                              elsif connection_string.start_with?("sqlite")
+                                :sqlite
+                              else
+                                raise "We only support Postgres and SQLite for now. Sorry!"
+                              end
 
-    ActiveRecordRules.dialect = if connection_string.start_with?("postgres")
-                                  :postgres
-                                elsif connection_string.start_with?("sqlite")
-                                  :sqlite
-                                else
-                                  raise "We only support Postgres and SQLite for now. Sorry!"
-                                end
+  config.filter_run_excluding(restrict_database: :postgres) if ActiveRecordRules.dialect != :postgres
+
+  config.around do |example|
     # Reset the in-memory loaded rules before each run.
     ActiveRecordRules.loaded_rules = []
 

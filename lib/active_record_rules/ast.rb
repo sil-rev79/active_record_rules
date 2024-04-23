@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "active_record_rules/ast/aggregate"
+require "active_record_rules/ast/array"
 require "active_record_rules/ast/binary_operator_expression"
 require "active_record_rules/ast/comparison"
 require "active_record_rules/ast/constant"

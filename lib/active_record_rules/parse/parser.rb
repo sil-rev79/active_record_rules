@@ -76,16 +76,24 @@ module ActiveRecordRules
 
       rule(:expression) do
         infix_expression(
-          ((str("(") >> expression >> str(")")) |
-           (str("<") >> name.as(:binding_name) >> str(">")) |
-           count |
-           sum |
-           boolean |
-           string |
-           number |
-           integer |
-           nil_expr |
-           name.as(:record_name)),
+          (
+            # Recursive case
+            (str("(") >> expression >> str(")")) |
+            # Variable bindings wrapped in < >
+            (str("<") >> name.as(:binding_name) >> str(">")) |
+            # Aggregate operators
+            count |
+            sum |
+            array |
+            # Primitives
+            boolean |
+            string |
+            number |
+            integer |
+            nil_expr |
+            # Simple names: database fields
+            name.as(:record_name)
+          ),
           [whitespace.maybe >> match("[+-]").as(:op) >> whitespace.maybe, 1, :left],
           [whitespace.maybe >> match("[*/]").as(:op) >> whitespace.maybe, 2, :left]
         ) { |l, o, r| { lhs: l, op: o[:op], rhs: r } }
@@ -138,6 +146,16 @@ module ActiveRecordRules
 
       rule(:sum) do
         str("sum").as(:operation) >> whitespace.maybe >>
+          str("(") >> (whitespace | newline).repeat >>
+          expression.as(:expression) >> (whitespace | newline).repeat >>
+          str(")") >> whitespace.maybe >>
+          str("{") >> (whitespace | newline).repeat >>
+          inline_constraints.as(:constraints) >> (whitespace | newline).repeat >>
+          str("}")
+      end
+
+      rule(:array) do
+        str("array").as(:operation) >> whitespace.maybe >>
           str("(") >> (whitespace | newline).repeat >>
           expression.as(:expression) >> (whitespace | newline).repeat >>
           str(")") >> whitespace.maybe >>
