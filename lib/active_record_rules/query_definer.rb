@@ -96,7 +96,7 @@ module ActiveRecordRules
       [
         "select #{bindings}",
         "  from #{tables}",
-        (" where #{conditions}" unless conditions.empty?)
+        (" where #{conditions.split("\n").join("\n       ")}" unless conditions.empty?)
       ].compact.join("\n")
     end
 
