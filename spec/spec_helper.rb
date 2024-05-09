@@ -77,7 +77,7 @@ RSpec.configure do |config|
 
   config.around do |example|
     # Reset the in-memory loaded rules before each run.
-    ActiveRecordRules.loaded_rules = []
+    ActiveRecordRules.unload_all_rules!
 
     if ActiveRecordRules.dialect == :postgres
       # Connect to the "postgres" database and drop+create the

@@ -31,9 +31,6 @@ module ActiveRecordRules
   cattr_accessor :id_type, default: "integer"
   cattr_reader :automatic_load_paths
 
-  # Internal state
-  cattr_accessor :loaded_rules, default: []
-
   class << self
     def config = (yield self)
 
@@ -75,6 +72,10 @@ module ActiveRecordRules
       definitions.keys
     end
 
+    def unload_all_rules!
+      @loaded_rules = []
+    end
+
     def define_rule(definition_string)
       definition = Parse.definition(definition_string)
       raw_define_rule(definition)
@@ -101,15 +102,15 @@ module ActiveRecordRules
 
     def trigger_all(*_klasses)
       ActiveRecord::Base.transaction do
-        loaded_rules.each(&:activate)
-        loaded_rules.each(&:run_pending_executions)
+        @loaded_rules.each(&:activate)
+        @loaded_rules.each(&:run_pending_executions)
       end
     end
 
     def trigger(_all_objects)
       ActiveRecord::Base.transaction do
-        loaded_rules.each(&:activate)
-        loaded_rules.each(&:run_pending_executions)
+        @loaded_rules.each(&:activate)
+        @loaded_rules.each(&:run_pending_executions)
       end
     end
 
@@ -117,7 +118,7 @@ module ActiveRecordRules
 
     def after_trigger(klass, previous, current)
       activated = []
-      loaded_rules.each do |rule|
+      @loaded_rules.each do |rule|
         pending = rule.calculate_required_activations(klass, previous, current)
         if pending.any?
           rule.activate(pending)
@@ -139,7 +140,7 @@ module ActiveRecordRules
       rule.save!
       rule.activate
       rule.ignore_pending_executions
-      loaded_rules << rule
+      (@loaded_rules ||= []) << rule
       rule
     end
 
@@ -157,7 +158,7 @@ module ActiveRecordRules
     end
 
     def raw_delete_rule(rule)
-      loaded_rules.delete(rule)
+      @loaded_rules&.delete(rule)
       rule.destroy!
     end
   end
