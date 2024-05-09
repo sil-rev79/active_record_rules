@@ -48,7 +48,9 @@ end
 class TestRecord < ActiveRecord::Base
   self.abstract_class = true
 
-  after_commit ->(object) { ActiveRecordRules.trigger([object]) }
+  after_create { ActiveRecordRules.after_create_trigger(self) }
+  after_update { ActiveRecordRules.after_update_trigger(self) }
+  after_destroy { ActiveRecordRules.after_destroy_trigger(self) }
 end
 
 RSpec.configure do |config|

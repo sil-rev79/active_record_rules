@@ -18,6 +18,7 @@ RSpec.describe ActiveRecordRules do
       end
       schema.create_table :students do |t|
         t.string :name
+        t.string :status
       end
       schema.create_table :course_students do |t|
         t.references :course
@@ -34,7 +35,7 @@ RSpec.describe ActiveRecordRules do
           Course(id = <course_id>, <early_cutoff>)
           <count> = count(<student_id>) {
             CourseStudent(<course_id>, <student_id>, rego_time < <early_cutoff>)
-            Student(id = <student_id>)
+            Student(id = <student_id>, status = "active")
           }
         on match
           Course.update(course_id, early_rego_count: count)
@@ -42,7 +43,7 @@ RSpec.describe ActiveRecordRules do
     end
 
     let(:course) { Course.create!(early_cutoff: 10) }
-    let(:student) { Student.create!(name: "John Doe") }
+    let(:student) { Student.create!(name: "John Doe", status: "active") }
 
     it "sets the number of things to zero" do
       expect(course.reload.early_rego_count).to eq 0
@@ -52,6 +53,7 @@ RSpec.describe ActiveRecordRules do
       let!(:course_student) { CourseStudent.create(course: course, student: student, rego_time: 3) }
 
       it "includes the student in the count" do
+        # !!
         expect(course.reload.early_rego_count).to eq 1
       end
 
@@ -82,7 +84,7 @@ RSpec.describe ActiveRecordRules do
 
   describe "array aggregation", restrict_database: :postgres do
     let(:course) { Course.create! }
-    let(:student) { Student.create!(name: "John Doe") }
+    let(:student) { Student.create!(name: "John Doe", status: "active") }
 
     before do
       described_class.define_rule <<~RULE

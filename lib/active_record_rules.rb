@@ -85,6 +85,20 @@ module ActiveRecordRules
       raw_delete_rule(rule)
     end
 
+    def after_create_trigger(record)
+      after_trigger(record.class, nil, record.attributes)
+    end
+
+    def after_update_trigger(record)
+      after_trigger(record.class,
+                    record.attributes.merge(record.previous_changes.transform_values(&:first)),
+                    record.attributes)
+    end
+
+    def after_destroy_trigger(record)
+      after_trigger(record.class, record.attributes, nil)
+    end
+
     def trigger_all(*_klasses)
       ActiveRecord::Base.transaction do
         loaded_rules.each(&:activate)
@@ -100,6 +114,18 @@ module ActiveRecordRules
     end
 
     private
+
+    def after_trigger(klass, previous, current)
+      activated = []
+      loaded_rules.each do |rule|
+        pending = rule.calculate_required_activations(klass, previous, current)
+        if pending.any?
+          rule.activate(pending)
+          activated << rule
+        end
+      end
+      activated.each(&:run_pending_executions)
+    end
 
     def build_rule(definition)
       Rule.new(

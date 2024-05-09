@@ -37,6 +37,10 @@ module ActiveRecordRules
         end
       end
 
+      def relevant_change?(klass, previous, current)
+        @constraints.any? { _1.relevant_change?(klass, previous, current) }
+      end
+
       def bound_names = Set.new
     end
   end

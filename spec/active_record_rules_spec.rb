@@ -193,10 +193,10 @@ RSpec.describe ActiveRecordRules do
         Person.create!(name: "John", greetable: true)
       end
 
-      it "only processes a single Person when one is added", skip: "This optimisation has not been reimplemented yet" do
+      it "only reprocesses a single Person when one is added" do
         capturing_logs do |output|
           Person.create!(name: "Jane", greetable: true)
-          expect(output.string.scan(/Person\(([0-9]+)\)/).uniq).to contain_exactly(["12"])
+          expect(output.string.scan(/"people_[0-9]+":([0-9]+)/).uniq).to contain_exactly(["12"])
         end
       end
 
@@ -511,8 +511,7 @@ RSpec.describe ActiveRecordRules do
     end
   end
 
-  describe "modifications with lots of people",
-           skip: "The optimisations needed for this have not been reimplemented yet" do
+  describe "modifications with lots of people" do
     before do
       described_class.define_rule(<<~RULE)
         rule run custom methods
@@ -527,15 +526,15 @@ RSpec.describe ActiveRecordRules do
 
       Salutation.create!(greeting: "hi")
       Person.insert_all((0..10_000).map { { name: "Person #{_1}" } })
-      described_class.trigger_all # trigger everything in a batch
+      Benchmark.measure { described_class.trigger_all } # trigger everything in a batch
     end
 
-    it "is quick to add one more person" do
+    it "are quick to add one more person" do
       result = Benchmark.measure { Person.create!(name: "John") }
       expect(result.total).to be < 0.05
     end
 
-    it "is quick to remove one person" do
+    it "are quick to remove one person" do
       person = Person.all.sample
       result = Benchmark.measure { person.destroy! }
       expect(result.total).to be < 0.05

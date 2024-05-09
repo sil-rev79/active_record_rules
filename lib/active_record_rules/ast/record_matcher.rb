@@ -21,7 +21,7 @@ module ActiveRecordRules
         @table_name ||= @class.table_name
       end
 
-      def to_query(definer)
+      def to_query_and_table(definer)
         table_definer = definer.define_table(table_name) do |_bindings|
           table_name
         end
@@ -35,11 +35,46 @@ module ActiveRecordRules
           table_definer.add_condition(&emitter) if emitter
         end
 
-        nil
+        [nil, table_definer.table_name]
+      end
+
+      def to_query(definer)
+        query, = to_query_and_table(definer)
+        query
       end
 
       def bound_names
         @bound_names ||= @clauses.map(&:bound_names).reduce(&:+)
+      end
+
+      def relevant_change?(klass, previous, current)
+        return false unless klass == @class
+
+        @clauses.any? do |clause|
+          clause.relevant_change?(klass, previous, current)
+        end
+      end
+
+      def ids_needing_activation(index, _id_bindings, klass, previous, current)
+        return unless relevant_change?(klass, previous, current)
+
+        index
+      end
+
+      # Return the names of variables that are bound to this record's id
+      def id_bindings
+        bindings = Set.new
+        @clauses.each do |clause|
+          case clause
+          in Comparison(Variable(name), "=", RecordField("id"))
+            bindings << name
+          in Comparison(RecordField("id"), "=", Variable(name)) # rubocop:disable Lint/DuplicateBranch
+            bindings << name
+          else
+            nil
+          end
+        end
+        bindings
       end
 
       def unparse = "#{@negated ? "not " : ""}#{@class_name}(#{@clauses.map(&:unparse).join(", ")})"

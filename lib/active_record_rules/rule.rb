@@ -75,36 +75,35 @@ module ActiveRecordRules
       SQL
     end
 
-    def activate(_keys_to_ids = nil)
+    def calculate_required_activations(klass, previous, current)
+      table_bindings = Hash.new { _1[_2] = [] }
+      parsed_definition.constraints_with_tables.each do |constraint, table|
+        table_bindings[constraint.unparse] << id
+        constraint.id_bindings.each do |name|
+          table_bindings[name] << table
+        end
+      end
+
+      pending_activations = Set.new
+      return pending_activations if previous.nil? && current.nil?
+      return pending_activations if previous == current
+
+      parsed_definition.constraints_with_tables.each do |constraint, table|
+        next unless constraint.relevant_change?(klass, previous, current)
+
+        if table
+          pending_activations << [table, previous["id"]] if previous && previous["id"]
+          pending_activations << [table, current["id"]] if current && current["id"]
+        else
+          pending_activations << :all
+        end
+      end
+      pending_activations
+    end
+
+    def activate(pending_activations = nil)
       # pp(name)
       # puts(parsed_definition.to_query_sql)
-      # pp(ActiveRecord::Base.connection.select_all(<<~SQL).rows)
-      #   select #{ActiveRecord::Base.connection.quote(id)},
-      #          coalesce(record.ids, match.ids),
-      #          case
-      #            when record.ids is null and match.awaiting_execution = #{RuleMatch.awaiting_executions["match"]}
-      #              then #{RuleMatch.awaiting_executions["delete"]}
-      #            when record.ids is null
-      #              then #{RuleMatch.awaiting_executions["unmatch"]}
-      #            when match.ids is null or match.awaiting_execution = #{RuleMatch.awaiting_executions["match"]}
-      #              then #{RuleMatch.awaiting_executions["match"]}
-      #            else
-      #              #{RuleMatch.awaiting_executions["update"]}
-      #          end,
-      #          match.live_arguments,
-      #          coalesce(record.arguments, match.next_arguments)
-      #     from (
-      #       #{parsed_definition.to_query_sql.split("\n").join("\n    ")}
-      #     ) as record
-      #     full outer join (
-      #       select ids,
-      #              awaiting_execution,
-      #              live_arguments,
-      #              next_arguments
-      #         from #{RuleMatch.table_name}
-      #        where rule_id = #{ActiveRecord::Base.connection.quote(id)}
-      #     ) as match on match.ids = record.ids
-      # SQL
 
       ActiveRecord::Base.connection.execute(<<~SQL.squish)
         insert into arr__rule_matches(rule_id, ids, awaiting_execution, live_arguments, next_arguments)
@@ -130,6 +129,7 @@ module ActiveRecordRules
                  end
             from (
               #{parsed_definition.to_query_sql.split("\n").join("\n      ")}
+               where (#{format_plain_sql_conditions(pending_activations)})
             ) as record
             full outer join (
               select ids,
@@ -138,6 +138,7 @@ module ActiveRecordRules
                      next_arguments
                 from #{RuleMatch.table_name}
                where rule_id = #{ActiveRecord::Base.connection.quote(id)}
+                 and (#{format_json_sql_conditions(pending_activations)})
             ) as match on match.ids = record.ids
            where true
           on conflict(rule_id, ids) do update
@@ -149,7 +150,32 @@ module ActiveRecordRules
       # pp(:after, rule_matches.reload.to_a)
     end
 
+    PendingActivation = Struct.new(:rule, :condition_index, :id)
+
     private
+
+    def format_plain_sql_conditions(pending_activations)
+      return "true" if pending_activations.nil? || pending_activations.include?(:all)
+      return "false" if pending_activations.empty?
+
+      pending_activations.map do |table, value|
+        "__id_#{table} = #{ActiveRecord::Base.connection.quote(value)}"
+      end.join(" or ")
+    end
+
+    def format_json_sql_conditions(pending_activations)
+      return "true" if pending_activations.nil? || pending_activations.include?(:all)
+      return "false" if pending_activations.empty?
+
+      pending_activations.map do |table, value|
+        case ActiveRecordRules.dialect
+        in :sqlite
+          "ids->>'#{table}' = #{ActiveRecord::Base.connection.quote(value)}"
+        in :postgres
+          "ids->>'#{table}' = #{ActiveRecord::Base.connection.quote(value.to_s)}"
+        end
+      end.join(" or ")
+    end
 
     def parsed_definition
       @parsed_definition ||= ActiveRecordRules::Parse.definition(definition)

@@ -23,6 +23,10 @@ module ActiveRecordRules
         end
       end
 
+      def relevant_change?(klass, previous, current)
+        @constraints.any? { _1.relevant_change?(klass, previous, current) }
+      end
+
       def final_result(self_expression) = "coalesce(#{self_expression}, 0)"
 
       def unparse

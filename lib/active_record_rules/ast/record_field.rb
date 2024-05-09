@@ -21,6 +21,12 @@ module ActiveRecordRules
         )
       end
 
+      def relevant_change?(_, previous, current)
+        previous.nil? || current.nil? || previous[@name] != current[@name]
+      end
+
+      def deconstruct = [@name]
+
       def unparse = @name
 
       private

@@ -18,16 +18,47 @@ module ActiveRecordRules
       end
 
       def to_query_sql
+        populate_query_parts!
+        @query_sql
+      end
+
+      def constraints_with_tables
+        populate_query_parts!
+        @constraints.zip(@tables)
+      end
+
+      def bound_names
+        @bound_names ||= constraints.map(&:bound_names).reduce(&:+)
+      end
+
+      def unparse
+        on_match = @on_match && "on match\n  #{@on_match.split("\n").join("\n  ")}\n"
+        on_update = @on_update && "on update\n  #{@on_update.split("\n").join("\n  ")}\n"
+        on_unmatch = @on_unmatch && "on unmatch\n  #{@on_unmatch.split("\n").join("\n  ")}\n"
+        [
+          "rule #{@name}",
+          "  #{@constraints.map(&:unparse).join("\n  ")}",
+          "#{on_match}#{on_update}#{on_unmatch}"
+        ].join("\n")
+      end
+
+      private
+
+      def populate_query_parts!
+        return if @query_sql
+
         query_definer = QueryDefiner.new
+        @tables = []
         constraints.each do |constraint|
-          emitter = constraint.to_query(query_definer)
+          emitter, table = constraint.to_query_and_table(query_definer)
+          @tables << table
           query_definer.add_condition(&emitter) if emitter
         end
 
-        id_names, other_names = query_definer.bindings.keys.partition { _1.start_with?("__id_") }
-        <<~SQL
-          select #{json_sql(id_names)} as ids,
-                 #{json_sql(other_names)} as arguments
+        @id_names, @other_names = query_definer.bindings.keys.partition { _1.start_with?("__id_") }
+        @query_sql = <<~SQL
+          select #{json_sql(@id_names)} as ids,
+                 #{json_sql(@other_names)} as arguments
             from (
               #{query_definer.to_sql.split("\n").join("\n    ")}
             ) as q
@@ -51,21 +82,6 @@ module ActiveRecordRules
         else
           string
         end
-      end
-
-      def bound_names
-        @bound_names ||= constraints.map(&:bound_names).reduce(&:+)
-      end
-
-      def unparse
-        on_match = @on_match && "on match\n  #{@on_match.split("\n").join("\n  ")}\n"
-        on_update = @on_update && "on update\n  #{@on_update.split("\n").join("\n  ")}\n"
-        on_unmatch = @on_unmatch && "on unmatch\n  #{@on_unmatch.split("\n").join("\n  ")}\n"
-        [
-          "rule #{@name}",
-          "  #{@constraints.map(&:unparse).join("\n  ")}",
-          "#{on_match}#{on_update}#{on_unmatch}"
-        ].join("\n")
       end
     end
   end

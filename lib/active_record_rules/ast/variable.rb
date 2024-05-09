@@ -12,6 +12,8 @@ module ActiveRecordRules
         @name = name
       end
 
+      def relevant_change?(_, _, _) = false
+      def deconstruct = [@name]
       def to_query(_) = ->(bindings) { bindings[@name] }
       def unparse = "<#{@name}>"
     end

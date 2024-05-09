@@ -14,7 +14,7 @@ module ActiveRecordRules
         @constraints = (constraints || []).freeze
       end
 
-      def to_query(definer)
+      def to_query_and_table(definer)
         # Negations all get emitted as subqueries within a "not
         # exists" clause.
         #
@@ -29,12 +29,24 @@ module ActiveRecordRules
         end.compact
         query_definer.add_binding("__value") { "1" }
 
-        lambda do |bindings|
-          sql = query_definer.to_sql(bindings, ["__value"])
-          "not exists (#{sql.split("\n").join("\n            ")})"
-        end
+        [lambda do |bindings|
+           sql = query_definer.to_sql(bindings, ["__value"])
+           "not exists (#{sql.split("\n").join("\n            ")})"
+         end,
+         nil]
       end
 
+      def to_query(definer)
+        query, = to_query_and_table(definer)
+        query
+      end
+
+      def relevant_change?(klass, previous, current)
+        @constraints.any? { _1.relevant_change?(klass, previous, current) }
+      end
+
+      # Return the names of variables that are bound to this record's id
+      def id_bindings = Set.new
       def bound_names = Set.new
       def unparse = "not { #{@constraints.map(&:unparse).join("; ")} }"
     end

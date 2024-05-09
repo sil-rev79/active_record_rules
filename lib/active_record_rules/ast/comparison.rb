@@ -15,7 +15,7 @@ module ActiveRecordRules
         @rhs = rhs
       end
 
-      def to_query(definer)
+      def to_query_and_table(definer)
         left = @lhs.to_query(definer)
         right = @rhs.to_query(definer)
         if @comparison == "="
@@ -40,6 +40,11 @@ module ActiveRecordRules
         end
       end
 
+      def to_query(definer)
+        query, = to_query_and_table(definer)
+        query
+      end
+
       def bound_names
         @bound_names ||= if @comparison == "="
                            [
@@ -51,7 +56,17 @@ module ActiveRecordRules
                          end
       end
 
+      def relevant_change?(klass, previous, current)
+        @lhs.relevant_change?(klass, previous, current) ||
+          @rhs.relevant_change?(klass, previous, current)
+      end
+
+      # Return the names of variables that are bound to this record's id
+      def id_bindings = Set.new
+
       def unparse = "#{@lhs.unparse} #{@comparison} #{@rhs.unparse}"
+
+      def deconstruct = [@lhs, @comparison, @rhs]
     end
   end
 end
