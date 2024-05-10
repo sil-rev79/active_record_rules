@@ -172,7 +172,7 @@ module ActiveRecordRules
         in :sqlite
           "ids->>'#{table}' = #{ActiveRecord::Base.connection.quote(value)}"
         in :postgres
-          "ids->>'#{table}' = #{ActiveRecord::Base.connection.quote(value.to_s)}"
+          "ids @> jsonb_build_object('#{table}', #{ActiveRecord::Base.connection.quote(value)})"
         end
       end.join(" or ")
     end

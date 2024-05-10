@@ -1,6 +1,10 @@
 # -*- ruby -*-
 class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_version %>
   def change
+    <%- if postgres? %>
+    enable_extension :btree_gin # This is needed to include rule_id in the GIN index, below
+    <%- end %>
+
     create_table :arr__rules do |t|
       t.string :name, null: false
       t.string :definition, null: false
@@ -13,7 +17,10 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
       t.<%= json_type %> :live_arguments
       t.<%= json_type %> :next_arguments
       t.index [:rule_id, :ids], unique: true, name: 'rule_match_uniqueness'
-      t.index :awaiting_execution, name: 'rule_match_awaiting_execution'
+      <%- if postgres? %>
+      t.index [:rule_id, :ids], using: :gin, name: 'rule_match_ids_lookup'
+      <%- end %>
+      t.index [:rule_id, :awaiting_execution], name: 'rule_match_awaiting_execution'
     end
   end
 end

@@ -20,6 +20,8 @@ module ActiveRecordRules
 
     def dialect = name
 
+    def postgres? = name == "postgres"
+
     def json_type
       case name
       in "postgres"
