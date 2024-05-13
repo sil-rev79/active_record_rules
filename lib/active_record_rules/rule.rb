@@ -76,29 +76,7 @@ module ActiveRecordRules
     end
 
     def calculate_required_activations(klass, previous, current)
-      table_bindings = Hash.new { _1[_2] = [] }
-      parsed_definition.constraints_with_tables.each do |constraint, table|
-        table_bindings[constraint.unparse] << id
-        constraint.id_bindings.each do |name|
-          table_bindings[name] << table
-        end
-      end
-
-      pending_activations = Set.new
-      return pending_activations if previous.nil? && current.nil?
-      return pending_activations if previous == current
-
-      parsed_definition.constraints_with_tables.each do |constraint, table|
-        next unless constraint.relevant_change?(klass, previous, current)
-
-        if table
-          pending_activations << [table, previous["id"]] if previous && previous["id"]
-          pending_activations << [table, current["id"]] if current && current["id"]
-        else
-          pending_activations << :all
-        end
-      end
-      pending_activations
+      parsed_definition.affected_ids_sql(klass, previous, current)
     end
 
     def activate(pending_activations = nil)
@@ -150,7 +128,7 @@ module ActiveRecordRules
       # pp(:after, rule_matches.reload.to_a)
     end
 
-    PendingActivation = Struct.new(:rule, :condition_index, :id)
+    PendingActivation = Struct.new(:condition_terms, :condition_sql)
 
     private
 
@@ -158,8 +136,9 @@ module ActiveRecordRules
       return "true" if pending_activations.nil? || pending_activations.include?(:all)
       return "false" if pending_activations.empty?
 
-      pending_activations.map do |table, value|
-        "__id_#{table} = #{ActiveRecord::Base.connection.quote(value)}"
+      pending_activations.map do |pending_activation|
+        ids = pending_activation.condition_terms.map { "q.__id_#{_1}" }
+        "(#{ids.join(", ")}) in (#{pending_activation.condition_sql})"
       end.join(" or ")
     end
 
@@ -167,12 +146,18 @@ module ActiveRecordRules
       return "true" if pending_activations.nil? || pending_activations.include?(:all)
       return "false" if pending_activations.empty?
 
-      pending_activations.map do |table, value|
+      pending_activations.map do |pending_activation|
         case ActiveRecordRules.dialect
         in :sqlite
-          "ids->>'#{table}' = #{ActiveRecord::Base.connection.quote(value)}"
+          terms = pending_activation.condition_terms.map { "ids->>'#{_1}'" }
+          "(#{terms.join(", ")}) in (#{pending_activation.condition_sql})"
         in :postgres
-          "ids @> jsonb_build_object('#{table}', #{ActiveRecord::Base.connection.quote(value)})"
+          terms = pending_activation.condition_terms.flat_map { ["'#{_1}'", "_ids.#{_1}"] }
+          <<~SQL
+            ids @> any(
+              (select jsonb_build_object(#{terms.join(", ")}) from (#{pending_activation.condition_sql}) as _ids)
+            )
+          SQL
         end
       end.join(" or ")
     end

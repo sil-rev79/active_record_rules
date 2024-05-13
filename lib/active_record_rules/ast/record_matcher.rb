@@ -21,7 +21,7 @@ module ActiveRecordRules
         @table_name ||= @class.table_name
       end
 
-      def to_query_and_table(definer)
+      def to_query(definer)
         table_definer = definer.define_table(table_name) do |_bindings|
           table_name
         end
@@ -35,12 +35,7 @@ module ActiveRecordRules
           table_definer.add_condition(&emitter) if emitter
         end
 
-        [nil, table_definer.table_name]
-      end
-
-      def to_query(definer)
-        query, = to_query_and_table(definer)
-        query
+        nil
       end
 
       def bound_names
@@ -77,7 +72,8 @@ module ActiveRecordRules
         bindings
       end
 
-      def unparse = "#{@negated ? "not " : ""}#{@class_name}(#{@clauses.map(&:unparse).join(", ")})"
+      def deconstruct = [@class, @clauses]
+      def unparse = "#{@class_name}(#{@clauses.map(&:unparse).join(", ")})"
     end
   end
 end

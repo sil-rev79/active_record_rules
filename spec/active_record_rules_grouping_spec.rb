@@ -30,6 +30,12 @@ RSpec.describe ActiveRecordRules do
 
   describe "count" do
     before do
+      # Create a bunch of extra courses, to make this test much slower
+      # without optimisations.
+      (1..500).each do |i|
+        Course.create!(early_cutoff: i)
+      end
+
       described_class.define_rule <<~RULE
         rule Reify student counts on classes
           Course(id = <course_id>, <early_cutoff>)
@@ -53,7 +59,6 @@ RSpec.describe ActiveRecordRules do
       let!(:course_student) { CourseStudent.create(course: course, student: student, rego_time: 3) }
 
       it "includes the student in the count" do
-        # !!
         expect(course.reload.early_rego_count).to eq 1
       end
 

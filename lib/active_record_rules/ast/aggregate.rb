@@ -42,6 +42,7 @@ module ActiveRecordRules
       end
 
       def bound_names = Set.new
+      def deconstruct = [constraints]
     end
   end
 end

@@ -11,14 +11,15 @@ RSpec.describe ActiveRecordRules do
     define_tables do |schema|
       schema.create_table :racers do |t|
         t.integer :race_time
+        t.integer :race_id
         t.boolean :winner
       end
     end
 
     described_class.define_rule <<~RULE
       rule the fastest is the winner
-        Racer(<id>, <race_time>)
-        not { Racer(race_time < <race_time>) }
+        Racer(<id>, <race_id>, <race_time>)
+        not { Racer(<race_id>, race_time < <race_time>) }
       on match
         Racer.find(id).update!(winner: true)
       on unmatch
