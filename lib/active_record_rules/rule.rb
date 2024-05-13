@@ -39,7 +39,7 @@ module ActiveRecordRules
         end
 
         # Then mark them as being done
-        batch.update_all(<<~SQL.squish)
+        batch.update_all(<<~SQL.squish!)
           live_arguments = next_arguments,
           next_arguments = null,
           awaiting_execution = #{RuleMatch.awaiting_executions["none"]}
@@ -58,7 +58,7 @@ module ActiveRecordRules
         end
 
         # Then mark them as being done
-        batch.update_all(<<~SQL.squish)
+        batch.update_all(<<~SQL.squish!)
           live_arguments = next_arguments,
           next_arguments = null,
           awaiting_execution = #{RuleMatch.awaiting_executions["none"]}
@@ -68,7 +68,7 @@ module ActiveRecordRules
 
     def ignore_pending_executions
       rule_matches.where(awaiting_execution: ["unmatch", "delete"]).delete_all
-      rule_matches.where(awaiting_execution: ["match", "update"]).update_all(<<~SQL.squish)
+      rule_matches.where(awaiting_execution: ["match", "update"]).update_all(<<~SQL.squish!)
         live_arguments = next_arguments,
         next_arguments = null,
         awaiting_execution = #{RuleMatch.awaiting_executions["none"]}
@@ -105,7 +105,7 @@ module ActiveRecordRules
       # pp(name)
       # puts(parsed_definition.to_query_sql)
 
-      ActiveRecord::Base.connection.execute(<<~SQL.squish)
+      ActiveRecord::Base.connection.execute(<<~SQL.squish!)
         insert into arr__rule_matches(rule_id, ids, awaiting_execution, live_arguments, next_arguments)
           select #{ActiveRecord::Base.connection.quote(id)},
                  coalesce(record.ids, match.ids),
