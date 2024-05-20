@@ -12,22 +12,29 @@ module ActiveRecordRules
       rule_matches.where(awaiting_execution: "unmatch").in_batches do |batch|
         all_rows = batch.pluck(:ids, :live_arguments)
 
-        # Go through each record and run the unmatch code
+        # Remove them
+        batch.delete_all
+
+        # Then go through each record and run the unmatch code
         all_rows.map do |ids, live_arguments|
           logger&.info { "Rule(#{id}): unmatched for #{ids.to_json}" }
           logger&.debug { "Rule(#{id}): unmatched with arguments #{live_arguments.to_json}" }
 
           execute_unmatch(live_arguments)
         end
-
-        # Then remove them
-        batch.delete_all
       end
 
       rule_matches.where(awaiting_execution: "update").in_batches do |batch|
         all_rows = batch.pluck(:ids, :live_arguments, :next_arguments)
 
-        # Go through each record and run the update code
+        # Mark them as being done
+        batch.update_all(<<~SQL.squish!)
+          live_arguments = next_arguments,
+          next_arguments = null,
+          awaiting_execution = #{RuleMatch.awaiting_executions["none"]}
+        SQL
+
+        # Then, go through each record and run the update code
         all_rows.map do |ids, live_arguments, next_arguments|
           logger&.info { "Rule(#{id}): updated for #{ids.to_json}" }
           logger&.debug do
@@ -37,32 +44,25 @@ module ActiveRecordRules
 
           execute_update(live_arguments, next_arguments)
         end
-
-        # Then mark them as being done
-        batch.update_all(<<~SQL.squish!)
-          live_arguments = next_arguments,
-          next_arguments = null,
-          awaiting_execution = #{RuleMatch.awaiting_executions["none"]}
-        SQL
       end
 
       rule_matches.where(awaiting_execution: "match").in_batches do |batch|
         all_ids = batch.pluck(:ids, :next_arguments)
 
-        # Go through each record and run the match code
+        # Mark them as being done
+        batch.update_all(<<~SQL.squish!)
+          live_arguments = next_arguments,
+          next_arguments = null,
+          awaiting_execution = #{RuleMatch.awaiting_executions["none"]}
+        SQL
+
+        # Then, go through each record and run the match code
         all_ids.map do |ids, next_arguments|
           logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
           logger&.debug { "Rule(#{id}): matched with arguments #{next_arguments.to_json}" }
 
           execute_match(next_arguments)
         end
-
-        # Then mark them as being done
-        batch.update_all(<<~SQL.squish!)
-          live_arguments = next_arguments,
-          next_arguments = null,
-          awaiting_execution = #{RuleMatch.awaiting_executions["none"]}
-        SQL
       end
     end
 
