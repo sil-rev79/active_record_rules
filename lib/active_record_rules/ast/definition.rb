@@ -26,59 +26,12 @@ module ActiveRecordRules
         return Set.new if previous.nil? && current.nil?
         return Set.new if previous == current
 
-        populate_query_parts!
-
-        table_bindings = Hash.new { _1[_2] = [] }
-
-        to_do = constraints.dup.map { [_1, true] }
-        table_index = 0
-        target_tables = []
-        start_tables = []
-        table_names = {}
-        external_table_names = {}
-        i = 0
-        while (constraint, top_level = to_do.shift)
-          case constraint
-          in Aggregate(aggregated_constraints)
-            to_do += aggregated_constraints.map { [_1, false] }
-          in Negation(negated_constraints)
-            to_do += negated_constraints.map { [_1, false] }
-          in RecordMatcher(match_klass, clauses)
-            table_name = "#{match_klass.table_name}_#{table_index += 1}"
-            table_names[table_name] = match_klass.table_name
-            external_table_names[table_name] = @table_names[i]
-            i += 1
-
-            target_tables << table_name if top_level
-            start_tables << table_name if klass == match_klass
-
-            clauses.each do |clause|
-              case clause
-              in Comparison(Variable(lhs), "=", RecordField(rhs))
-                table_bindings[lhs] << TableField.new(table_name, rhs)
-              in Comparison(RecordField(lhs), "=", Variable(rhs))
-                table_bindings[rhs] << TableField.new(table_name, lhs)
-              else
-                # Recurse into the LHS and RHS to find other relevant tables.
-                to_do << [lhs, false]
-                to_do << [rhs, false]
-              end
-            end
-          in Comparison(lhs, _, rhs)
-            # Recurse into the LHS and RHS to find other relevant tables.
-            to_do << [lhs, false]
-            to_do << [rhs, false]
-          else
-            # we're not handling anything else
-            nil
-          end
-        end
-
-        equivalence_sets = table_bindings.values
-
         pending_activations = Set.new
-        start_tables.each do |table|
-          if target_tables.include?(table)
+
+        populate_table_edges!
+
+        @start_tables[klass].each do |table|
+          if @target_tables.include?(table)
             if previous
               pending_activations << Rule::PendingActivation.new([table], "select #{previous["id"]} as #{table}")
             end
@@ -88,11 +41,9 @@ module ActiveRecordRules
           else
             candidates = []
             done = Set.new([table])
-            equivalence_sets.each do |set|
-              next unless (entry = set.find { _1.table == table })
-
-              set.map do |item|
-                candidates << [item, [[item, entry]]] unless item.table == entry.table
+            @edges[table].each do |field, local_edges|
+              local_edges.each do |edge|
+                candidates << [edge, [[edge, TableField.new(table, field)]]]
               end
             end
 
@@ -100,16 +51,14 @@ module ActiveRecordRules
             while (item, path = candidates.shift)
               next unless done.add?(item.table)
 
-              if target_tables.include?(item.table)
+              if @target_tables.include?(item.table)
                 final_path = path
                 break
               end
 
-              equivalence_sets.each do |set|
-                next unless (entry = set.find { _1.table == item.table })
-
-                set.map do |next_item|
-                  candidates << [next_item, [[next_item, entry]] + path] unless next_item.table == entry.table
+              @edges[item.table].each do |field, local_edges|
+                local_edges.each do |edge|
+                  candidates << [edge, [[edge, TableField.new(item.table, field)]] + path]
                 end
               end
             end
@@ -121,33 +70,55 @@ module ActiveRecordRules
 
             first, = final_path.first
             last, dead_last = final_path.last
-            query_base = [
-              "select #{first.table}.id as #{first.table}",
-              "  from #{table_names[first.table]} as #{first.table}",
-              *final_path[...-1].flat_map do |from, to|
-                [" inner join #{table_names[to.table]} as #{to.table}",
-                 "         on #{from.table}.#{from.field} = #{to.table}.#{to.field}"]
+
+            if first == last && first.field == "id"
+              # A single-segment path connecting to "id" doesn't
+              # really need to hit a table at all, we can just return
+              # the values we already know about.
+              unless previous.nil?
+                value = ActiveRecord::Base.connection.quote(previous[dead_last.field])
+                pending_activations << Rule::PendingActivation.new(
+                  [@external_table_names[first.table]],
+                  "select #{value} as #{first.table}"
+                )
               end
-            ].join("\n")
+              unless current.nil?
+                value = ActiveRecord::Base.connection.quote(current[dead_last.field])
+                pending_activations << Rule::PendingActivation.new(
+                  [@external_table_names[first.table]],
+                  "select #{value} as #{first.table}"
+                )
+              end
+            else
+              # A path with more than one segment needs some query, though.
+              query_base = [
+                "select #{first.table}.id as #{first.table}",
+                "  from #{@internal_table_names[first.table]} as #{first.table}",
+                *final_path[...-1].flat_map do |from, to|
+                  [" inner join #{@internal_table_names[to.table]} as #{to.table}",
+                   "         on #{from.table}.#{from.field} = #{to.table}.#{to.field}"]
+                end
+              ].join("\n")
 
-            unless previous.nil?
-              op = (previous[dead_last.field].nil? ? "is" : "=")
-              value = ActiveRecord::Base.connection.quote(previous[dead_last.field])
-              pending_activations << Rule::PendingActivation.new(
-                [external_table_names[first.table]],
-                query_base +
-                "\n where #{last.table}.#{last.field} #{op} #{value}"
-              )
-            end
+              unless previous.nil?
+                op = (previous[dead_last.field].nil? ? "is" : "=")
+                value = ActiveRecord::Base.connection.quote(previous[dead_last.field])
+                pending_activations << Rule::PendingActivation.new(
+                  [@external_table_names[first.table]],
+                  query_base +
+                  "\n where #{last.table}.#{last.field} #{op} #{value}"
+                )
+              end
 
-            unless current.nil?
-              op = (current[dead_last.field].nil? ? "is" : "=")
-              value = ActiveRecord::Base.connection.quote(current[dead_last.field])
-              pending_activations << Rule::PendingActivation.new(
-                [external_table_names[first.table]],
-                query_base +
-                "\n where #{last.table}.#{last.field} #{op} #{value}"
-              )
+              unless current.nil?
+                op = (current[dead_last.field].nil? ? "is" : "=")
+                value = ActiveRecord::Base.connection.quote(current[dead_last.field])
+                pending_activations << Rule::PendingActivation.new(
+                  [@external_table_names[first.table]],
+                  query_base +
+                  "\n where #{last.table}.#{last.field} #{op} #{value}"
+                )
+              end
             end
           end
         end
@@ -192,6 +163,65 @@ module ActiveRecordRules
               #{query_definer.to_sql.split("\n").join("\n    ")}
             ) as q
         SQL
+      end
+
+      def populate_table_edges!
+        return if @edges
+
+        populate_query_parts!
+
+        table_bindings = Hash.new { _1[_2] = [] }
+
+        to_do = constraints.dup.map { [_1, true] }
+        table_index = 0
+        @target_tables = []
+        @start_tables = Hash.new { _1[_2] = [] }
+        @internal_table_names = {}
+        @external_table_names = {}
+        i = 0
+        while (constraint, top_level = to_do.shift)
+          case constraint
+          in Aggregate(aggregated_constraints)
+            to_do += aggregated_constraints.map { [_1, false] }
+          in Negation(negated_constraints)
+            to_do += negated_constraints.map { [_1, false] }
+          in RecordMatcher(match_klass, clauses)
+            table_name = "#{match_klass.table_name}_#{table_index += 1}"
+            @internal_table_names[table_name] = match_klass.table_name
+            @external_table_names[table_name] = @table_names[i]
+            i += 1
+
+            @target_tables << table_name if top_level
+            @start_tables[match_klass] << table_name
+
+            clauses.each do |clause|
+              case clause
+              in Comparison(Variable(lhs), "=", RecordField(rhs))
+                table_bindings[lhs] << TableField.new(table_name, rhs)
+              in Comparison(RecordField(lhs), "=", Variable(rhs))
+                table_bindings[rhs] << TableField.new(table_name, lhs)
+              else
+                # Recurse into the LHS and RHS to find other relevant tables.
+                to_do << [lhs, false]
+                to_do << [rhs, false]
+              end
+            end
+          in Comparison(lhs, _, rhs)
+            # Recurse into the LHS and RHS to find other relevant tables.
+            to_do << [lhs, false]
+            to_do << [rhs, false]
+          else
+            # we're not handling anything else
+            nil
+          end
+        end
+
+        @edges = Hash.new { _1[_2] = {} } # table => { field => [TableField ...] }
+        table_bindings.each_value do |table_fields|
+          table_fields.each do |table_field|
+            @edges[table_field.table][table_field.field] = table_fields.reject { _1 == table_field }
+          end
+        end
       end
 
       def json_sql(names)
