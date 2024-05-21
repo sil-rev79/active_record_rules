@@ -44,7 +44,9 @@ module ActiveRecordRules
           comparison.as(:comparison) >> whitespace.maybe >>
           expression.as(:rhs)
         ) | (
-          str("not").as(:operation) >> whitespace.maybe >>
+          (
+            str("not") | str("any")
+          ).as(:operation) >> whitespace.maybe >>
           str("{") >> (whitespace | newline).repeat >>
           inline_constraints.as(:constraints) >> (whitespace | newline).repeat >>
           str("}")

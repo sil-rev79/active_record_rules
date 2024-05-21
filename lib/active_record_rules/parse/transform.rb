@@ -27,6 +27,9 @@ module ActiveRecordRules
       rule(operation: "array", expression: simple(:expression), constraints: sequence(:constraints)) do
         ::ActiveRecordRules::Ast::Array.new(expression, constraints)
       end
+      rule(operation: "any", constraints: sequence(:constraints)) do
+        Any.new(constraints)
+      end
       rule(operation: "not", constraints: sequence(:constraints)) do
         Negation.new(constraints)
       end
