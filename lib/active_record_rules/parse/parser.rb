@@ -27,15 +27,28 @@ module ActiveRecordRules
           (whitespace.maybe >> newline).repeat >> (
             # This is a line with content:
             whitespace >>
-            (record_matcher | boolean_clause) >>
+            (record_matcher | boolean_constraint) >>
             whitespace.maybe >> newline
           )
         ).repeat >> (whitespace.maybe >> newline).repeat
       end
 
       rule(:inline_constraints) do
-        (record_matcher | boolean_clause).repeat(1, 1) >>
-          ((whitespace | newline).repeat >> (record_matcher | boolean_clause)).repeat
+        (record_matcher | boolean_constraint).repeat(1, 1) >>
+          ((whitespace | newline).repeat >> (record_matcher | boolean_constraint)).repeat
+      end
+
+      rule(:boolean_constraint) do
+        (
+          expression.as(:lhs) >> whitespace.maybe >>
+          comparison.as(:comparison) >> whitespace.maybe >>
+          expression.as(:rhs)
+        ) | (
+          str("not").as(:operation) >> whitespace.maybe >>
+          str("{") >> (whitespace | newline).repeat >>
+          inline_constraints.as(:constraints) >> (whitespace | newline).repeat >>
+          str("}")
+        )
       end
 
       rule(:record_matcher) do
@@ -58,11 +71,6 @@ module ActiveRecordRules
           expression.as(:rhs)
         ) | (
           str("<") >> name.as(:simple_name_clause) >> str(">")
-        ) | (
-          str("not").as(:operation) >> whitespace.maybe >>
-          str("{") >> (whitespace | newline).repeat >>
-          inline_constraints.as(:constraints) >> (whitespace | newline).repeat >>
-          str("}")
         )
       end
 
