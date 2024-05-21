@@ -156,6 +156,8 @@ module ActiveRecordRules
       rule(:aggregate) do
         aggregate_op("count", require_expression: false) |
           aggregate_op("sum") |
+          aggregate_op("maximum") |
+          aggregate_op("minimum") |
           aggregate_op("array")
       end
 
