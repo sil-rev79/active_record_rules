@@ -92,9 +92,7 @@ module ActiveRecordRules
             # Variable bindings wrapped in < >
             (str("<") >> name.as(:binding_name) >> str(">")) |
             # Aggregate operators
-            count |
-            sum |
-            array |
+            aggregate |
             # Primitives
             boolean |
             string |
@@ -142,36 +140,23 @@ module ActiveRecordRules
         str("nil").as(:nil) >> match("[a-zA-Z0-9]_!?").absent?
       end
 
-      rule(:count) do
-        str("count").as(:operation) >> whitespace.maybe >>
-          (
-            str("(") >> (whitespace | newline).repeat >>
-            expression.as(:expression) >> (whitespace | newline).repeat >>
-            str(")")
-          ).maybe >> whitespace.maybe >>
+      def aggregate_op(name, require_expression: true)
+        expr_part = (
+          str("(") >> (whitespace | newline).repeat >>
+          expression.as(:expression) >> (whitespace | newline).repeat >>
+          str(")")
+        )
+        str(name).as(:aggregate_operation) >> whitespace.maybe >>
+          (require_expression ? expr_part : expr_part.maybe) >> whitespace.maybe >>
           str("{") >> (whitespace | newline).repeat >>
           inline_constraints.as(:constraints) >> (whitespace | newline).repeat >>
           str("}")
       end
 
-      rule(:sum) do
-        str("sum").as(:operation) >> whitespace.maybe >>
-          str("(") >> (whitespace | newline).repeat >>
-          expression.as(:expression) >> (whitespace | newline).repeat >>
-          str(")") >> whitespace.maybe >>
-          str("{") >> (whitespace | newline).repeat >>
-          inline_constraints.as(:constraints) >> (whitespace | newline).repeat >>
-          str("}")
-      end
-
-      rule(:array) do
-        str("array").as(:operation) >> whitespace.maybe >>
-          str("(") >> (whitespace | newline).repeat >>
-          expression.as(:expression) >> (whitespace | newline).repeat >>
-          str(")") >> whitespace.maybe >>
-          str("{") >> (whitespace | newline).repeat >>
-          inline_constraints.as(:constraints) >> (whitespace | newline).repeat >>
-          str("}")
+      rule(:aggregate) do
+        aggregate_op("count", require_expression: false) |
+          aggregate_op("sum") |
+          aggregate_op("array")
       end
 
       # ===============================

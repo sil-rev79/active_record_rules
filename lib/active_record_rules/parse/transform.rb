@@ -15,18 +15,16 @@ module ActiveRecordRules
       rule(nil: simple(:value)) { Constant.new(nil) }
       rule(binding_name: simple(:value)) { Variable.new(value.to_s) }
       rule(record_name: simple(:value)) { RecordField.new(value.to_s) }
-      rule(operation: "count", constraints: sequence(:constraints)) do
-        Count.new(nil, constraints)
+
+      rule(aggregate_operation: simple(:name), constraints: sequence(:constraints)) do
+        class_name = name.to_s.split("_").map(&:capitalize).join
+        Object.const_get("ActiveRecordRules::Ast::#{class_name}").new(nil, constraints)
       end
-      rule(operation: "count", expression: simple(:expression), constraints: sequence(:constraints)) do
-        Count.new(expression, constraints)
+      rule(aggregate_operation: simple(:name), expression: simple(:expression), constraints: sequence(:constraints)) do
+        class_name = name.to_s.split("_").map(&:capitalize).join
+        Object.const_get("ActiveRecordRules::Ast::#{class_name}").new(expression, constraints)
       end
-      rule(operation: "sum", expression: simple(:expression), constraints: sequence(:constraints)) do
-        Sum.new(expression, constraints)
-      end
-      rule(operation: "array", expression: simple(:expression), constraints: sequence(:constraints)) do
-        ::ActiveRecordRules::Ast::Array.new(expression, constraints)
-      end
+
       rule(operation: "any", constraints: sequence(:constraints)) do
         Any.new(constraints)
       end
