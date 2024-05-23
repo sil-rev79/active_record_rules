@@ -25,5 +25,13 @@ module ActiveRecordRules
       unmatch: 3,
       delete: 4
     }, _prefix: "awaiting_"
+
+    def deconstruct_keys(_)
+      { id: id,
+        ids: ids,
+        awaiting_execution: awaiting_execution,
+        live_arguments: live_arguments,
+        next_arguments: next_arguments }
+    end
   end
 end

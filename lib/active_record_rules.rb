@@ -73,7 +73,7 @@ module ActiveRecordRules
     end
 
     def unload_all_rules!
-      @loaded_rules = []
+      @loaded_rules = {}
     end
 
     def define_rule(definition_string)
@@ -86,46 +86,58 @@ module ActiveRecordRules
       raw_delete_rule(rule)
     end
 
-    def after_create_trigger(record)
-      after_trigger(record.class, nil, record.attributes)
+    def after_create_trigger(record) = inline_activate(capture_create_change(record))
+
+    def capture_create_change(record)
+      [record.class, nil, record.attributes]
     end
 
-    def after_update_trigger(record)
-      after_trigger(record.class,
-                    record.attributes.merge(record.previous_changes.transform_values(&:first)),
-                    record.attributes)
+    def after_update_trigger(record) = inline_activate(capture_update_change(record))
+
+    def capture_update_change(record)
+      [record.class,
+       record.attributes.merge(record.previous_changes.transform_values(&:first)),
+       record.attributes]
     end
 
-    def after_destroy_trigger(record)
-      after_trigger(record.class, record.attributes, nil)
+    def after_destroy_trigger(record) = inline_activate(capture_destroy_change(record))
+
+    def capture_destroy_change(record)
+      [record.class, record.attributes, nil]
     end
 
-    def trigger_all(*_klasses)
-      ActiveRecord::Base.transaction do
-        @loaded_rules.each(&:activate)
-        @loaded_rules.each(&:run_pending_executions)
+    def activate_rules(change)
+      klass, previous, current = change
+      @loaded_rules.flat_map do |_, rule|
+        pending = rule.calculate_required_activations(klass, previous, current)
+        if pending.any?
+          rule.activate(pending)
+        else
+          []
+        end
       end
     end
 
-    def trigger(_all_objects)
-      ActiveRecord::Base.transaction do
-        @loaded_rules.each(&:activate)
-        @loaded_rules.each(&:run_pending_executions)
+    def run_pending_executions(*ids)
+      ids.each do |id|
+        match = RuleMatch.find_by(id: id)
+        next unless match # If the match doesn't exist, ignore it - it might have unmatched
+
+        @loaded_rules[match.rule_id].run_pending_execution(match)
+      end
+    end
+
+    def activate_all
+      # This might generate a *lot* of ids to process!
+      @loaded_rules.flat_map do |_, rule|
+        rule.activate
       end
     end
 
     private
 
-    def after_trigger(klass, previous, current)
-      activated = []
-      @loaded_rules.each do |rule|
-        pending = rule.calculate_required_activations(klass, previous, current)
-        if pending.any?
-          rule.activate(pending)
-          activated << rule
-        end
-      end
-      activated.each(&:run_pending_executions)
+    def inline_activate(change)
+      activate_rules(change).each { run_pending_executions(_1) }
     end
 
     def build_rule(definition)
@@ -140,7 +152,7 @@ module ActiveRecordRules
       rule.save!
       rule.activate
       rule.ignore_pending_executions
-      (@loaded_rules ||= []) << rule
+      (@loaded_rules ||= {})[rule.id] = rule
       rule
     end
 
@@ -158,7 +170,7 @@ module ActiveRecordRules
     end
 
     def raw_delete_rule(rule)
-      @loaded_rules&.delete(rule)
+      @loaded_rules.delete(rule.id)
       rule.destroy!
     end
   end

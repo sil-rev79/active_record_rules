@@ -526,7 +526,6 @@ RSpec.describe ActiveRecordRules do
 
       Salutation.create!(greeting: "hi")
       Person.insert_all((0..10_000).map { { name: "Person #{_1}" } })
-      Benchmark.measure { described_class.trigger_all } # trigger everything in a batch
     end
 
     it "are quick to add one more person" do

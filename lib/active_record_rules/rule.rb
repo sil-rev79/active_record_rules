@@ -6,63 +6,44 @@ module ActiveRecordRules
 
     has_many :rule_matches, dependent: :destroy
 
-    def run_pending_executions
-      rule_matches.delete_by(awaiting_execution: "delete")
+    def run_pending_execution(match)
+      raise "Cannot run execution meant for another rule!" unless match.rule_id == id
 
-      rule_matches.where(awaiting_execution: "unmatch").in_batches do |batch|
-        all_rows = batch.pluck(:ids, :live_arguments)
+      case match
+      in RuleMatch(awaiting_execution: "match", ids:, next_arguments:)
+        match.update_columns(live_arguments: next_arguments,
+                             next_arguments: nil,
+                             awaiting_execution: "none")
+        logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
+        logger&.debug { "Rule(#{id}): matched with arguments #{next_arguments.to_json}" }
 
-        # Remove them
-        batch.delete_all
+        execute_match(next_arguments)
 
-        # Then go through each record and run the unmatch code
-        all_rows.map do |ids, live_arguments|
-          logger&.info { "Rule(#{id}): unmatched for #{ids.to_json}" }
-          logger&.debug { "Rule(#{id}): unmatched with arguments #{live_arguments.to_json}" }
-
-          execute_unmatch(live_arguments)
+      in RuleMatch(awaiting_execution: "update", ids:, live_arguments:, next_arguments:)
+        match.update_columns(live_arguments: next_arguments,
+                             next_arguments: nil,
+                             awaiting_execution: "none")
+        logger&.info { "Rule(#{id}): updated for #{ids.to_json}" }
+        logger&.debug do
+          "Rule(#{id}): updating from #{live_arguments.to_json} " \
+            "=> #{next_arguments.to_json}"
         end
-      end
 
-      rule_matches.where(awaiting_execution: "update").in_batches do |batch|
-        all_rows = batch.pluck(:ids, :live_arguments, :next_arguments)
+        execute_update(live_arguments, next_arguments)
 
-        # Mark them as being done
-        batch.update_all(<<~SQL.squish!)
-          live_arguments = next_arguments,
-          next_arguments = null,
-          awaiting_execution = #{RuleMatch.awaiting_executions["none"]}
-        SQL
+      in RuleMatch(awaiting_execution: "unmatch", ids:, live_arguments:)
+        match.delete
+        logger&.info { "Rule(#{id}): unmatched for #{ids.to_json}" }
+        logger&.debug { "Rule(#{id}): unmatched with arguments #{live_arguments.to_json}" }
 
-        # Then, go through each record and run the update code
-        all_rows.map do |ids, live_arguments, next_arguments|
-          logger&.info { "Rule(#{id}): updated for #{ids.to_json}" }
-          logger&.debug do
-            "Rule(#{id}): updating from #{live_arguments.to_json} " \
-              "=> #{next_arguments.to_json}"
-          end
+        execute_unmatch(live_arguments)
 
-          execute_update(live_arguments, next_arguments)
-        end
-      end
+      in RuleMatch(awaiting_execution: "delete")
+        match.delete
 
-      rule_matches.where(awaiting_execution: "match").in_batches do |batch|
-        all_ids = batch.pluck(:ids, :next_arguments)
+      in RuleMatch(awaiting_execution: "none")
+        # do nothing
 
-        # Mark them as being done
-        batch.update_all(<<~SQL.squish!)
-          live_arguments = next_arguments,
-          next_arguments = null,
-          awaiting_execution = #{RuleMatch.awaiting_executions["none"]}
-        SQL
-
-        # Then, go through each record and run the match code
-        all_ids.map do |ids, next_arguments|
-          logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
-          logger&.debug { "Rule(#{id}): matched with arguments #{next_arguments.to_json}" }
-
-          execute_match(next_arguments)
-        end
       end
     end
 
@@ -80,10 +61,7 @@ module ActiveRecordRules
     end
 
     def activate(pending_activations = nil)
-      # pp(name)
-      # puts(parsed_definition.to_query_sql)
-
-      ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+      ActiveRecord::Base.connection.execute(<<~SQL.squish!).map { _1["id"] }
         insert into arr__rule_matches(rule_id, ids, awaiting_execution, live_arguments, next_arguments)
           select #{ActiveRecord::Base.connection.quote(id)},
                  coalesce(record.ids, match.ids),
@@ -123,9 +101,8 @@ module ActiveRecordRules
             set awaiting_execution = excluded.awaiting_execution,
                 live_arguments = excluded.live_arguments,
                 next_arguments = excluded.next_arguments
+          returning id
       SQL
-
-      # pp(:after, rule_matches.reload.to_a)
     end
 
     PendingActivation = Struct.new(:condition_terms, :condition_sql)

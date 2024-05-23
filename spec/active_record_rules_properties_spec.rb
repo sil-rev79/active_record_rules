@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 # For the first example group
-class SupportRequest < ActiveRecord::Base; end
-class ClientRepresentative < ActiveRecord::Base; end
+class SupportRequest < TestRecord; end
+class ClientRepresentative < TestRecord; end
 
 # For the second example group
 class Card < TestRecord; end
@@ -59,7 +59,6 @@ RSpec.describe ActiveRecordRules do
           end
         end
       end
-      described_class.trigger_all
       expect(TestHelper.matches.sort).to eq(expected_matches.sort)
     end
   end

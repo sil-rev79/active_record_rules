@@ -96,8 +96,8 @@ RSpec.describe ActiveRecordRules do
         # We want to avoid triggering on each rule, to avoid making
         # this test take forever. Since we work on the database level,
         # we can use a different Ruby model and it still works.
-        times.each { RacerNoTrigger.create!(race_time: _1) }
-        described_class.trigger_all(Racer)
+        times.each { Racer.create!(race_time: _1) }
+        # described_class.trigger_all(Racer)
       end
 
       it_always "has a single winner" do
