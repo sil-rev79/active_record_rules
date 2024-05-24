@@ -36,7 +36,7 @@ module ActiveRecordRules
               next unless attributes
 
               value = ActiveRecord::Base.connection.quote(attributes["id"])
-              pending_activations << Rule::PendingActivation.new([table], "select #{value} as #{table}")
+              pending_activations << Rule::PendingActivation.new([table], "select #{id_cast(value)} as #{table}")
             end
           else
             candidates = []
@@ -240,6 +240,15 @@ module ActiveRecordRules
           string[5..]
         else
           string
+        end
+      end
+
+      def id_cast(sql)
+        case ActiveRecordRules.dialect
+        in :sqlite
+          sql
+        in :postgres
+          "#{sql} :: #{ActiveRecordRules.id_type}"
         end
       end
     end
