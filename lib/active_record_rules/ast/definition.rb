@@ -32,11 +32,11 @@ module ActiveRecordRules
 
         @start_tables[klass].each do |table|
           if @target_tables.include?(table)
-            if previous
-              pending_activations << Rule::PendingActivation.new([table], "select #{previous["id"]} as #{table}")
-            end
-            if current
-              pending_activations << Rule::PendingActivation.new([table], "select #{current["id"]} as #{table}")
+            [previous, current].each do |attributes|
+              next unless attributes
+
+              value = ActiveRecord::Base.connection.quote(attributes["id"])
+              pending_activations << Rule::PendingActivation.new([table], "select #{value} as #{table}")
             end
           else
             candidates = []
