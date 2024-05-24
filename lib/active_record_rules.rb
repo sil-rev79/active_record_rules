@@ -127,7 +127,14 @@ module ActiveRecordRules
         match = RuleMatch.find_by(id: id)
         next unless match # If the match doesn't exist, ignore it - it might have unmatched
 
-        @loaded_rules[match.rule_id].run_pending_execution(match)
+        rule = @loaded_rules[match.rule_id]
+        unless rule
+          logger.warn("Could not find loaded rule for match (rule id: #{match.rule_id}): ignoring match #{match.id}.")
+          next
+        end
+        next unless rule
+
+        rule.run_pending_execution(match)
       end
     end
 
