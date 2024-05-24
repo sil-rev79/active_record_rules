@@ -1,13 +1,8 @@
 # -*- ruby -*-
 class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_version %>
   def change
-    create_table :arr__rules do |t|
-      t.string :name, null: false
-      t.string :definition, null: false
-    end
-
     create_table :arr__rule_matches do |t|
-      t.references :rule, foreign_key: { to_table: :arr__rules }, null: false
+      t.integer :rule_id, null: false, limit: 4
       t.integer :awaiting_execution, null: false
       t.<%= json_type %> :ids
       t.<%= json_type %> :live_arguments

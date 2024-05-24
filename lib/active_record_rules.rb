@@ -20,10 +20,6 @@ require "active_record_rules/railtie" if defined?(Rails)
 #     on unmatch
 #       User.find(author_id).decrement!(:post_count)
 #   RULE
-#
-# Rules are persisted as database values (see
-# ActiveRecordRules::Rule), and can be modified as part of a running
-# system.
 module ActiveRecordRules
   cattr_accessor :logger, :execution_context
   # We default to the SQLite dialect, but we also support :postgres
@@ -60,16 +56,8 @@ module ActiveRecordRules
         end
       end
 
-      definitions.each do |name, (definition, _)|
-        if (rule = Rule.find_by(name: name))
-          raw_update_rule(rule, definition)
-        else
-          rule = raw_define_rule(definition)
-        end
-        @loaded_rules[name] = rule
-      end
-      Rule.where.not(name: definitions.keys).each do |rule|
-        raw_delete_rule(rule)
+      definitions.each do |_, (definition, _)|
+        define_rule(definition)
       end
 
       definitions.keys
@@ -79,23 +67,32 @@ module ActiveRecordRules
       @loaded_rules = {}
     end
 
-    def define_rule(definition_string)
-      definition = Parse.definition(definition_string)
-      raw_define_rule(definition)
+    def define_rule(definition)
+      parsed = definition.is_a?(String) ? Parse.definition(definition) : definition
+      rule = Rule.new(definition: parsed)
+      if (existing = @loaded_rules[rule.id]) && rule != existing
+        raise <<~TEXT
+          Error: hash collision between rules. Change one of the names slighly to produce different hashes.
+            Existing rule: #{existing.name}
+            New rule:      #{rule.name}
+        TEXT
+      end
+
+      @loaded_rules[rule.id] = rule
+      rule
     end
 
-    def delete_rule(rule_name)
-      rule = Rule.find_by(name: rule_name)
-      raw_delete_rule(rule)
+    def undefine_rule(name)
+      @loaded_rules.delete_if { _2.name == name }
     end
 
-    def after_create_trigger(record) = inline_activate(capture_create_change(record))
+    def after_create_trigger(record) = after_trigger(capture_create_change(record))
 
     def capture_create_change(record)
       [record.class.name, nil, record.attributes]
     end
 
-    def after_update_trigger(record) = inline_activate(capture_update_change(record))
+    def after_update_trigger(record) = after_trigger(capture_update_change(record))
 
     def capture_update_change(record)
       [record.class.name,
@@ -103,7 +100,7 @@ module ActiveRecordRules
        record.attributes]
     end
 
-    def after_destroy_trigger(record) = inline_activate(capture_destroy_change(record))
+    def after_destroy_trigger(record) = after_trigger(capture_destroy_change(record))
 
     def capture_destroy_change(record)
       [record.class.name, record.attributes, nil]
@@ -147,41 +144,8 @@ module ActiveRecordRules
 
     private
 
-    def inline_activate(change)
+    def after_trigger(change)
       activate_rules(change).each { run_pending_executions(_1) }
-    end
-
-    def build_rule(definition)
-      Rule.new(
-        name: definition.name,
-        definition: definition.unparse
-      )
-    end
-
-    def raw_define_rule(definition)
-      rule = build_rule(definition)
-      rule.save!
-      rule.activate
-      rule.ignore_pending_executions
-      rule
-    end
-
-    def rules_equal?(left, right)
-      left.definition == right.definition
-    end
-
-    def raw_update_rule(rule, definition)
-      new_rule, = build_rule(definition)
-
-      return rule if rules_equal?(rule, new_rule)
-
-      raw_delete_rule(rule)
-      raw_define_rule(definition)
-    end
-
-    def raw_delete_rule(rule)
-      @loaded_rules.delete(rule.id)
-      rule.destroy!
     end
   end
 end

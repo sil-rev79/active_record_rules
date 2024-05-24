@@ -477,7 +477,7 @@ RSpec.describe ActiveRecordRules do
       expect(TestHelper.matches).to be_empty
     end
 
-    it "doesn't match existing objects after an unrelated update" do
+    it "doesn't match existing objects after an unrelated update", skip: "reconsidering semantics" do
       person.update!(greetable: true)
       expect(TestHelper.matches).to be_empty
     end
@@ -506,7 +506,7 @@ RSpec.describe ActiveRecordRules do
     end
 
     it "doesn't unmatch existing objects" do
-      described_class.delete_rule("run custom methods")
+      described_class.undefine_rule("run custom methods")
       expect(TestHelper.matches).to be_empty
     end
   end

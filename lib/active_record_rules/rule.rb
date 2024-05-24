@@ -1,10 +1,27 @@
 # frozen_string_literal: true
 
-module ActiveRecordRules
-  class Rule < ActiveRecord::Base
-    self.table_name = :arr__rules
+require "digest/md5"
 
-    has_many :rule_matches, dependent: :destroy
+module ActiveRecordRules
+  class Rule
+    attr_reader :id, :name, :definition
+
+    def initialize(definition:)
+      @name = definition.name
+      @definition = definition
+      # The id is the MD5 hash, truncated to a 32 bit integer, in
+      # network (big) endian byte order. These objects should be part
+      # of the source of a program, so we're not concerned with
+      # malicious collisions - a developer can resolve a collision
+      # by manually changing a rule definition.
+      @id, = Digest::MD5.digest([definition.name, definition.constraints.map(&:unparse)].join("\n")).unpack("l>")
+    end
+
+    def rule_matches = RuleMatch.where(id: id)
+
+    def ==(other)
+      super || definition.unparse == other.definition.unparse
+    end
 
     def run_pending_execution(match)
       raise "Cannot run execution meant for another rule!" unless match.rule_id == id
@@ -57,7 +74,7 @@ module ActiveRecordRules
     end
 
     def calculate_required_activations(klass, previous, current)
-      parsed_definition.affected_ids_sql(klass, previous, current)
+      definition.affected_ids_sql(klass, previous, current)
     end
 
     def activate(pending_activations = nil)
@@ -84,7 +101,7 @@ module ActiveRecordRules
                    coalesce(record.arguments, match.next_arguments)
                  end
             from (
-              #{parsed_definition.to_query_sql.split("\n").join("\n      ")}
+              #{definition.to_query_sql.split("\n").join("\n      ")}
                where (#{format_plain_sql_conditions(pending_activations)})
             ) as record
             full outer join (
@@ -139,17 +156,13 @@ module ActiveRecordRules
       end.join(" or ")
     end
 
-    def parsed_definition
-      @parsed_definition ||= ActiveRecordRules::Parse.definition(definition)
-    end
-
     def logger
       ActiveRecordRules.logger
     end
 
     def argument_binding_parts(args_name)
       @argument_binding_parts ||=
-        parsed_definition.bound_names.map { "#{_1} = #{args_name}[\"#{_1}\"]" }
+        definition.bound_names.map { "#{_1} = #{args_name}[\"#{_1}\"]" }
     end
 
     def on_match_proc
@@ -160,7 +173,7 @@ module ActiveRecordRules
         # }
         ->(__arguments) {
           #{argument_binding_parts("__arguments").join("\n  ")}
-          #{parsed_definition.on_match}
+          #{definition.on_match}
         }
       RUBY
     end
@@ -173,13 +186,13 @@ module ActiveRecordRules
         # }
         ->(__arguments) {
           #{argument_binding_parts("__arguments").join("\n  ")}
-          #{parsed_definition.on_unmatch}
+          #{definition.on_unmatch}
         }
       RUBY
     end
 
     def on_update_proc
-      return unless parsed_definition.on_update
+      return unless definition.on_update
 
       @on_update_proc ||= Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
         # ->(__arguments) {
@@ -188,7 +201,7 @@ module ActiveRecordRules
         # }
         ->(__arguments) {
           #{argument_binding_parts("__arguments").join("\n  ")}
-          #{parsed_definition.on_update}
+          #{definition.on_update}
         }
       RUBY
     end
