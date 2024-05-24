@@ -1,7 +1,7 @@
 # -*- ruby -*-
 class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_version %>
   def change
-    create_table :arr__rule_matches do |t|
+    create_table :arr__rule_matches, id: :bigint do |t|
       t.integer :rule_id, null: false, limit: 4
       t.integer :awaiting_execution, null: false
       t.<%= json_type %> :ids
