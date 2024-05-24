@@ -89,13 +89,13 @@ module ActiveRecordRules
     def after_create_trigger(record) = inline_activate(capture_create_change(record))
 
     def capture_create_change(record)
-      [record.class, nil, record.attributes]
+      [record.class.name, nil, record.attributes]
     end
 
     def after_update_trigger(record) = inline_activate(capture_update_change(record))
 
     def capture_update_change(record)
-      [record.class,
+      [record.class.name,
        record.attributes.merge(record.previous_changes.transform_values(&:first)),
        record.attributes]
     end
@@ -103,11 +103,12 @@ module ActiveRecordRules
     def after_destroy_trigger(record) = inline_activate(capture_destroy_change(record))
 
     def capture_destroy_change(record)
-      [record.class, record.attributes, nil]
+      [record.class.name, record.attributes, nil]
     end
 
     def activate_rules(change)
-      klass, previous, current = change
+      class_name, previous, current = change
+      klass = Object.const_get(class_name)
       @loaded_rules.flat_map do |_, rule|
         pending = rule.calculate_required_activations(klass, previous, current)
         if pending.any?
