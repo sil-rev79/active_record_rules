@@ -39,6 +39,8 @@ module ActiveRecordRules
     end
 
     def load_rules(*filenames)
+      @loaded_rules ||= {}
+
       # Flatten any arrays in the arguments
       filenames = filenames.flat_map { _1.is_a?(Array) ? _1 : [_1] }
 
@@ -62,8 +64,9 @@ module ActiveRecordRules
         if (rule = Rule.find_by(name: name))
           raw_update_rule(rule, definition)
         else
-          raw_define_rule(definition)
+          rule = raw_define_rule(definition)
         end
+        @loaded_rules[name] = rule
       end
       Rule.where.not(name: definitions.keys).each do |rule|
         raw_delete_rule(rule)
@@ -153,7 +156,6 @@ module ActiveRecordRules
       rule.save!
       rule.activate
       rule.ignore_pending_executions
-      (@loaded_rules ||= {})[rule.id] = rule
       rule
     end
 
