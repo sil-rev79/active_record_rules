@@ -50,6 +50,11 @@ module ActiveRecordRules
         end
       end
 
+      def record_relevant_attributes(tracker)
+        subtracker = tracker.for_class(@class)
+        @clauses.each { _1.record_relevant_attributes(subtracker) }
+      end
+
       def ids_needing_activation(index, _id_bindings, klass, previous, current)
         return unless relevant_change?(klass, previous, current)
 

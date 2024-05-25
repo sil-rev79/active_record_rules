@@ -39,6 +39,10 @@ module ActiveRecordRules
         @constraints.any? { _1.relevant_change?(klass, previous, current) }
       end
 
+      def record_relevant_attributes(tracker)
+        @constraints.each { _1.record_relevant_attributes(tracker) }
+      end
+
       # Return the names of variables that are bound to this record's id
       def id_bindings = Set.new
       def bound_names = Set.new

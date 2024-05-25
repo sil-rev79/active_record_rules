@@ -20,6 +20,11 @@ module ActiveRecordRules
         ->(bindings) { "(#{left.call(bindings)} #{@operator} #{right.call(bindings)})" }
       end
 
+      def record_relevant_attributes(tracker)
+        @lhs.record_relevant_attributes(tracker)
+        @rhs.record_relevant_attributes(tracker)
+      end
+
       def unparse = "#{@lhs.unparse} #{@operator} #{@rhs.unparse}"
     end
   end

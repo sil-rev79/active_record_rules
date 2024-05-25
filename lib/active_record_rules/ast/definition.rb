@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "active_record_rules/ast/node"
+require "active_record_rules/attribute_tracker"
 require "active_record_rules/query_definer"
 
 module ActiveRecordRules
@@ -20,6 +21,14 @@ module ActiveRecordRules
       def to_query_sql
         populate_query_parts!
         @query_sql
+      end
+
+      def relevant_attributes_by_class
+        @relevant_attributes_by_class ||= begin
+          tracker = AttributeTracker.new
+          @constraints.each { _1.record_relevant_attributes(tracker) }
+          tracker.attributes_by_class
+        end
       end
 
       def affected_ids_sql(klass, previous, current)

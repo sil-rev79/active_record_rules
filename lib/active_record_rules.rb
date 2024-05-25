@@ -4,7 +4,6 @@ require "active_record"
 require "active_record_rules/parse"
 require "active_record_rules/rule"
 require "active_record_rules/rule_match"
-require "active_record_rules/railtie" if defined?(Rails)
 
 # A production rule system for ActiveRecord objects.
 #
@@ -96,24 +95,39 @@ module ActiveRecordRules
     def after_create_trigger(record) = after_trigger(capture_create_change(record))
 
     def capture_create_change(record)
-      [record.class.name, nil, record.attributes]
+      attrs = relevant_attributes(record.class)
+      return nil if attrs.empty?
+
+      [record.class.name,
+       nil,
+       record.attributes.slice("id", *attrs)]
     end
 
     def after_update_trigger(record) = after_trigger(capture_update_change(record))
 
     def capture_update_change(record)
+      attrs = relevant_attributes(record.class)
+      return nil if attrs.empty?
+
       [record.class.name,
-       record.attributes.merge(record.previous_changes.transform_values(&:first)),
-       record.attributes]
+       record.attributes.merge(record.previous_changes.transform_values(&:first)).slice("id", *attrs),
+       record.attributes.slice("id", *attrs)]
     end
 
     def after_destroy_trigger(record) = after_trigger(capture_destroy_change(record))
 
     def capture_destroy_change(record)
-      [record.class.name, record.attributes, nil]
+      attrs = relevant_attributes(record.class)
+      return nil if attrs.empty?
+
+      [record.class.name,
+       record.attributes.slice("id", *attrs),
+       nil]
     end
 
     def activate_rules(change)
+      return [] if change.nil?
+
       class_name, previous, current = change
       klass = Object.const_get(class_name)
       @loaded_rules.flat_map do |_, rule|
@@ -151,6 +165,12 @@ module ActiveRecordRules
     end
 
     private
+
+    def relevant_attributes(klass)
+      @loaded_rules.map do |_, rule|
+        rule.relevant_attributes_by_class[klass] || Set.new
+      end.reduce(Set.new, &:+)
+    end
 
     def after_trigger(change)
       activate_rules(change).each { run_pending_executions(_1) }

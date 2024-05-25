@@ -56,6 +56,11 @@ module ActiveRecordRules
           @rhs.relevant_change?(klass, previous, current)
       end
 
+      def record_relevant_attributes(tracker)
+        @lhs.record_relevant_attributes(tracker)
+        @rhs.record_relevant_attributes(tracker)
+      end
+
       # Return the names of variables that are bound to this record's id
       def id_bindings = Set.new
 

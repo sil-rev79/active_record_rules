@@ -41,6 +41,10 @@ module ActiveRecordRules
         @constraints.any? { _1.relevant_change?(klass, previous, current) }
       end
 
+      def record_relevant_attributes(tracker)
+        @constraints.each { _1.record_relevant_attributes(tracker) }
+      end
+
       def bound_names = Set.new
       def deconstruct = [constraints]
     end

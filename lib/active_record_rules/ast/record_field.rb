@@ -25,6 +25,10 @@ module ActiveRecordRules
         previous[@name] != current[@name]
       end
 
+      def record_relevant_attributes(tracker)
+        tracker.add(@name)
+      end
+
       def deconstruct = [@name]
 
       def unparse = @name

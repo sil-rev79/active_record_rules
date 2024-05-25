@@ -77,6 +77,10 @@ module ActiveRecordRules
       definition.affected_ids_sql(klass, previous, current)
     end
 
+    def relevant_attributes_by_class
+      definition.relevant_attributes_by_class
+    end
+
     def activate(pending_activations = nil)
       ActiveRecord::Base.connection.execute(<<~SQL.squish!).map { _1["id"] }
         insert into arr__rule_matches(rule_id, ids, awaiting_execution, live_arguments, next_arguments)
