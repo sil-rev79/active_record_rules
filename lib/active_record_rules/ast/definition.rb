@@ -26,6 +26,11 @@ module ActiveRecordRules
         return Set.new if previous.nil? && current.nil?
         return Set.new if previous == current
 
+        relevant = previous.nil? ||
+                   current.nil? ||
+                   @constraints.any? { _1.relevant_change?(klass, previous, current) }
+        return Set.new unless relevant
+
         pending_activations = Set.new
 
         populate_table_edges!
