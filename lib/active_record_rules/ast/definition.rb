@@ -32,6 +32,8 @@ module ActiveRecordRules
 
         @start_tables[klass].each do |table|
           if @target_tables.include?(table)
+            # No need to find a path if the record we're changing is
+            # one of our ground ids. Nice and easy.
             [previous, current].each do |attributes|
               next unless attributes
 
@@ -39,6 +41,16 @@ module ActiveRecordRules
               pending_activations << Rule::PendingActivation.new([table], "select #{id_cast(value)} as #{table}")
             end
           else
+            # If we're not immediately in the right place, then we
+            # need to find a path to where we're going. We do a
+            # breadth first search until we have either (a) found a
+            # path to *all* target tables, or (b) run out of paths to
+            # explore.
+            #
+            # Once we have that, we construct a SQL query based on the
+            # paths we've found. If we find no paths, then we have to
+            # invalidate *all* matches.
+            target_tables = Set.new(@target_tables)
             candidates = []
             done = Set.new([table])
             @edges[table].each do |field, local_edges|
@@ -47,13 +59,14 @@ module ActiveRecordRules
               end
             end
 
-            final_path = nil
+            paths = []
             while (item, path = candidates.shift)
               next unless done.add?(item.table)
 
-              if @target_tables.include?(item.table)
-                final_path = path
-                break
+              if target_tables.include?(item.table)
+                paths << path
+                target_tables.delete(item.table)
+                break if target_tables.empty?
               end
 
               @edges[item.table].each do |field, local_edges|
@@ -66,59 +79,79 @@ module ActiveRecordRules
             # If we do a search and we fail to find a path, then we just
             # have to invalidate everything. Note that this *returns*
             # which breaks out of this entire loop.
-            return Set.new([:all]) if final_path.nil? || final_path.empty?
+            #
+            # This is relatively expensive, so hopefully it doesn't
+            # happen often!
+            return Set.new([:all]) if paths.empty?
 
-            first, = final_path.first
-            last, dead_last = final_path.last
+            selections = {}
+            tables = Hash.new { _1[_2] = [] }
+            wheres = []
 
-            if first == last && first.field == "id"
-              # A single-segment path connecting to "id" doesn't
-              # really need to hit a table at all, we can just return
-              # the values we already know about.
-              unless previous.nil?
-                value = ActiveRecord::Base.connection.quote(previous[dead_last.field])
-                pending_activations << Rule::PendingActivation.new(
-                  [@external_table_names[first.table]],
-                  "select #{value} as #{first.table}"
-                )
-              end
-              unless current.nil?
-                value = ActiveRecord::Base.connection.quote(current[dead_last.field])
-                pending_activations << Rule::PendingActivation.new(
-                  [@external_table_names[first.table]],
-                  "select #{value} as #{first.table}"
-                )
-              end
-            else
-              # A path with more than one segment needs some query, though.
-              query_base = [
-                "select #{first.table}.id as #{first.table}",
-                "  from #{@internal_table_names[first.table]} as #{first.table}",
-                *final_path[...-1].flat_map do |from, to|
-                  [" inner join #{@internal_table_names[to.table]} as #{to.table}",
-                   "         on #{from.table}.#{from.field} = #{to.table}.#{to.field}"]
+            paths.each do |full_path|
+              first, = full_path.first
+              last, dead_last = full_path.last
+
+              if first == last && first.field == "id"
+                # A single-segment path connecting to "id" doesn't
+                # really need to hit a table at all, we can just return
+                # the values we already know about.
+                selections[first.table] = lambda { |attributes|
+                  ActiveRecord::Base.connection.quote(
+                    attributes[dead_last.field]
+                  )
+                }
+              else
+                selections[first.table] = ->(_) { "#{first.table}.id" }
+
+                tables[first.table] ||= []
+                full_path[...-1].each do |from, to|
+                  tables[to.table] << "#{from.table}.#{from.field} = #{to.table}.#{to.field}"
                 end
-              ].join("\n")
 
-              unless previous.nil?
-                op = (previous[dead_last.field].nil? ? "is" : "=")
-                value = ActiveRecord::Base.connection.quote(previous[dead_last.field])
-                pending_activations << Rule::PendingActivation.new(
-                  [@external_table_names[first.table]],
-                  query_base +
-                  "\n where #{last.table}.#{last.field} #{op} #{value}"
-                )
+                wheres << lambda { |attributes|
+                  op = (attributes[dead_last.field].nil? ? "is" : "=")
+                  value = ActiveRecord::Base.connection.quote(attributes[dead_last.field])
+                  "#{last.table}.#{last.field} #{op} #{value}"
+                }
+              end
+            end
+
+            [previous, current].each do |attributes|
+              next if attributes.nil?
+
+              selections_sql = selections.map do |name, maker|
+                "#{maker.call(attributes)} as #{name}"
+              end.uniq.join(",\n       ")
+
+              tables_sql = tables.sort_by { _2.length }.map do |name, ons|
+                if ons.empty?
+                  " cross join #{@internal_table_names[name]} as #{name}"
+                else
+                  [
+                    " inner join #{@internal_table_names[name]} as #{name}",
+                    "         on #{ons.uniq.join("\n     and ")}"
+                  ].join("\n")
+                end
+              end.uniq.join("\n")
+              unless tables_sql.empty? || tables_sql.start_with?(" cross join ")
+                raise "Invalid query generated: do all of the joins have 'on' conditions somehow?"
               end
 
-              unless current.nil?
-                op = (current[dead_last.field].nil? ? "is" : "=")
-                value = ActiveRecord::Base.connection.quote(current[dead_last.field])
-                pending_activations << Rule::PendingActivation.new(
-                  [@external_table_names[first.table]],
-                  query_base +
-                  "\n where #{last.table}.#{last.field} #{op} #{value}"
-                )
-              end
+              tables_sql = tables_sql[(" cross join ".size)..]
+
+              wheres_sql = wheres.map do |maker|
+                maker.call(attributes)
+              end.uniq.join("\n   and ")
+
+              pending_activations << Rule::PendingActivation.new(
+                selections.keys.map { @external_table_names[_1] },
+                [
+                  "select #{selections_sql}",
+                  ("  from #{tables_sql}" unless tables.empty?),
+                  (" where #{wheres_sql}" unless wheres.empty?)
+                ].compact.join("\n")
+              )
             end
           end
         end

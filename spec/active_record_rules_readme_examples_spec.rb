@@ -121,6 +121,12 @@ RSpec.describe ActiveRecordRules do
       before { OrderItem.create!(order_id: order.id, item_id: item.id, quantity: 2, value: 51) }
 
       it { is_expected.not_to be_zero }
+
+      describe "transferring the order to non-VIP user" do
+        before { order.update!(user_id: User.create!) }
+
+        it { is_expected.to be_zero }
+      end
     end
 
     context "with two items together worth 100" do
@@ -151,6 +157,12 @@ RSpec.describe ActiveRecordRules do
       end
 
       it { is_expected.to be_zero }
+
+      describe "the item coming off sale" do
+        before { item2.update!(sale_discount: 0) }
+
+        it { is_expected.not_to be_zero }
+      end
     end
   end
 end
