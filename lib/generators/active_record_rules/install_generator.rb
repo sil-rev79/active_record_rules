@@ -7,6 +7,7 @@ require "rails/generators/migration"
 module ActiveRecordRules
   class InstallGenerator < ActiveRecord::Generators::Base # :nodoc:
     desc "Generates a migration for ActiveRecordRules models."
+    argument :name, type: :string, default: "" # We don't use/need the name
 
     source_root __dir__
 
@@ -18,26 +19,15 @@ module ActiveRecordRules
       migration_template "create_tables.rb.erb", "db/migrate/create_active_record_rules_tables.rb"
     end
 
-    def dialect = name
-
-    def postgres? = name == "postgres"
+    def postgres? = ActiveRecordRules.dialect == :postgres
 
     def json_type
-      case name
-      in "postgres"
+      case ActiveRecordRules.dialect
+      in :postgres
         "jsonb"
-      in "sqlite"
+      in :sqlite
         "json"
-      else
-        raise "Unsupported dialect: #{name}. Only postgres and sqlite are supported."
       end
-    end
-
-    def primary_key_type
-      config = Rails.configuration.generators
-      config.options[config.orm][:primary_key_type] || :primary_key
-    rescue StandardError
-      :integer
     end
 
     def migration_version

@@ -65,21 +65,14 @@ RSpec.configure do |config|
   end
 
   connection_string = ENV.fetch("ARR_DATABASE", "sqlite3::memory:")
-  ActiveRecordRules.dialect = if connection_string.start_with?("postgres")
-                                :postgres
-                              elsif connection_string.start_with?("sqlite")
-                                :sqlite
-                              else
-                                raise "We only support Postgres and SQLite for now. Sorry!"
-                              end
 
-  config.filter_run_excluding(restrict_database: :postgres) if ActiveRecordRules.dialect != :postgres
+  config.filter_run_excluding(restrict_database: :postgres) unless connection_string.start_with?("postgres")
 
   config.around do |example|
     # Reset the in-memory loaded rules before each run.
     ActiveRecordRules.unload_all_rules!
 
-    if ActiveRecordRules.dialect == :postgres
+    if connection_string.start_with?("postgres")
       # Connect to the "postgres" database and drop+create the
       # database we want to use
       db_name = connection_string.match(%r{/([^/]*)(\?|$)})[1]
@@ -93,7 +86,7 @@ RSpec.configure do |config|
     Dir.mktmpdir do |dir|
       Rails::Generators.invoke(
         "active_record_rules:install",
-        [ActiveRecordRules.dialect.to_s, "--quiet"],
+        ["--quiet"],
         destination_root: dir
       )
 

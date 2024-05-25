@@ -9,7 +9,7 @@ A [production system][] within ActiveRecord to execute code when matching rule c
 Include `active_record_rules` in your `Gemfile`, then run the following code to generate migrations and initialisation code for `ActiveRecordRules`.
 
 ```shell
-rails generate active_record_rules:install postgres # or sqlite
+rails generate active_record_rules:install
 rails db:migrate
 ```
 
@@ -80,7 +80,7 @@ change = ActiveRecordRules.capture_destroy_change(self)
 ids = ActiveRecordRules.activate_rules(change)
 
 # Process a number of pending executions
-ActiveRecordRules.run_pending_execution(*ids)
+ActiveRecordRules.run_pending_executions(*ids)
 ```
 
 The helper methods used above, `ActiveRecordRules.after_{create,update,destroy}_trigger` run these methods in sequence to provide a simple way to get things working. In a production system, though, you might prefer to process rules in a separate thread/process. For example, using `ActiveJob` you might have:

@@ -21,26 +21,33 @@ require "active_record_rules/railtie" if defined?(Rails)
 #       User.find(author_id).decrement!(:post_count)
 #   RULE
 module ActiveRecordRules
-  cattr_accessor :logger, :execution_context
-  # We default to the SQLite dialect, but we also support :postgres
-  cattr_accessor :dialect, default: :sqlite
-  cattr_accessor :id_type, default: "integer"
-  cattr_reader :automatic_load_paths
+  cattr_accessor :execution_context
 
   class << self
-    def config = (yield self)
+    attr_accessor :execution_context
+    attr_writer :logger, :dialect
 
-    def load_after_migration(*path_patterns)
-      @automatic_load_paths = path_patterns
+    def logger = @logger || ActiveRecord::Base.logger
+
+    def dialect
+      return @dialect if @dialect
+
+      name = ActiveRecord::Base.connection.adapter_name
+      case name
+      in "SQLite"
+        :sqlite
+      in "PostgreSQL" | "PostGIS"
+        :postgres
+      else
+        "Unknown database adapter: #{name} (only SQLite and PostgreSQL are supported)."
+      end
     end
 
     def load_rules(*filenames)
       @loaded_rules ||= {}
 
-      # Flatten any arrays in the arguments
-      filenames = filenames.flat_map { _1.is_a?(Array) ? _1 : [_1] }
-
-      definition_hashes = filenames.flat_map do |filename|
+      # Flatten any arrays in the arguments, just for convenience.
+      definition_hashes = filenames.flatten.flat_map do |filename|
         File.open(filename) do |file|
           Parse.definitions(file.read).map do |definition|
             { definition.name => [definition, filename] }
@@ -134,6 +141,7 @@ module ActiveRecordRules
         rule.run_pending_execution(match)
       end
     end
+    alias run_pending_execution run_pending_executions
 
     def activate_all
       # This might generate a *lot* of ids to process!
