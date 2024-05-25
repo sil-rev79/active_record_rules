@@ -20,6 +20,11 @@ module ActiveRecordRules
         ->(bindings) { "(#{left.call(bindings)} #{@operator} #{right.call(bindings)})" }
       end
 
+      def relevant_change?(klass, previous, current)
+        @lhs.relevant_change?(klass, previous, current) ||
+          @rhs.relevant_change?(klass, previous, current)
+      end
+
       def record_relevant_attributes(tracker)
         @lhs.record_relevant_attributes(tracker)
         @rhs.record_relevant_attributes(tracker)
