@@ -6,7 +6,7 @@ require "active_record_rules/query_definer"
 
 module ActiveRecordRules
   module Ast
-    class Negation < ExpressionNode
+    class Negation < Node
       attr_reader :constraints
 
       def initialize(constraints)
@@ -43,8 +43,6 @@ module ActiveRecordRules
         @constraints.each { _1.record_relevant_attributes(tracker) }
       end
 
-      # Return the names of variables that are bound to this record's id
-      def id_bindings = Set.new
       def bound_names = Set.new
       def unparse = "not { #{@constraints.map(&:unparse).join("; ")} }"
       def deconstruct = [constraints]

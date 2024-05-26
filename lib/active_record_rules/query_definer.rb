@@ -13,9 +13,9 @@ module ActiveRecordRules
       @conditions = []
     end
 
-    def define_table(name, make_conditions = nil, &make_definition)
+    def define_table(name)
       table_name = "#{name}_#{next_index}"
-      @tables[table_name] = [make_definition, make_conditions]
+      @tables[table_name] = name
       TableDefiner.new(self, table_name)
     end
 
@@ -62,13 +62,8 @@ module ActiveRecordRules
       bindings = names.map { "#{resolved_bindings[_1].split("\n").join("\n        ")} as #{_1}" }.join(",\n       ")
 
       left_joins = []
-      tables = @tables.map do |name, (definition, on_condition)|
-        if on_condition
-          left_joins << [name, definition, on_condition]
-          nil
-        else
-          "#{definition.call(resolved_bindings).split("\n").join("\n        ")} as #{name}"
-        end
+      tables = @tables.map do |name, real_name|
+        "#{real_name} as #{name}"
       end.compact.join("\n cross join ")
       tables += left_joins.map do |name, definition, on_condition|
         on = on_condition.call(name, resolved_bindings)

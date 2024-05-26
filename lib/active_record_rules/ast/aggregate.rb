@@ -45,7 +45,6 @@ module ActiveRecordRules
         @constraints.each { _1.record_relevant_attributes(tracker) }
       end
 
-      def bound_names = Set.new
       def deconstruct = [constraints]
     end
   end

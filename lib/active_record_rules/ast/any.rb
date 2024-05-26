@@ -6,7 +6,7 @@ require "active_record_rules/query_definer"
 
 module ActiveRecordRules
   module Ast
-    class Any < ExpressionNode
+    class Any < Node
       attr_reader :constraints
 
       def initialize(constraints)
@@ -32,8 +32,6 @@ module ActiveRecordRules
         @constraints.any? { _1.relevant_change?(klass, previous, current) }
       end
 
-      # Return the names of variables that are bound to this record's id
-      def id_bindings = Set.new
       def bound_names = Set.new
       def unparse = "any { #{@constraints.map(&:unparse).join("; ")} }"
       def deconstruct = [constraints]

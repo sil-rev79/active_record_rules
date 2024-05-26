@@ -17,14 +17,8 @@ module ActiveRecordRules
         raise "Record matches must be on subclasses of ActiveRecord::Base, not #{@class_name}"
       end
 
-      def table_name
-        @table_name ||= @class.table_name
-      end
-
       def to_query(definer)
-        table_definer = definer.define_table(table_name) do |_bindings|
-          table_name
-        end
+        table_definer = definer.define_table(@class.table_name)
 
         definer.add_binding("__id_#{table_definer.table_name}") do
           "#{table_definer.table_name}.id"
@@ -53,28 +47,6 @@ module ActiveRecordRules
       def record_relevant_attributes(tracker)
         subtracker = tracker.for_class(@class)
         @clauses.each { _1.record_relevant_attributes(subtracker) }
-      end
-
-      def ids_needing_activation(index, _id_bindings, klass, previous, current)
-        return unless relevant_change?(klass, previous, current)
-
-        index
-      end
-
-      # Return the names of variables that are bound to this record's id
-      def id_bindings
-        bindings = Set.new
-        @clauses.each do |clause|
-          case clause
-          in Comparison(Variable(name), "=", RecordField("id"))
-            bindings << name
-          in Comparison(RecordField("id"), "=", Variable(name)) # rubocop:disable Lint/DuplicateBranch
-            bindings << name
-          else
-            nil
-          end
-        end
-        bindings
       end
 
       def deconstruct = [@class, @clauses]
