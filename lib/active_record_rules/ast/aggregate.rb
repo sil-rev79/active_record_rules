@@ -30,7 +30,7 @@ module ActiveRecordRules
           grouping = (bindings.keys & query_definer.bindings.keys).map do |name|
             # This is a bit of a cludge to get a value that's valid in
             # the subquery, rather than in the parent query.
-            "#{bindings[name]} = #{query_definer.bindings[name].first.call(bindings)}"
+            "#{bindings[name]} is not distinct from #{query_definer.bindings[name].first.call(bindings)}"
           end
           sql = query_definer.to_sql(bindings, ["__value"]) # Then we only emit __value here
           final_result("(#{sql}\n and #{grouping.join(" and ")})")

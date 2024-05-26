@@ -120,13 +120,12 @@ module ActiveRecordRules
 
                 tables[first.table] ||= []
                 full_path[...-1].each do |from, to|
-                  tables[to.table] << "#{from.table}.#{from.field} = #{to.table}.#{to.field}"
+                  tables[to.table] << "#{from.table}.#{from.field} is not distinct from #{to.table}.#{to.field}"
                 end
 
                 wheres << lambda { |attributes|
-                  op = (attributes[dead_last.field].nil? ? "is" : "=")
                   value = ActiveRecord::Base.connection.quote(attributes[dead_last.field])
-                  "#{last.table}.#{last.field} #{op} #{value}"
+                  "#{last.table}.#{last.field} is not distinct from #{value}"
                 }
               end
             end

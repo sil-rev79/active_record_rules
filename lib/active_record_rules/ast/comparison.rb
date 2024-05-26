@@ -24,18 +24,18 @@ module ActiveRecordRules
           return if @lhs.is_a?(Variable) || @rhs.is_a?(Variable)
         end
 
+        comparison = case @comparison
+                     in "="
+                       "is not distinct from"
+                     in "!="
+                       "is distinct from"
+                     else
+                       @comparison
+                     end
+
         lambda do |bindings|
           left_str = left.call(bindings)
           right_str = right.call(bindings)
-          comparison =
-            case [left_str, @comparison, right_str]
-            in ["NULL", "=", _] | [_, "=", "NULL"]
-              "is"
-            in ["NULL", "!=", _] | [_, "!=", "NULL"]
-              "is not"
-            else
-              @comparison
-            end
           "(#{left_str} #{comparison} #{right_str})"
         end
       end
