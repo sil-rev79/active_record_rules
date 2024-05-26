@@ -106,6 +106,45 @@ class RunPendingExecutions < ApplicationJob
 end
 ```
 
+## Rule State
+
+The current state of matches is stored in `RuleMatch` records. As the rules themselves do not have a database presence (existing only in code), `RuleMatch` records are connected to rules by a truncated MD5 hash of the rule name. This has several important consequences for the management of rule state:
+
+ 1. **Changing the name of a rule invalidates all existing matches.** Or, put another way, renaming a rule is equivalent to deleting the rule with the old name, and adding a new rule with the new name.
+
+ 2. **Rules will only (re)match on records as they are changed, not all existing records.** This is because there is no way for ActiveRecordRules to tell the difference between the first load of a rule, or other subsequent loads. If you want to match all existing records you will have to run something like
+
+    ```
+    ids = ActiveRecordRules.find_rule(rule_name).activate
+    ActiveRecordRules.run_pending_executions(*ids)
+    ```
+
+ 3. **Updates to rule logic/code may leave inconsistencies in `update`/`unmatch` clauses.** Due to the way ActiveRecordRules persists the last-matched values for `update` and `unmatch` clauses, the variables provided to these clauses may not match those expected by the rule. Any names not present in the last-matched values will be provided as `nil`, and any binding names removed from the matching logic will not be accessible.
+
+    ```
+    # Initial definition
+    rule Example
+      Record(<id>, <name>)
+    on match
+      pp [id, name] # available names
+    on unmatch
+      # both id and name are available, and will be the value from the matched record
+      pp [id, name]
+
+    # redefined to
+    rule Example
+      Record(<id>, <nickname>)
+    on match
+      # nickname may be nil for records which activated with the old definition,
+      #   but haven't been executed yet
+      # name is not exposed, and cannot be used
+      pp [id, nickname]
+    on unmatch
+      # nickname may be nil, for old matches which have "name" instead
+      # name is not exposed, and cannot be used
+      pp [id, nickname]
+    ```
+
 ## Development
 
 This project uses Guix as its main dependency management system. A development environment can be created by running:

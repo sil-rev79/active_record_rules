@@ -88,6 +88,10 @@ module ActiveRecordRules
       rule
     end
 
+    def find_rule(name)
+      @loaded_rules[Rule.name_to_id(name)]
+    end
+
     def undefine_rule(name)
       @loaded_rules.delete_if { _2.name == name }
     end

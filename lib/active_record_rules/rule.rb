@@ -9,12 +9,16 @@ module ActiveRecordRules
     def initialize(definition:)
       @name = definition.name
       @definition = definition
-      # The id is the MD5 hash of the definition's name, truncated to
-      # a 32 bit integer, in network (big) endian byte order. These
-      # objects should be part of the source of a program, so we're
-      # not concerned with malicious collisions - a developer can
-      # resolve a collision by manually changing a rule definition.
-      @id, = Digest::MD5.digest(definition.name).unpack("l>")
+      @id, = Rule.name_to_id(definition.name)
+    end
+
+    # The id is the MD5 hash of the definition's name, truncated to a
+    # 32 bit integer, in network (big) endian byte order. These
+    # objects should be part of the source of a program, so we're not
+    # concerned with malicious collisions - a developer can resolve a
+    # collision by manually changing a rule definition.
+    def self.name_to_id(name)
+      Digest::MD5.digest(name).unpack1("l>")
     end
 
     def rule_matches = RuleMatch.where(id: id)
