@@ -109,9 +109,13 @@ module ActiveRecordRules
       attrs = relevant_attributes(record.class)
       return nil if attrs.empty?
 
-      [record.class.name,
-       record.attributes.merge(record.previous_changes.transform_values(&:first)).slice("id", *attrs),
-       record.attributes.slice("id", *attrs)]
+      # Get before+after for relevant attributes, then bail out if
+      # there's no change in them.
+      after = record.attributes.slice("id", *attrs)
+      before = after.merge(record.previous_changes.slice("id", *attrs).transform_values(&:first))
+      return nil if before == after
+
+      [record.class.name, before, after]
     end
 
     def after_destroy_trigger(record) = after_trigger(capture_destroy_change(record))
