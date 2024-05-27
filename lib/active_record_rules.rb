@@ -151,14 +151,12 @@ module ActiveRecordRules
     #
     # @return A change record suitable to activate rules, or nil if no activation is necessary
     def capture_update_change(record)
-      attrs = relevant_attributes(record.class)
-      return nil if attrs.empty?
+      attrs = ["id", *relevant_attributes(record.class)]
+      return nil unless attrs.any? { record.previous_changes.key?(_1) }
 
-      # Get before+after for relevant attributes, then bail out if
-      # there's no change in them.
-      after = record.attributes.slice("id", *attrs)
-      before = after.merge(record.previous_changes.slice("id", *attrs).transform_values(&:first))
-      return nil if before == after
+      # Get before+after for relevant attributes
+      after = record.attributes.slice(*attrs)
+      before = after.merge(record.previous_changes.slice(*attrs).transform_values(&:first))
 
       [record.class.name, before, after]
     end
