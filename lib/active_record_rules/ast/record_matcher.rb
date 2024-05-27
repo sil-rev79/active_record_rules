@@ -18,7 +18,7 @@ module ActiveRecordRules
       end
 
       def to_query(definer)
-        table_definer = definer.define_table(@class.table_name)
+        table_definer = definer.define_table(@class)
 
         definer.add_binding("__id_#{table_definer.table_name}") do
           "#{table_definer.table_name}.id"

@@ -14,7 +14,7 @@ module ActiveRecordRules
       rule(boolean: simple(:value)) { Constant.new(value.to_s == "true") }
       rule(nil: simple(:value)) { Constant.new(nil) }
       rule(binding_name: simple(:value)) { Variable.new(value.to_s) }
-      rule(record_name: simple(:value)) { RecordField.new(value.to_s) }
+      rule(record_name: simple(:value)) { RecordField.new(value.line_and_column, *value.to_s.split(":")) }
 
       rule(aggregate_operation: simple(:name), constraints: sequence(:constraints)) do
         class_name = name.to_s.split("_").map(&:capitalize).join
@@ -33,10 +33,11 @@ module ActiveRecordRules
       end
 
       rule(simple_name_clause: simple(:name)) do
+        raw_name, flags = name.to_s.split(":")
         Comparison.new(
-          RecordField.new(name.to_s),
+          RecordField.new(name.line_and_column, raw_name, flags),
           "=",
-          Variable.new(name.to_s)
+          Variable.new(raw_name)
         )
       end
 

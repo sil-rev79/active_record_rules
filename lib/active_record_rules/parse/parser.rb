@@ -72,7 +72,7 @@ module ActiveRecordRules
           comparison.as(:comparison) >> whitespace.maybe >>
           expression.as(:rhs)
         ) | (
-          str("<") >> name.as(:simple_name_clause) >> str(">")
+          str("<") >> record_name.as(:simple_name_clause) >> str(">")
         )
       end
 
@@ -100,7 +100,7 @@ module ActiveRecordRules
             integer |
             nil_expr |
             # Simple names: database fields
-            name.as(:record_name)
+            record_name.as(:record_name)
           ),
           [whitespace.maybe >> match("[+-]").as(:op) >> whitespace.maybe, 1, :left],
           [whitespace.maybe >> match("[*/]").as(:op) >> whitespace.maybe, 2, :left]
@@ -186,6 +186,11 @@ module ActiveRecordRules
 
       rule(:name) do
         (match("[a-zA-Z_]") >> match("[a-zA-Z_0-9!?]").repeat)
+      end
+
+      rule(:record_name) do
+        (match("[a-zA-Z_]") >> match("[a-zA-Z_0-9!?]").repeat) >>
+          (str(":") >> match("[is]")).maybe # enum specification
       end
 
       rule(:class_name) do

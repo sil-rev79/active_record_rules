@@ -13,10 +13,10 @@ module ActiveRecordRules
       @conditions = []
     end
 
-    def define_table(name)
-      table_name = "#{name}_#{next_index}"
-      @tables[table_name] = name
-      TableDefiner.new(self, table_name)
+    def define_table(klass)
+      table_name = "#{klass.table_name}_#{next_index}"
+      @tables[table_name] = klass.table_name
+      TableDefiner.new(self, klass, table_name)
     end
 
     def add_binding(name, &make_definition)
@@ -96,12 +96,13 @@ module ActiveRecordRules
     end
 
     class TableDefiner
-      def initialize(query_definer, table_name)
+      def initialize(query_definer, table_class, table_name)
         @query_definer = query_definer
+        @table_class = table_class
         @table_name = table_name
       end
 
-      attr_reader :table_name
+      attr_reader :table_class, :table_name
 
       def method_missing(name, *args, **kwargs, &block) = @query_definer.public_send(name, *args, **kwargs, &block)
       def respond_to_missing?(name) = @query_definer.respond_to?(name)
