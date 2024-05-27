@@ -32,7 +32,6 @@ module ActiveRecordRules
         @constraints.any? { _1.relevant_change?(klass, previous, current) }
       end
 
-      def bound_names = Set.new
       def unparse = "any { #{@constraints.map(&:unparse).join("; ")} }"
       def deconstruct = [constraints]
     end

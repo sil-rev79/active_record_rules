@@ -39,11 +39,7 @@ module ActiveRecordRules
       end
 
       rule(:boolean_constraint) do
-        (
-          expression.as(:lhs) >> whitespace.maybe >>
-          comparison.as(:comparison) >> whitespace.maybe >>
-          expression.as(:rhs)
-        ) | (
+        boolean_expression | (
           (
             str("not") | str("any")
           ).as(:operation) >> whitespace.maybe >>
@@ -67,13 +63,22 @@ module ActiveRecordRules
       end
 
       rule(:boolean_clause) do
-        (
-          expression.as(:lhs) >> whitespace.maybe >>
-          comparison.as(:comparison) >> whitespace.maybe >>
-          expression.as(:rhs)
-        ) | (
+        boolean_expression | (
           str("<") >> record_name.as(:simple_name_clause) >> str(">")
         )
+      end
+
+      rule(:boolean_expression) do
+        infix_expression(
+          (str("(") >> boolean_expression >> str(")")) |
+          (
+            expression.as(:lhs) >> whitespace.maybe >>
+            comparison.as(:op) >> whitespace.maybe >>
+            expression.as(:rhs)
+          ),
+          [whitespace.maybe >> str("or").as(:op) >> whitespace.maybe, 1, :left],
+          [whitespace.maybe >> str("and").as(:op) >> whitespace.maybe, 2, :left]
+        ) { |l, o, r| { lhs: l, op: o[:op], rhs: r } }
       end
 
       rule(:comparison) do

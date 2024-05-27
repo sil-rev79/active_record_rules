@@ -15,9 +15,22 @@ module ActiveRecordRules
       end
 
       def to_query(definer)
+        operator = case @operator
+                   in "="
+                     "is not distinct from"
+                   in "!="
+                     "is distinct from"
+                   else
+                     @operator
+                   end
+
         left = @lhs.to_query(definer)
         right = @rhs.to_query(definer)
-        ->(bindings) { "(#{left.call(bindings)} #{@operator} #{right.call(bindings)})" }
+        lambda do |bindings|
+          left_str = left.call(bindings)
+          right_str = right.call(bindings)
+          "(#{left_str} #{operator} #{right_str})"
+        end
       end
 
       def relevant_change?(klass, previous, current)
@@ -31,6 +44,8 @@ module ActiveRecordRules
       end
 
       def unparse = "#{@lhs.unparse} #{@operator} #{@rhs.unparse}"
+
+      def deconstruct = [@lhs, @operator, @rhs]
     end
   end
 end

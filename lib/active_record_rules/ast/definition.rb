@@ -173,7 +173,31 @@ module ActiveRecordRules
       end
 
       def bound_names
-        @bound_names ||= constraints.map(&:bound_names).reduce(&:+)
+        constraints.map do |constraint|
+          case constraint
+          in RecordMatcher(_, clauses)
+            clauses.map do |clause|
+              case clause
+              in BinaryOperatorExpression(Variable(left), "=", Variable(right))
+                Set.new([left, right])
+              in BinaryOperatorExpression(Variable(left), "=", _)
+                Set.new([left])
+              in BinaryOperatorExpression(_, "=", Variable(right))
+                Set.new([right])
+              else
+                Set.new
+              end
+            end.reduce(&:+)
+          in BinaryOperatorExpression(Variable(left), "=", Variable(right))
+            Set.new([left, right])
+          in BinaryOperatorExpression(Variable(left), "=", _)
+            Set.new([left])
+          in BinaryOperatorExpression(_, "=", Variable(right))
+            Set.new([right])
+          else
+            Set.new
+          end
+        end.reduce(&:+)
       end
 
       def unparse
@@ -196,8 +220,18 @@ module ActiveRecordRules
 
         query_definer = QueryDefiner.new
         constraints.each do |constraint|
-          emitter = constraint.to_query(query_definer)
-          query_definer.add_condition(&emitter) if emitter
+          case constraint
+          in BinaryOperatorExpression(Variable(left), "=", Variable(right))
+            query_definer.add_binding(left) { _1[right] }
+            query_definer.add_binding(right) { _1[left] }
+          in BinaryOperatorExpression(Variable(left), "=", right)
+            query_definer.add_binding(left, &right.to_query(query_definer))
+          in BinaryOperatorExpression(left, "=", Variable(right))
+            query_definer.add_binding(right, &left.to_query(query_definer))
+          else
+            emitter = constraint.to_query(query_definer)
+            query_definer.add_condition(&emitter) if emitter
+          end
         end
 
         @table_names = query_definer.tables.keys.to_a
@@ -242,9 +276,9 @@ module ActiveRecordRules
 
             clauses.each do |clause|
               case clause
-              in Comparison(Variable(lhs), "=", RecordField(rhs))
+              in BinaryOperatorExpression(Variable(lhs), "=", RecordField(rhs))
                 table_bindings[lhs] << TableField.new(table_name, rhs)
-              in Comparison(RecordField(lhs), "=", Variable(rhs))
+              in BinaryOperatorExpression(RecordField(lhs), "=", Variable(rhs))
                 table_bindings[rhs] << TableField.new(table_name, lhs)
               else
                 # Recurse into the LHS and RHS to find other relevant tables.
@@ -252,7 +286,7 @@ module ActiveRecordRules
                 to_do << [rhs, false]
               end
             end
-          in Comparison(lhs, _, rhs)
+          in BinaryOperatorExpression(lhs, _, rhs)
             # Recurse into the LHS and RHS to find other relevant tables.
             to_do << [lhs, false]
             to_do << [rhs, false]

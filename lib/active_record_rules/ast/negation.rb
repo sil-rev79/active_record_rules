@@ -43,7 +43,6 @@ module ActiveRecordRules
         @constraints.each { _1.record_relevant_attributes(tracker) }
       end
 
-      def bound_names = Set.new
       def unparse = "not { #{@constraints.map(&:unparse).join("; ")} }"
       def deconstruct = [constraints]
     end

@@ -25,15 +25,21 @@ module ActiveRecordRules
         end
 
         @clauses.each do |clause|
-          emitter = clause.to_query(table_definer)
-          table_definer.add_condition(&emitter) if emitter
+          case clause
+          in BinaryOperatorExpression(Variable(left), "=", Variable(right))
+            definer.add_binding(left) { _1[right] }
+            definer.add_binding(right) { _1[left] }
+          in BinaryOperatorExpression(Variable(left), "=", right)
+            definer.add_binding(left, &right.to_query(table_definer))
+          in BinaryOperatorExpression(left, "=", Variable(right))
+            definer.add_binding(right, &left.to_query(table_definer))
+          else
+            emitter = clause.to_query(table_definer)
+            table_definer.add_condition(&emitter) if emitter
+          end
         end
 
         nil
-      end
-
-      def bound_names
-        @bound_names ||= @clauses.map(&:bound_names).reduce(&:+)
       end
 
       def relevant_change?(klass, previous, current)

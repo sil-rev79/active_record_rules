@@ -34,15 +34,11 @@ module ActiveRecordRules
 
       rule(simple_name_clause: simple(:name)) do
         raw_name, flags = name.to_s.split(":")
-        Comparison.new(
+        BinaryOperatorExpression.new(
           RecordField.new(name.line_and_column, raw_name, flags),
           "=",
           Variable.new(raw_name)
         )
-      end
-
-      rule(lhs: simple(:left), comparison: simple(:comparison), rhs: simple(:right)) do
-        Comparison.new(left, comparison.to_s, right)
       end
 
       rule(lhs: simple(:left), op: simple(:op), rhs: simple(:right)) do

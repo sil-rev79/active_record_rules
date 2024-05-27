@@ -575,4 +575,33 @@ RSpec.describe ActiveRecordRules do
       end
     end
   end
+
+  describe "boolean operators" do
+    before do
+      described_class.define_rule(<<~RULE)
+        rule find salutations with "hello" as their greeting
+          Salutation(<id> = id, greeting = "hello" or (greeting = "hi" and farewell = "bye"))
+        on match
+          TestHelper.matches.add(id)
+        on unmatch
+          TestHelper.matches.delete(id)
+      RULE
+      TestHelper.matches = Set.new
+    end
+
+    it "matches one branch of an or" do
+      Salutation.create!(greeting: "hello")
+      expect(TestHelper.matches).not_to be_empty
+    end
+
+    it "fails to match one branch of an and" do
+      Salutation.create!(greeting: "hi")
+      expect(TestHelper.matches).to be_empty
+    end
+
+    it "matches both branches of an and" do
+      Salutation.create!(greeting: "hi", farewell: "bye")
+      expect(TestHelper.matches).not_to be_empty
+    end
+  end
 end
