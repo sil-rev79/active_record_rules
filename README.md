@@ -5,13 +5,13 @@ A [production system][] within ActiveRecord to execute code when matching rule c
 Rules are a great way to simplify business logic, but too often their target audience has been non-developers. Instead, ActiveRecordRules sees itself as a tool for _developers_ to express the complex logic of their system. The matching logic for rules is written in a custom DSL, but the resulting behaviours are regular Ruby code:
 
 ```
-rule Unapproved users must be in "pending" state
+rule Unapproved customers must be in "pending" state
   # Custom matching DSL. '<id>' denotes a variable called `id`.
-  User(<id>, <status>)
-  not { UserApproval(user_id = <id>, status = "approved") }
+  Customer(<id>, status != "pending")
+  not { CustomerApproval(customer_id = <id>, status = "approved") }
 on match
   # Regular Ruby code
-  User.find(id).update!(status: 'pending') unless status == 'pending'
+  Customer.find(id).update!(status: 'pending')
 ```
 
 [production system]: https://en.wikipedia.org/wiki/Production_system_(computer_science)
@@ -44,9 +44,9 @@ At the moment only Postgres and SQLite are supported. Contributions are welcome 
 With the default Rails configuration you can define rules in any file with the `.rules` extension. These rules will be loaded when your Rails application starts. The rules use a custom DSL that looks like this:
 
 ```
-rule Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP users
-  Order(id = <order_id>, <user_id>, status = "pending")
-  User(id = <user_id>, vip_user = 1)
+rule Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers
+  Order(id = <order_id>, <customer_id>, status = "pending")
+  Customer(id = <customer_id>, vip_customer = true)
   <order_value> = sum(<value> * <quantity>) {
     OrderItem(<order_id>, <item_id>, <quantity>, <value>)
     Item(id = <item_id>, sale_discount = 0)

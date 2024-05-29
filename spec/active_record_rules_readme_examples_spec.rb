@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class User < TestRecord; end
+class Customer < TestRecord; end
 class Order < TestRecord; end
 class Item < TestRecord; end
 class OrderItem < TestRecord; end
@@ -9,17 +9,17 @@ RSpec.describe ActiveRecordRules do
   subject { order.reload.discount }
 
   let(:matches) { TestHelper.matches }
-  let(:user) { User.create! }
-  let(:order) { Order.create!(user_id: user.id) }
+  let(:customer) { Customer.create! }
+  let(:order) { Order.create!(customer_id: customer.id) }
 
   before do
     define_tables do |schema|
-      schema.create_table :users do |t|
-        t.boolean :vip_user
+      schema.create_table :customers do |t|
+        t.boolean :vip_customer
       end
 
       schema.create_table :orders do |t|
-        t.references :user
+        t.references :customer
         t.string :status, default: "pending"
         t.float :discount, default: 0
       end
@@ -37,9 +37,9 @@ RSpec.describe ActiveRecordRules do
     end
 
     described_class.define_rule(<<~RULE)
-      rule Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP users
-        Order(id = <order_id>, <user_id>, status = "pending")
-        User(id = <user_id>, vip_user = true)
+      rule Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers
+        Order(id = <order_id>, <customer_id>, status = "pending")
+        Customer(id = <customer_id>, vip_customer = true)
         <order_value> = sum(<value> * <quantity>) {
           OrderItem(<order_id>, <item_id>, <quantity>, <value>)
           Item(id = <item_id>, sale_discount = 0)
@@ -54,7 +54,7 @@ RSpec.describe ActiveRecordRules do
     RULE
   end
 
-  context "with a non-VIP user" do
+  context "with a non-VIP customer" do
     context "with an empty order" do
       it { is_expected.to be_zero }
     end
@@ -100,8 +100,8 @@ RSpec.describe ActiveRecordRules do
     end
   end
 
-  context "with a VIP user" do
-    before { user.update!(vip_user: true) }
+  context "with a VIP customer" do
+    before { customer.update!(vip_customer: true) }
 
     context "with an empty order" do
       it { is_expected.to be_zero }
@@ -122,8 +122,8 @@ RSpec.describe ActiveRecordRules do
 
       it { is_expected.not_to be_zero }
 
-      describe "transferring the order to non-VIP user" do
-        before { order.update!(user_id: User.create!) }
+      describe "transferring the order to non-VIP customer" do
+        before { order.update!(customer_id: Customer.create!) }
 
         it { is_expected.to be_zero }
       end
