@@ -78,7 +78,7 @@ module ActiveRecordRules
         *@bindings.keys.flat_map do |name|
           first = all_bindings[name][0]
           (all_bindings[name][1..] || []).map do |other|
-            "#{first} is not distinct from #{other}"
+            "exists (select #{first} intersect select #{other})"
           end
         end
       ].join("\n   and ")

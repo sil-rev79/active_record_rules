@@ -15,21 +15,20 @@ module ActiveRecordRules
       end
 
       def to_query(definer)
-        operator = case @operator
-                   in "="
-                     "is not distinct from"
-                   in "!="
-                     "is distinct from"
-                   else
-                     @operator
-                   end
-
         left = @lhs.to_query(definer)
         right = @rhs.to_query(definer)
         lambda do |bindings|
           left_str = left.call(bindings)
           right_str = right.call(bindings)
-          "(#{left_str} #{operator} #{right_str})"
+
+          case @operator
+          in "="
+            "exists (select #{left_str} intersect select #{right_str})"
+          in "!="
+            "not exists (select #{left_str} intersect select #{right_str})"
+          else
+            "(#{left_str} #{@operator} #{right_str})"
+          end
         end
       end
 

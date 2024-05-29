@@ -120,12 +120,12 @@ module ActiveRecordRules
 
                 tables[first.table] ||= []
                 full_path[...-1].each do |from, to|
-                  tables[to.table] << "#{from.table}.#{from.field} is not distinct from #{to.table}.#{to.field}"
+                  tables[to.table] << "exists (select #{from.table}.#{from.field} intersect select #{to.table}.#{to.field})"
                 end
 
                 wheres << lambda { |attributes|
                   value = ActiveRecord::Base.connection.quote(attributes[dead_last.field])
-                  "#{last.table}.#{last.field} is not distinct from #{value}"
+                  "exists (select #{last.table}.#{last.field} intersect select #{value})"
                 }
               end
             end
