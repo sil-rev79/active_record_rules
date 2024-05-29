@@ -78,7 +78,7 @@ module ActiveRecordRules
         *@bindings.keys.flat_map do |name|
           first = all_bindings[name][0]
           (all_bindings[name][1..] || []).map do |other|
-            "exists (select #{first} intersect select #{other})"
+            gen_eq(first, other)
           end
         end
       ].join("\n   and ")
@@ -114,6 +114,19 @@ module ActiveRecordRules
       else
         @counter ||= 0
         @counter += 1
+      end
+    end
+
+    def gen_eq(left, right)
+      case [left, right]
+      in "NULL", "NULL"
+        "TRUE"
+      in "NULL", _
+        "#{right} is NULL"
+      in _, "NULL"
+        "#{left} is NULL"
+      else
+        "(#{left} = #{right} or (#{left} is null and #{right} is null))"
       end
     end
   end

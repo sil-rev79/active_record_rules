@@ -31,12 +31,7 @@ module ActiveRecordRules
             # This query_definer.bindings call is a bit of a cludge to
             # get a value that's valid in the subquery, rather than in
             # the parent query.
-            #
-            # We need this convoluted exists/intersect thing so we can
-            # have equality semantics with null = null. We'd prefer to
-            # use the "is distinct from" Postgres operator, but it
-            # causes Postgres to ignore all our indexes.
-            "exists (select #{bindings[name]} intersect select #{query_definer.bindings[name].first.call(bindings)})"
+            gen_eq(bindings[name], query_definer.bindings[name].first.call(bindings))
           end
           sql = query_definer.to_sql(bindings, ["__value"]) # Then we only emit __value here
           final_result("(#{sql}\n and #{grouping.join(" and ")})")

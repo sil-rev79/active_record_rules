@@ -120,12 +120,12 @@ module ActiveRecordRules
 
                 tables[first.table] ||= []
                 full_path[...-1].each do |from, to|
-                  tables[to.table] << "exists (select #{from.table}.#{from.field} intersect select #{to.table}.#{to.field})"
+                  tables[to.table] << gen_eq("#{from.table}.#{from.field}", "#{to.table}.#{to.field}")
                 end
 
                 wheres << lambda { |attributes|
                   value = ActiveRecord::Base.connection.quote(attributes[dead_last.field])
-                  "exists (select #{last.table}.#{last.field} intersect select #{value})"
+                  gen_eq("#{last.table}.#{last.field}", value)
                 }
               end
             end

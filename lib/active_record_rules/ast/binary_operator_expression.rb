@@ -23,9 +23,9 @@ module ActiveRecordRules
 
           case @operator
           in "="
-            "exists (select #{left_str} intersect select #{right_str})"
+            gen_eq(left_str, right_str)
           in "!="
-            "not exists (select #{left_str} intersect select #{right_str})"
+            "not #{gen_eq(left_str, right_str)}"
           else
             "(#{left_str} #{@operator} #{right_str})"
           end
