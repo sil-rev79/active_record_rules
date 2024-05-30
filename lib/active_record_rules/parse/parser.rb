@@ -6,11 +6,11 @@ module ActiveRecordRules
   module Parse
     class Parser < Parslet::Parser # :nodoc:
       rule(:definitions) do
-        ((whitespace | newline).repeat >> definition).repeat >> (whitespace | newline).repeat
+        (whitespace.maybe >> definition).repeat >> whitespace.maybe
       end
 
       rule(:definition) do
-        str("rule") >> whitespace >>
+        str("rule") >> horizontal_whitespace >>
           (newline.absent? >> any).repeat.as(:name) >> newline >>
           constraints.as(:constraints) >>
           on_match.maybe.as(:on_match) >>
@@ -24,27 +24,27 @@ module ActiveRecordRules
 
       rule(:constraints) do
         (
-          (whitespace.maybe >> newline).repeat >> (
+          (horizontal_whitespace.maybe >> newline).repeat >> (
             # This is a line with content:
-            whitespace >>
+            horizontal_whitespace >>
             (record_matcher | boolean_constraint) >>
-            whitespace.maybe >> newline
+            horizontal_whitespace.maybe >> newline
           )
-        ).repeat >> (whitespace.maybe >> newline).repeat
+        ).repeat >> (horizontal_whitespace.maybe >> newline).repeat
       end
 
       rule(:inline_constraints) do
         (record_matcher | boolean_constraint).repeat(1, 1) >>
-          ((whitespace | newline).repeat >> (record_matcher | boolean_constraint)).repeat
+          (whitespace.maybe >> (record_matcher | boolean_constraint)).repeat
       end
 
       rule(:boolean_constraint) do
         boolean_expression | (
           (
             str("not") | str("any")
-          ).as(:operation) >> whitespace.maybe >>
-          str("{") >> (whitespace | newline).repeat >>
-          inline_constraints.as(:constraints) >> (whitespace | newline).repeat >>
+          ).as(:operation) >> horizontal_whitespace.maybe >>
+          str("{") >> whitespace.maybe >>
+          inline_constraints.as(:constraints) >> whitespace.maybe >>
           str("}")
         )
       end
@@ -147,14 +147,14 @@ module ActiveRecordRules
 
       def aggregate_op(name, require_expression: true)
         expr_part = (
-          str("(") >> (whitespace | newline).repeat >>
-          expression.as(:expression) >> (whitespace | newline).repeat >>
+          str("(") >> whitespace.maybe >>
+          expression.as(:expression) >> whitespace.maybe >>
           str(")")
         )
         str(name).as(:aggregate_operation) >> whitespace.maybe >>
           (require_expression ? expr_part : expr_part.maybe) >> whitespace.maybe >>
-          str("{") >> (whitespace | newline).repeat >>
-          inline_constraints.as(:constraints) >> (whitespace | newline).repeat >>
+          str("{") >> whitespace.maybe >>
+          inline_constraints.as(:constraints) >> whitespace.maybe >>
           str("}")
       end
 
@@ -171,18 +171,18 @@ module ActiveRecordRules
       # ===============================
 
       rule(:on_match) do
-        str("on") >> whitespace >> str("match") >> whitespace.maybe >> newline >>
-          (whitespace >> (eol.absent? >> any).repeat.as(:line) >> eol).repeat
+        str("on") >> horizontal_whitespace >> str("match") >> horizontal_whitespace.maybe >> newline >>
+          (horizontal_whitespace >> (eol.absent? >> any).repeat.as(:line) >> (eol | eof)).repeat
       end
 
       rule(:on_update) do
-        str("on") >> whitespace >> str("update") >> whitespace.maybe >> newline >>
-          (whitespace >> (eol.absent? >> any).repeat.as(:line) >> eol).repeat
+        str("on") >> horizontal_whitespace >> str("update") >> horizontal_whitespace.maybe >> newline >>
+          (horizontal_whitespace >> (eol.absent? >> any).repeat.as(:line) >> (eol | eof)).repeat
       end
 
       rule(:on_unmatch) do
-        str("on") >> whitespace >> str("unmatch") >> whitespace.maybe >> newline >>
-          (whitespace >> (eol.absent? >> any).repeat.as(:line) >> (eol | any.absent?)).repeat
+        str("on") >> horizontal_whitespace >> str("unmatch") >> horizontal_whitespace.maybe >> newline >>
+          (horizontal_whitespace >> (eol.absent? >> any).repeat.as(:line) >> (eol | eof)).repeat
       end
 
       # ================
@@ -202,10 +202,15 @@ module ActiveRecordRules
         (name >> (str("::") >> name).repeat)
       end
 
-      rule(:whitespace) { match('[ \t]').repeat(1) }
+      rule(:horizontal_whitespace) { match('[ \t]').repeat(1) }
+      rule(:whitespace) { (match('[ \t]') | newline).repeat(1) }
 
       rule(:eol) do
         str("\r\n") | str("\n") | str(";") # treat semicolons like newlines!
+      end
+
+      rule(:eof) do
+        any.absent?
       end
 
       rule(:newline) do

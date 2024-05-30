@@ -8,7 +8,12 @@ on unmatch
 
 
 rule Farewell People
-  Salutation(<farewell>)
-  Person(<name>, farewellable = true)
+  Salutation(
+    <farewell>
+  )
+  Person(
+    <name>,
+    farewellable = true
+  )
 on unmatch
   push("#{farewell}, #{name}")
