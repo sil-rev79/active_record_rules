@@ -37,8 +37,10 @@ module ActiveRecordRules
                       "add :i or :s to cast to int/string (at #{@location.join(":")})"
               end
             else
-              ActiveRecordRules.logger&.warn do
-                "Flags provided for #{definer.table_class}##{@name}, but attribute is not an enum"
+              unless @flags.empty?
+                ActiveRecordRules.logger&.warn do
+                  "Flags provided for #{definer.table_class}##{@name}, but attribute is not an enum"
+                end
               end
 
               "#{definer.table_name}.#{@name}"
