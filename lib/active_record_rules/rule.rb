@@ -86,12 +86,20 @@ module ActiveRecordRules
     end
 
     def activate(pending_activations = nil)
-      logger&.info { "Rule(#{id}): activating rule" }
-      logger&.debug do
-        if pending_activations
-          "Rule(#{id}): only activating for: " \
-            "#{pending_activations.map(&:condition_terms)} matching " \
-            "#{pending_activations.map(&:condition_sql)}"
+      plain_sql_conditions = format_plain_sql_conditions(pending_activations)
+      json_sql_conditions = format_json_sql_conditions(pending_activations)
+
+      if plain_sql_conditions == "false"
+        logger&.info { "Rule(#{id}): activating rule with no pending activations - doing nothing" }
+        return []
+      elsif plain_sql_conditions == "true"
+        logger&.info { "Rule(#{id}): activating rule for all records" }
+      else
+        logger&.info { "Rule(#{id}): activating rule" }
+        logger&.debug do
+          "Rule(#{id}): activating for: \n  " + pending_activations.map do |pending_activation|
+            format_plain_sql_conditions([pending_activation])
+          end.join("\n  ")
         end
       end
 
@@ -119,7 +127,7 @@ module ActiveRecordRules
                  end
             from (
               #{definition.to_query_sql.split("\n").join("\n      ")}
-               where (#{format_plain_sql_conditions(pending_activations)})
+               where (#{plain_sql_conditions})
             ) as record
             full outer join (
               select ids,
@@ -128,7 +136,7 @@ module ActiveRecordRules
                      next_arguments
                 from #{RuleMatch.table_name}
                where rule_id = #{ActiveRecord::Base.connection.quote(id)}
-                 and (#{format_json_sql_conditions(pending_activations)})
+                 and (#{json_sql_conditions})
             ) as match on match.ids = record.ids
            where true
           on conflict(rule_id, ids) do update
