@@ -86,6 +86,15 @@ module ActiveRecordRules
     end
 
     def activate(pending_activations = nil)
+      logger&.info { "Rule(#{id}): activating rule" }
+      logger&.debug do
+        if pending_activations
+          "Rule(#{id}): only activating for: " \
+            "#{pending_activations.map(&:condition_terms)} matching " \
+            "#{pending_activations.map(&:condition_sql)}"
+        end
+      end
+
       ActiveRecord::Base.connection.execute(<<~SQL.squish!).map { _1["id"] }
         insert into arr__rule_matches(rule_id, ids, awaiting_execution, live_arguments, next_arguments)
           select #{ActiveRecord::Base.connection.quote(id)},
