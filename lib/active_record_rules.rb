@@ -106,10 +106,17 @@ module ActiveRecordRules
 
     # Retrieve a Rule by name
     #
-    # @param name [String] The rule name to find
+    # @param name_or_id [String, Integer] The rule name or id to find
     # @return [Rule, nil] The rule, or nil if that rule is not defined
-    def find_rule(name)
-      @loaded_rules[Rule.name_to_id(name)]
+    def find_rule(name_or_id)
+      case name_or_id
+      when String
+        @loaded_rules[Rule.name_to_id(name_or_id)]
+      when Integer
+        @loaded_rules[name_or_id]
+      else
+        raise "Rules can only be found by name (a String) or id (an Integer)."
+      end
     end
 
     # Remove a Rule definition by name
