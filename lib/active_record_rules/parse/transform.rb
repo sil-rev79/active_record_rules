@@ -14,7 +14,16 @@ module ActiveRecordRules
       rule(boolean: simple(:value)) { Constant.new(value.to_s == "true") }
       rule(nil: simple(:value)) { Constant.new(nil) }
       rule(binding_name: simple(:value)) { Variable.new(value.to_s) }
-      rule(record_name: simple(:value)) { RecordField.new(value.line_and_column, *value.to_s.split(":")) }
+      rule(record_name: simple(:value), json_extractors: nil) do
+        RecordField.new(value.line_and_column, *value.to_s.split(":"))
+      end
+      rule(record_name: simple(:value), json_extractors: sequence(:json_extractors)) do
+        json_extractors.reverse.reduce(
+          RecordField.new(value.line_and_column, *value.to_s.split(":"))
+        ) { JsonLookup.new(_1, _2) }
+      end
+
+      rule(json_field_name: simple(:json_field_name)) { Constant.new(json_field_name.to_s) }
 
       rule(aggregate_operation: simple(:name), constraints: sequence(:constraints)) do
         class_name = name.to_s.split("_").map(&:capitalize).join

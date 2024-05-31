@@ -104,12 +104,23 @@ module ActiveRecordRules
             number |
             integer |
             nil_expr |
-            # Simple names: database fields
-            record_name.as(:record_name)
+            # Database fields, with JSON extractors
+            record_expression
           ),
           [whitespace.maybe >> match("[+-]").as(:op) >> whitespace.maybe, 1, :left],
           [whitespace.maybe >> match("[*/]").as(:op) >> whitespace.maybe, 2, :left]
         ) { |l, o, r| { lhs: l, op: o[:op], rhs: r } }
+      end
+
+      rule(:record_expression) do
+        record_name.as(:record_name) >>
+          (
+            (whitespace.maybe >> str(".") >>
+             whitespace.maybe >> name.as(:json_field_name)) |
+            (whitespace.maybe >> str("[") >>
+             whitespace.maybe >> expression >>
+             whitespace.maybe >> str("]"))
+          ).repeat.as(:json_extractors)
       end
 
       rule(:string) do

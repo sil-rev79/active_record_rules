@@ -28,6 +28,10 @@ module ActiveRecordRules
         end
       end
 
+      def record_relevant_attributes(tracker)
+        @constraints.each { _1.record_relevant_attributes(tracker) }
+      end
+
       def relevant_change?(klass, previous, current)
         @constraints.any? { _1.relevant_change?(klass, previous, current) }
       end

@@ -66,7 +66,11 @@ RSpec.configure do |config|
 
   connection_string = ENV.fetch("ARR_DATABASE", "sqlite3::memory:")
 
-  config.filter_run_excluding(restrict_database: :postgres) unless connection_string.start_with?("postgres")
+  if connection_string.start_with?("postgres")
+    config.filter_run_excluding(restrict_database: :sqlite)
+  else
+    config.filter_run_excluding(restrict_database: :postgres)
+  end
 
   config.around do |example|
     # Reset the in-memory loaded rules before each run.
