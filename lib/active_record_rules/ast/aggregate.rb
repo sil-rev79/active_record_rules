@@ -27,14 +27,19 @@ module ActiveRecordRules
         # supported in SQLite at the moment, so doing this as a
         # subquery lets us keep better SQL engine compatibility.
         lambda do |bindings|
-          grouping = (bindings.keys & query_definer.bindings.keys).map do |name|
+          (bindings.keys & query_definer.bindings.keys).each do |name|
             # This query_definer.bindings call is a bit of a cludge to
             # get a value that's valid in the subquery, rather than in
             # the parent query.
-            gen_eq(bindings[name], query_definer.bindings[name].first.call(bindings))
+            query_definer.add_condition do
+              gen_eq(bindings[name], query_definer.bindings[name].first.call(bindings))
+            end
           end
           sql = query_definer.to_sql(bindings, ["__value"]) # Then we only emit __value here
-          final_result("(#{sql}\n and #{grouping.join(" and ")})")
+
+          # We order by __value here to make the array aggregate
+          # deterministic. It shouldn't really affect anything else.
+          final_result("(#{sql}\n order by __value)")
         end
       end
 

@@ -26,7 +26,7 @@ module ActiveRecordRules
             json_bit = path_parts.reduce("@#{expr}!") do |e, part|
               if part == "'*'"
                 array = true
-                e.sub(/@([^!]+)!/, "(select @e! from jsonb_array_elements(\\1) as e)")
+                e.sub(/@([^!]+)!/, "(select @e! from jsonb_array_elements(\\1) as e order by 1)")
               else
                 e.sub(/@([^!]+)!/, "@(\\1)->#{part}!")
               end
@@ -43,7 +43,7 @@ module ActiveRecordRules
             json_bit = path_parts.reduce("@#{expr}!") do |e, part|
               if part == "'*'"
                 array = true
-                e.sub(/@([^!]+)!/, "(select @json_each.value! from json_each(\\1))")
+                e.sub(/@([^!]+)!/, "(select @json_each.value! from json_each(\\1) order by 1)")
               else
                 e.sub(/@([^!]+)!/, "@(\\1)->#{part}!")
               end
