@@ -1,7 +1,14 @@
 # frozen_string_literal: true
 
 class Counter < TestRecord; end
-class Countable < TestRecord; end
+
+class Countable < TestRecord
+  enum status: {
+    planned: 0,
+    active: 1,
+    completed: 2
+  }
+end
 
 RSpec.describe ActiveRecordRules do
   before do
@@ -18,17 +25,24 @@ RSpec.describe ActiveRecordRules do
 
       schema.create_table :countables do |t|
         t.integer :value
+        t.integer :status
       end
     end
   end
 
-  describe "a counter using JSON-based conditions", restrict_database: :sqlite do
+  describe "a counter using JSON-based conditions" do
     before do
       described_class.define_rule(<<~RULE)
         rule A rule
-          Counter(<id>, <lower_bound> = definition.lower_bound,
-                        <upper_bound> = definition["upper_bound"])
-          Countable(<lower_bound> < value, value < <upper_bound>)
+          Counter(<id>,
+                  <statuses> = definition.statuses[*].text as text[],
+                  <lower_bound> = definition.lower_bound as integer,
+                  <upper_bound> = definition["upper_bound"] as integer)
+          Countable(
+            <lower_bound> < value,
+            value < <upper_bound>,
+            status:s in <statuses>
+          )
         on match
           Counter.find(id).increment!(:count)
         on unmatch
@@ -36,7 +50,14 @@ RSpec.describe ActiveRecordRules do
       RULE
     end
 
-    let(:counter) { Counter.create!(definition: { lower_bound: 0, upper_bound: 10 }) }
+    let!(:counter) do
+      Counter.create!(
+        definition: { lower_bound: 0,
+                      upper_bound: 10,
+                      statuses: [{ text: "planned" },
+                                 { text: "active" }] }
+      )
+    end
 
     context "with no countable values" do
       it "has a count of zero" do
@@ -45,7 +66,9 @@ RSpec.describe ActiveRecordRules do
     end
 
     context "with a countable value in range" do
-      let!(:countable) { Countable.create!(value: 5) }
+      let!(:countable) do
+        Countable.create!(value: 5, status: "planned")
+      end
 
       it "has a count of one" do
         expect(counter.reload.count).to eq(1)

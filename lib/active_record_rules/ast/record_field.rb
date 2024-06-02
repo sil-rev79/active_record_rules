@@ -61,8 +61,6 @@ module ActiveRecordRules
 
       def deconstruct = [@name]
 
-      def extract_value(attributes) = attributes[@name]
-
       def unparse = @name
     end
   end

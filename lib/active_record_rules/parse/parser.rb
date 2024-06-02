@@ -82,7 +82,7 @@ module ActiveRecordRules
       end
 
       rule(:comparison) do
-        (str("=") | str("!=") | str("<=") | str("<") | str(">=") | str(">"))
+        (str("=") | str("!=") | str("<=") | str("<") | str(">=") | str(">") | str("in"))
       end
 
       # ===========
@@ -114,13 +114,19 @@ module ActiveRecordRules
 
       rule(:record_expression) do
         record_name.as(:record_name) >>
-          (
-            (whitespace.maybe >> str(".") >>
-             whitespace.maybe >> name.as(:json_field_name)) |
-            (whitespace.maybe >> str("[") >>
-             whitespace.maybe >> expression >>
-             whitespace.maybe >> str("]"))
-          ).repeat.as(:json_extractors)
+          json_path.as(:json_extraction).maybe
+      end
+
+      rule(:json_path) do
+        (
+          (whitespace.maybe >> str(".") >>
+           whitespace.maybe >> name.as(:json_field_name)) |
+          (whitespace.maybe >> str("[") >>
+           whitespace.maybe >> (str("*").as(:json_field_name) | expression) >>
+           whitespace.maybe >> str("]"))
+        ).repeat.as(:json_path) >>
+          whitespace >> str("as") >> whitespace >>
+          sql_type.as(:type)
       end
 
       rule(:string) do
@@ -211,6 +217,10 @@ module ActiveRecordRules
 
       rule(:class_name) do
         (name >> (str("::") >> name).repeat)
+      end
+
+      rule(:sql_type) do
+        match("[A-Za-z]").repeat >> str("[]").maybe
       end
 
       rule(:horizontal_whitespace) { match('[ \t]').repeat(1) }

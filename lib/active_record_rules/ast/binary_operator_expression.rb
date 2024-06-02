@@ -26,6 +26,13 @@ module ActiveRecordRules
             gen_eq(left_str, right_str)
           in "!="
             "not #{gen_eq(left_str, right_str)}"
+          in "in"
+            case ActiveRecordRules.dialect
+            in :postgres
+              "array[#{left_str}] <@ #{right_str}"
+            in :sqlite
+              "exists (select 1 from json_each(#{right_str}) where json_each.value = #{left_str})"
+            end
           else
             "(#{left_str} #{@operator} #{right_str})"
           end

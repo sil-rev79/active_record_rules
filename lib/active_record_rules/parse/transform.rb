@@ -8,22 +8,27 @@ module ActiveRecordRules
     class Transform < Parslet::Transform # :nodoc:
       include ::ActiveRecordRules::Ast
 
+      JsonExtraction = Struct.new(:path, :type)
+
       rule(integer: simple(:value)) { Constant.new(value.to_i) }
       rule(number: simple(:value)) { Constant.new(value.to_f) }
       rule(string: simple(:value)) { Constant.new(value.to_s) }
       rule(boolean: simple(:value)) { Constant.new(value.to_s == "true") }
       rule(nil: simple(:value)) { Constant.new(nil) }
       rule(binding_name: simple(:value)) { Variable.new(value.to_s) }
-      rule(record_name: simple(:value), json_extractors: nil) do
+      rule(record_name: simple(:value)) do
         RecordField.new(value.line_and_column, *value.to_s.split(":"))
       end
-      rule(record_name: simple(:value), json_extractors: sequence(:json_extractors)) do
-        json_extractors.reverse.reduce(
-          RecordField.new(value.line_and_column, *value.to_s.split(":"))
-        ) { JsonLookup.new(_1, _2) }
+      rule(record_name: simple(:value), json_extraction: simple(:json_extraction)) do
+        JsonLookup.new(
+          RecordField.new(value.line_and_column, *value.to_s.split(":")),
+          json_extraction.path,
+          json_extraction.type
+        )
       end
 
       rule(json_field_name: simple(:json_field_name)) { Constant.new(json_field_name.to_s) }
+      rule(json_path: sequence(:json_path), type: simple(:type)) { JsonExtraction.new(json_path, type.to_s) }
 
       rule(aggregate_operation: simple(:name), constraints: sequence(:constraints)) do
         class_name = name.to_s.split("_").map(&:capitalize).join
