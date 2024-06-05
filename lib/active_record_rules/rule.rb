@@ -110,15 +110,6 @@ module ActiveRecordRules
       end
     end
 
-    def ignore_pending_executions
-      rule_matches.where(awaiting_execution: ["unmatch", "delete"]).delete_all
-      rule_matches.where(awaiting_execution: ["match", "update"]).update_all(<<~SQL.squish!)
-        live_arguments = next_arguments,
-        next_arguments = null,
-        awaiting_execution = #{RuleMatch.awaiting_executions["none"]}
-      SQL
-    end
-
     def calculate_required_activations(klass, previous, current)
       definition.affected_ids_sql(klass, previous, current)
     end
