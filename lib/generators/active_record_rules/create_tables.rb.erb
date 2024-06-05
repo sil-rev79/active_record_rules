@@ -3,15 +3,17 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
   def change
     create_table :arr__rule_matches, id: :bigint do |t|
       t.integer :rule_id, null: false, limit: 4
-      t.integer :awaiting_execution, null: false
-      t.<%= json_type %> :ids
+      t.timestamp :queued_since
+      t.timestamp :running_since
+      t.<%= json_type %> :ids, null: false
       t.<%= json_type %> :live_arguments
       t.<%= json_type %> :next_arguments
-      <%- if postgres? %>
+      <%- if postgres? -%>
       t.index [:ids], using: :gin, opclass: :jsonb_path_ops, name: 'rule_match_ids_lookup'
-      <%- end %>
+      <%- end -%>
       t.index [:rule_id, :ids], unique: true, name: 'rule_match_uniqueness'
-      t.index [:rule_id, :awaiting_execution], name: 'rule_match_awaiting_execution'
+      t.index [:rule_id, :queued_since], name: 'rule_match_queued_since'
+      t.index [:rule_id, :running_since], name: 'rule_match_running_since'
     end
   end
 end

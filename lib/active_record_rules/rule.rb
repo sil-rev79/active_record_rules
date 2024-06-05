@@ -27,23 +27,59 @@ module ActiveRecordRules
       super || definition.unparse == other.definition.unparse
     end
 
+    def self.claim_pending_execution!(id)
+      attributes = ActiveRecord::Base.connection.execute(<<~SQL.squish!).first
+        update #{RuleMatch.table_name}
+           set running_since = #{ActiveRecord::Base.connection.quote(Time.now)},
+               queued_since = null
+          where id = #{ActiveRecord::Base.connection.quote(id)}
+            and queued_since is not null
+            and running_since is null
+          returning id
+      SQL
+
+      # If we don't find attributes, then we haven't claimed anything,
+      # so return nil.
+      return nil unless attributes
+
+      # This hits the database again, which I don't love, but it's
+      # tricky to construct a new ActiveRecord object that thinks it's
+      # persisted without doing this.
+      RuleMatch.find(attributes["id"])
+    end
+
     def run_pending_execution(match)
       raise "Cannot run execution meant for another rule!" unless match.rule_id == id
 
       case match
-      in RuleMatch(awaiting_execution: "match", ids:, next_arguments:)
-        match.update_columns(live_arguments: next_arguments,
-                             next_arguments: nil,
-                             awaiting_execution: "none")
+      in RuleMatch(live_arguments: nil, next_arguments: nil)
+        match.delete
+
+      in RuleMatch(ids:, live_arguments:, next_arguments: nil)
+        logger&.info { "Rule(#{id}): unmatched for #{ids.to_json}" }
+        logger&.debug { "Rule(#{id}): unmatched with arguments #{live_arguments.to_json}" }
+
+        execute_unmatch(live_arguments)
+        match.delete
+
+      in RuleMatch(ids:, live_arguments: nil, next_arguments:)
         logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
         logger&.debug { "Rule(#{id}): matched with arguments #{next_arguments.to_json}" }
 
         execute_match(next_arguments)
+        ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+          update #{RuleMatch.table_name}
+             set running_since = null,
+                 live_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)},
+                 next_arguments = case when next_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)} then
+                                    null
+                                  else
+                                    next_arguments
+                                  end
+           where id = #{ActiveRecord::Base.connection.quote(match.id)}
+        SQL
 
-      in RuleMatch(awaiting_execution: "update", ids:, live_arguments:, next_arguments:)
-        match.update_columns(live_arguments: next_arguments,
-                             next_arguments: nil,
-                             awaiting_execution: "none")
+      in RuleMatch(ids:, live_arguments:, next_arguments:)
         logger&.info { "Rule(#{id}): updated for #{ids.to_json}" }
         logger&.debug do
           "Rule(#{id}): updating from #{live_arguments.to_json} " \
@@ -51,20 +87,17 @@ module ActiveRecordRules
         end
 
         execute_update(live_arguments, next_arguments)
-
-      in RuleMatch(awaiting_execution: "unmatch", ids:, live_arguments:)
-        match.delete
-        logger&.info { "Rule(#{id}): unmatched for #{ids.to_json}" }
-        logger&.debug { "Rule(#{id}): unmatched with arguments #{live_arguments.to_json}" }
-
-        execute_unmatch(live_arguments)
-
-      in RuleMatch(awaiting_execution: "delete")
-        match.delete
-
-      in RuleMatch(awaiting_execution: "none")
-        # do nothing
-
+        ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+          update #{RuleMatch.table_name}
+             set running_since = null,
+                 live_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)},
+                 next_arguments = case when next_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)} then
+                                    null
+                                  else
+                                    next_arguments
+                                  end
+           where id = #{ActiveRecord::Base.connection.quote(match.id)}
+        SQL
       end
     end
 
@@ -104,34 +137,26 @@ module ActiveRecordRules
       end
 
       ActiveRecord::Base.connection.execute(<<~SQL.squish!).map { _1["id"] }
-        insert into arr__rule_matches(rule_id, ids, awaiting_execution, live_arguments, next_arguments)
+        insert into #{RuleMatch.table_name}(rule_id, ids, queued_since, next_arguments)
           select #{ActiveRecord::Base.connection.quote(id)},
                  coalesce(record.ids, match.ids),
-                 case
-                   when record.ids is null and match.awaiting_execution = #{RuleMatch.awaiting_executions["match"]}
-                     then #{RuleMatch.awaiting_executions["delete"]}
-                   when record.ids is null
-                     then #{RuleMatch.awaiting_executions["unmatch"]}
-                   when match.ids is null or match.awaiting_execution = #{RuleMatch.awaiting_executions["match"]}
-                     then #{RuleMatch.awaiting_executions["match"]}
-                   when record.arguments = match.live_arguments
-                     then match.awaiting_execution
-                   else
-                     #{RuleMatch.awaiting_executions["update"]}
+                 case when record.arguments = match.live_arguments then
+                   match.queued_since
+                 else
+                   coalesce(match.queued_since, #{ActiveRecord::Base.connection.quote(Time.now)})
                  end,
-                 match.live_arguments,
                  case when record.arguments = match.live_arguments then
                    match.next_arguments
                  else
-                   coalesce(record.arguments, match.next_arguments)
+                   record.arguments
                  end
             from (
               #{definition.to_query_sql.split("\n").join("\n      ")}
                where (#{plain_sql_conditions})
             ) as record
             full outer join (
-              select ids,
-                     awaiting_execution,
+              select queued_since,
+                     ids,
                      live_arguments,
                      next_arguments
                 from #{RuleMatch.table_name}
@@ -140,8 +165,7 @@ module ActiveRecordRules
             ) as match on match.ids = record.ids
            where true
           on conflict(rule_id, ids) do update
-            set awaiting_execution = excluded.awaiting_execution,
-                live_arguments = excluded.live_arguments,
+            set queued_since = excluded.queued_since,
                 next_arguments = excluded.next_arguments
           returning id
       SQL

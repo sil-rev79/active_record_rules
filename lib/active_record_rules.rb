@@ -214,8 +214,10 @@ module ActiveRecordRules
     # @return nil
     def run_pending_executions(*ids)
       ids.each do |id|
-        match = RuleMatch.find_by(id: id)
-        next unless match # If the match doesn't exist, ignore it - it might have unmatched
+        match = Rule.claim_pending_execution!(id)
+        # If we don't find a match, ignore it - it might have
+        # unmatched, or still be running.
+        next unless match
 
         rule = @loaded_rules[match.rule_id]
         unless rule

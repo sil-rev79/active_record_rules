@@ -18,18 +18,11 @@ module ActiveRecordRules
   class RuleMatch < ActiveRecord::Base
     self.table_name = :arr__rule_matches
 
-    enum awaiting_execution: {
-      none: 0,
-      match: 1,
-      update: 2,
-      unmatch: 3,
-      delete: 4
-    }, _prefix: "awaiting_"
-
     def deconstruct_keys(_)
       { id: id,
+        queued_since: queued_since,
+        running_since: running_since,
         ids: ids,
-        awaiting_execution: awaiting_execution,
         live_arguments: live_arguments,
         next_arguments: next_arguments }
     end
