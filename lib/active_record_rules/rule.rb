@@ -59,25 +59,31 @@ module ActiveRecordRules
         logger&.info { "Rule(#{id}): unmatched for #{ids.to_json}" }
         logger&.debug { "Rule(#{id}): unmatched with arguments #{live_arguments.to_json}" }
 
-        execute_unmatch(live_arguments)
-        match.delete
+        begin
+          execute_unmatch(live_arguments)
+        ensure
+          match.delete
+        end
 
       in RuleMatch(ids:, live_arguments: nil, next_arguments:)
         logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
         logger&.debug { "Rule(#{id}): matched with arguments #{next_arguments.to_json}" }
 
-        execute_match(next_arguments)
-        ActiveRecord::Base.connection.execute(<<~SQL.squish!)
-          update #{RuleMatch.table_name}
-             set running_since = null,
-                 live_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)},
-                 next_arguments = case when next_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)} then
-                                    null
-                                  else
-                                    next_arguments
-                                  end
-           where id = #{ActiveRecord::Base.connection.quote(match.id)}
-        SQL
+        begin
+          execute_match(next_arguments)
+        ensure
+          ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+            update #{RuleMatch.table_name}
+               set running_since = null,
+                   live_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)},
+                   next_arguments = case when next_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)} then
+                                      null
+                                    else
+                                      next_arguments
+                                    end
+             where id = #{ActiveRecord::Base.connection.quote(match.id)}
+          SQL
+        end
 
       in RuleMatch(ids:, live_arguments:, next_arguments:)
         logger&.info { "Rule(#{id}): updated for #{ids.to_json}" }
@@ -86,18 +92,21 @@ module ActiveRecordRules
             "=> #{next_arguments.to_json}"
         end
 
-        execute_update(live_arguments, next_arguments)
-        ActiveRecord::Base.connection.execute(<<~SQL.squish!)
-          update #{RuleMatch.table_name}
-             set running_since = null,
-                 live_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)},
-                 next_arguments = case when next_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)} then
-                                    null
-                                  else
-                                    next_arguments
-                                  end
-           where id = #{ActiveRecord::Base.connection.quote(match.id)}
-        SQL
+        begin
+          execute_update(live_arguments, next_arguments)
+        ensure
+          ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+            update #{RuleMatch.table_name}
+               set running_since = null,
+                   live_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)},
+                   next_arguments = case when next_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)} then
+                                      null
+                                    else
+                                      next_arguments
+                                    end
+             where id = #{ActiveRecord::Base.connection.quote(match.id)}
+          SQL
+        end
       end
     end
 
