@@ -24,6 +24,8 @@ require "generators/active_record_rules/install_generator"
 require "tmpdir"
 require "properb"
 
+ActiveJob::Base.logger = nil
+
 module RSpecExtensions
   def define_tables(&block)
     block.call(ActiveRecord::Base.connection)
@@ -46,11 +48,9 @@ module TestHelper
 end
 
 class TestRecord < ActiveRecord::Base
-  self.abstract_class = true
+  include ActiveRecordRules::Hooks::Async
 
-  after_create { ActiveRecordRules.after_create_trigger(self) }
-  after_update { ActiveRecordRules.after_update_trigger(self) }
-  after_destroy { ActiveRecordRules.after_destroy_trigger(self) }
+  self.abstract_class = true
 end
 
 RSpec.configure do |config|
@@ -112,4 +112,14 @@ RSpec.configure do |config|
   config.include RSpecExtensions
 
   Properb.rspec_install(config)
+
+  config.include ActiveJob::TestHelper
+
+  config.around do |example|
+    ActiveJob::Base.queue_adapter = queue_adapter_for_test
+
+    perform_enqueued_jobs do
+      example.run
+    end
+  end
 end

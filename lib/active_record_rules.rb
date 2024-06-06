@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require "active_record"
+require "active_record_rules/hooks"
+require "active_record_rules/jobs"
 require "active_record_rules/parse"
 require "active_record_rules/rule"
 require "active_record_rules/rule_match"
@@ -212,7 +214,7 @@ module ActiveRecordRules
     #
     # @param ids [Array] An array of RuleMatch ids which need to be executed
     # @return nil
-    def run_pending_executions(*ids)
+    def run_pending_executions(ids)
       ids.each do |id|
         match = Rule.claim_pending_execution!(id)
         # If we don't find a match, ignore it - it might have
@@ -230,7 +232,14 @@ module ActiveRecordRules
       end
       nil
     end
-    alias run_pending_execution run_pending_executions
+
+    def run_pending_execution(id)
+      run_pending_executions([id])
+    end
+
+    def activate_and_execute(change)
+      run_pending_executions(activate_rules(change))
+    end
 
     # Activate all rules, for all records. This may generate a *lot*
     # of ids to process. These ids should then be passed into the
@@ -250,10 +259,6 @@ module ActiveRecordRules
       @loaded_rules.map do |_, rule|
         rule.relevant_attributes_by_class[klass] || Set.new
       end.reduce(Set.new, &:+)
-    end
-
-    def after_trigger(change)
-      activate_rules(change).each { run_pending_executions(_1) }
     end
   end
 end

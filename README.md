@@ -29,9 +29,7 @@ Once you have done this, you need to decide on how you will *trigger* rules that
 
 ```ruby
 class ApplicationRecord < ActiveRecord::Base
-  after_create { ActiveRecordRules.after_create_trigger(self) }
-  after_update { ActiveRecordRules.after_update_trigger(self) }
-  after_destroy { ActiveRecordRules.after_destroy_trigger(self) }
+  include ActiveRecordRules::Hooks::Sync
 end
 ```
 
@@ -78,45 +76,24 @@ Rule evaluation happens in three stages:
  2. *activating*: for each relevant rule, determine the new matching state (i.e. which records newly match/unmatch, or have been updated in a relevant way) and record which clauses need to be executed; then
  3. *executing*: run the code for each clause which needs to be executed.
 
-Invoking these stages is done by calling three methods:
-
-```ruby
-# These methods capture information about a change, to run a trigger later.
-# They are each suitable to run in the given ActiveRecord callback.
-change = ActiveRecordRules.capture_create_change(self)
-change = ActiveRecordRules.capture_update_change(self)
-change = ActiveRecordRules.capture_destroy_change(self)
-
-# Trigger and activate rules, for a given change, marking relevant rule-match
-# database records as "pending execution" and returning the ids of those records
-ids = ActiveRecordRules.activate_rules(change)
-
-# Process a number of pending executions
-ActiveRecordRules.run_pending_executions(*ids)
-```
-
-The helper methods used above, `ActiveRecordRules.after_{create,update,destroy}_trigger` run these methods in sequence to provide a simple way to get things working. In a production system, though, you might prefer to process rules in a separate thread/process. For example, using `ActiveJob` you might have:
+There are three pre-configured modules which can be `include`d into your `ApplicationRecord` to activate rules at different times:
 
 ```ruby
 class ApplicationRecord < ActiveRecord::Base
-  after_create { ActivateRules.perform_later(ActiveRecordRules.capture_create_change(self)) }
-  after_update { ActivateRules.perform_later(ActiveRecordRules.capture_update_change(self)) }
-  after_destroy { ActivateRules.perform_later(ActiveRecordRules.capture_destroy_change(self)) }
-end
+  # trigger/activate/execute rules after save, in the same transaction
+  include ActiveRecordRules::Hooks::AfterSave
 
-class ActivateRules < ApplicationJob
-  def perform(change)
-    ids = ActiveRecordRules.activate_rules(change)
-    ids.each { RunPendingExecutions.perform_later(_1) }
-  end
-end
+  # trigger/activate/execute rules after a transaction commits, but immediately
+  include ActiveRecordRules::Hooks::AfterCommit
 
-class RunPendingExecutions < ApplicationJob
-  def perform(id)
-    ActiveRecordRules.run_pending_execution(id)
-  end
+  # trigger/activate/execute rules in an ActiveJob job, performed later
+  include ActiveRecordRules::Hooks::Async
 end
 ```
+
+The `AfterSave` and `AfterCommit` modules run the rules in the ActiveRecord callbacks of the same names.
+
+The `Async` module triggers all rules immediately, then schedules activation to happen in an `ActiveJob` job, with `perform_later`. This activation then triggers each match's execution in a separate background job.
 
 ## Rule State
 
