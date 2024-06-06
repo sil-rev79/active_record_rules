@@ -30,7 +30,7 @@ module ActiveRecordRules
     def self.claim_pending_execution!(id)
       attributes = ActiveRecord::Base.connection.execute(<<~SQL.squish!).first
         update #{RuleMatch.table_name}
-           set running_since = #{ActiveRecord::Base.connection.quote(Time.now)},
+           set running_since = current_timestamp,
                queued_since = null
           where id = #{ActiveRecord::Base.connection.quote(id)}
             and queued_since is not null
@@ -143,7 +143,7 @@ module ActiveRecordRules
                  case when record.arguments = match.live_arguments then
                    match.queued_since
                  else
-                   coalesce(match.queued_since, #{ActiveRecord::Base.connection.quote(Time.now)})
+                   coalesce(match.queued_since, current_timestamp)
                  end,
                  case when record.arguments = match.live_arguments then
                    match.next_arguments
