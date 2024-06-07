@@ -5,6 +5,7 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
       t.integer :rule_id, null: false, limit: 4
       t.timestamp :queued_since
       t.timestamp :running_since
+      t.timestamp :failed_since
       t.<%= json_type %> :ids, null: false
       t.<%= json_type %> :live_arguments
       t.<%= json_type %> :next_arguments
@@ -14,6 +15,7 @@ class CreateActiveRecordRulesTables < ActiveRecord::Migration<%= migration_versi
       t.index [:rule_id, :ids], unique: true, name: 'rule_match_uniqueness'
       t.index [:rule_id, :queued_since], name: 'rule_match_queued_since'
       t.index [:rule_id, :running_since], name: 'rule_match_running_since'
+      t.index [:rule_id, :failed_since], name: 'rule_match_failed_since'
     end
   end
 end

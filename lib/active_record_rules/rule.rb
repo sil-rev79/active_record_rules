@@ -33,7 +33,7 @@ module ActiveRecordRules
            set running_since = current_timestamp,
                queued_since = null
           where id = #{ActiveRecord::Base.connection.quote(id)}
-            and queued_since is not null
+            and (queued_since is not null or failed_since is not null)
             and running_since is null
           returning id
       SQL
@@ -61,9 +61,16 @@ module ActiveRecordRules
 
         begin
           execute_unmatch(live_arguments)
-        ensure
-          match.delete
+        rescue StandardError => e
+          ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+            update #{RuleMatch.table_name}
+               set failed_since = current_timestamp
+             where id = #{ActiveRecord::Base.connection.quote(match.id)}
+          SQL
+          raise e
         end
+
+        match.delete
 
       in RuleMatch(ids:, live_arguments: nil, next_arguments:)
         logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
@@ -71,19 +78,28 @@ module ActiveRecordRules
 
         begin
           execute_match(next_arguments)
-        ensure
+        rescue StandardError => e
           ActiveRecord::Base.connection.execute(<<~SQL.squish!)
             update #{RuleMatch.table_name}
                set running_since = null,
-                   live_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)},
-                   next_arguments = case when next_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)} then
-                                      null
-                                    else
-                                      next_arguments
-                                    end
+                   failed_since = current_timestamp
              where id = #{ActiveRecord::Base.connection.quote(match.id)}
           SQL
+          raise e
         end
+
+        ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+          update #{RuleMatch.table_name}
+             set running_since = null,
+                 failed_since = null,
+                 live_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)},
+                 next_arguments = case when next_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)} then
+                                    null
+                                  else
+                                    next_arguments
+                                  end
+           where id = #{ActiveRecord::Base.connection.quote(match.id)}
+        SQL
 
       in RuleMatch(ids:, live_arguments:, next_arguments:)
         logger&.info { "Rule(#{id}): updated for #{ids.to_json}" }
@@ -94,19 +110,27 @@ module ActiveRecordRules
 
         begin
           execute_update(live_arguments, next_arguments)
-        ensure
+        rescue StandardError => e
           ActiveRecord::Base.connection.execute(<<~SQL.squish!)
             update #{RuleMatch.table_name}
                set running_since = null,
-                   live_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)},
-                   next_arguments = case when next_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)} then
-                                      null
-                                    else
-                                      next_arguments
-                                    end
+                   failed_since = current_timestamp
              where id = #{ActiveRecord::Base.connection.quote(match.id)}
           SQL
+          raise e
         end
+
+        ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+          update #{RuleMatch.table_name}
+             set running_since = null,
+                 live_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)},
+                 next_arguments = case when next_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)} then
+                                    null
+                                  else
+                                    next_arguments
+                                  end
+           where id = #{ActiveRecord::Base.connection.quote(match.id)}
+        SQL
       end
     end
 
