@@ -10,12 +10,20 @@ module ActiveRecordRules
       end
 
       rule(:definition) do
-        str("rule") >> horizontal_whitespace >>
+        timing.as(:timing) >> horizontal_whitespace >>
+          str("rule") >> horizontal_whitespace.maybe >>
+          str(":") >> horizontal_whitespace.maybe >>
           (newline.absent? >> any).repeat.as(:name) >> newline >>
           constraints.as(:constraints) >>
           on_match.maybe.as(:on_match) >>
           on_update.maybe.as(:on_update) >>
           on_unmatch.maybe.as(:on_unmatch)
+      end
+
+      rule(:timing) do
+        str("async") | (
+          str("post-") >> (str("save") | str("commit"))
+        )
       end
 
       # =============

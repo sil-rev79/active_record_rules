@@ -13,7 +13,7 @@ RSpec.describe ActiveRecordRules do
     end
 
     described_class.define_rule <<~RULE
-      rule calculate fraction value
+      async rule: calculate fraction value
         Fraction(<id>, <numerator>, <denominator>)
       on match
         Fraction.find(id).update!(int_value: numerator / denominator)

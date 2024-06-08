@@ -48,7 +48,7 @@ module TestHelper
 end
 
 class TestRecord < ActiveRecord::Base
-  include ActiveRecordRules::Hooks::Async
+  include ActiveRecordRules::Hooks
 
   self.abstract_class = true
 end

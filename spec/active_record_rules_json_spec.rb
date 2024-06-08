@@ -33,7 +33,7 @@ RSpec.describe ActiveRecordRules do
   describe "a counter using JSON-based conditions" do
     before do
       described_class.define_rule(<<~RULE)
-        rule A rule
+        async rule: A rule
           Counter(<id>,
                   <statuses> = definition.statuses[*].text as text[],
                   <lower_bound> = definition.lower_bound as integer,

@@ -37,7 +37,7 @@ RSpec.describe ActiveRecordRules do
     end
 
     described_class.define_rule(<<~RULE)
-      rule Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers
+      async rule: Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers
         Order(id = <order_id>, <customer_id>, status = "pending")
         Customer(id = <customer_id>, vip_customer = true)
         <order_value> = sum(<value> * <quantity>) {

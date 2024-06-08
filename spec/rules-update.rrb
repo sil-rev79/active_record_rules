@@ -1,4 +1,4 @@
-rule Greet People
+post-save rule: Greet People
   Salutation(<greeting>)
   Person(<name>, greetable = true)
 on match

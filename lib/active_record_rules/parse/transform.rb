@@ -68,6 +68,7 @@ module ActiveRecordRules
       end
 
       rule(
+        timing: simple(:timing),
         name: simple(:name),
         constraints: sequence(:constraints),
         on_match: subtree(:on_match),
@@ -75,7 +76,9 @@ module ActiveRecordRules
         on_unmatch: subtree(:on_unmatch)
       ) do
         Definition.new(
-          name.to_s,
+          timing.line_and_column,
+          timing.to_s,
+          name.to_s.strip,
           constraints,
           on_match&.join("\n"),
           on_update&.join("\n"),

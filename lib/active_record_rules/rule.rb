@@ -12,6 +12,8 @@ module ActiveRecordRules
       @id, = Rule.name_to_id(definition.name)
     end
 
+    def timing = definition.timing
+
     # The id is the MD5 hash of the definition's name, truncated to a
     # 32 bit integer, in network (big) endian byte order. These
     # objects should be part of the source of a program, so we're not

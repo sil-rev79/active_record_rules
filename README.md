@@ -5,7 +5,7 @@ A [production system][] within ActiveRecord to execute code when matching rule c
 Rules are a great way to simplify business logic, but too often their target audience has been non-developers. Instead, ActiveRecordRules sees itself as a tool for _developers_ to express the complex logic of their system. The matching logic for rules is written in a custom DSL, but the resulting behaviours are regular Ruby code:
 
 ```
-rule Unapproved customers must be in "pending" state
+async rule Unapproved customers must be in "pending" state
   # Custom matching DSL. '<id>' denotes a variable called `id`.
   Customer(<id>, status != "pending")
   not { CustomerApproval(customer_id = <id>, status = "approved") }
@@ -29,7 +29,7 @@ Once you have done this, you need to decide on how you will *trigger* rules that
 
 ```ruby
 class ApplicationRecord < ActiveRecord::Base
-  include ActiveRecordRules::Hooks::Sync
+  include ActiveRecordRules::Hooks
 end
 ```
 
@@ -42,7 +42,7 @@ At the moment only Postgres and SQLite are supported. Contributions are welcome 
 With the default Rails configuration you can define rules in any file with the `.rules` extension. These rules will be loaded when your Rails application starts. The rules use a custom DSL that looks like this:
 
 ```
-rule Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers
+post-save rule: Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers
   Order(id = <order_id>, <customer_id>, status = "pending")
   Customer(id = <customer_id>, vip_customer = true)
   <order_value> = sum(<value> * <quantity>) {
@@ -76,24 +76,10 @@ Rule evaluation happens in three stages:
  2. *activating*: for each relevant rule, determine the new matching state (i.e. which records newly match/unmatch, or have been updated in a relevant way) and record which clauses need to be executed; then
  3. *executing*: run the code for each clause which needs to be executed.
 
-There are three pre-configured modules which can be `include`d into your `ApplicationRecord` to activate rules at different times:
-
-```ruby
-class ApplicationRecord < ActiveRecord::Base
-  # trigger/activate/execute rules after save, in the same transaction
-  include ActiveRecordRules::Hooks::AfterSave
-
-  # trigger/activate/execute rules after a transaction commits, but immediately
-  include ActiveRecordRules::Hooks::AfterCommit
-
-  # trigger/activate/execute rules in an ActiveJob job, performed later
-  include ActiveRecordRules::Hooks::Async
-end
-```
-
-The `AfterSave` and `AfterCommit` modules run the rules in the ActiveRecord callbacks of the same names.
-
-The `Async` module triggers all rules immediately, then schedules activation to happen in an `ActiveJob` job, with `perform_later`. This activation then triggers each match's execution in a separate background job.
+Each rule declares how it will be run:
+ - `post-save`, i.e. in an `after_save` hook;
+ - `post-commit`, i.e. in an `after_commit` hook; or
+ - `async`, i.e. in an `ActiveJob` that is scheduled in an `after_commit` hook.
 
 ## Rule State
 
@@ -105,14 +91,14 @@ The current state of matches is stored in `RuleMatch` records. As the rules them
 
     ```
     ids = ActiveRecordRules.find_rule(rule_name).activate
-    ActiveRecordRules.run_pending_executions(*ids)
+    ActiveRecordRules.run_pending_executions(ids)
     ```
 
  3. **Updates to rule logic/code may leave inconsistencies in `update`/`unmatch` clauses.** Due to the way ActiveRecordRules persists the last-matched values for `update` and `unmatch` clauses, the variables provided to these clauses may not match those expected by the rule. Any names not present in the last-matched values will be provided as `nil`, and any binding names removed from the matching logic will not be accessible.
 
     ```
     # Initial definition
-    rule Example
+    async rule Example
       Record(<id>, <name>)
     on match
       pp [id, name] # available names
@@ -121,7 +107,7 @@ The current state of matches is stored in `RuleMatch` records. As the rules them
       pp [id, name]
 
     # redefined to
-    rule Example
+    async rule Example
       Record(<id>, <nickname>)
     on match
       # nickname may be nil for records which activated with the old definition,

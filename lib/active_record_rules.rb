@@ -13,7 +13,7 @@ require "active_record_rules/rule_match"
 #
 # @example Define a simple rule#
 #   ActiveRecordRules.define_rule(<<~RULE)
-#     rule Update number of posts for user
+#     async rule: Update number of posts for user
 #       Post(<author_id>, status = "published")
 #       User(id = <author_id>)
 #     on match
@@ -56,8 +56,6 @@ module ActiveRecordRules
     # @param filenames [Array<String>] The files to load rules from
     # @return [Array<Rule>] The rules that were just defined
     def load_rules(*filenames)
-      @loaded_rules ||= {}
-
       # Flatten any arrays in the arguments, just for convenience.
       definition_hashes = filenames.flatten.flat_map do |filename|
         File.open(filename) do |file|
@@ -69,8 +67,8 @@ module ActiveRecordRules
 
       definitions = definition_hashes.reduce({}) do |left, right|
         left.merge(right) do |key, (l, lfilename), (r, rfilename)|
-          lloc = "#{lfilename}:#{l[:name].line}"
-          rloc = "#{rfilename}:#{r[:name].line}"
+          lloc = "#{lfilename}:#{l.location[0]}"
+          rloc = "#{rfilename}:#{r.location[0]}"
           raise "Multiple definitions with same rule name: #{key}, #{lloc} and #{rloc}"
         end
       end
@@ -84,6 +82,9 @@ module ActiveRecordRules
     # to be what you want.
     def unload_all_rules!
       @loaded_rules = {}
+      @after_save_rules = {}
+      @after_commit_rules = {}
+      @async_rules = {}
     end
 
     # Define a new rule by providing a definition, either as a string
@@ -92,6 +93,11 @@ module ActiveRecordRules
     # @param definition [String, Definition] The definition of the rule
     # @return [Rule] The newly defined Rule object.
     def define_rule(definition)
+      @loaded_rules ||= {}
+      @after_save_rules ||= {}
+      @after_commit_rules ||= {}
+      @async_rules ||= {}
+
       parsed = definition.is_a?(String) ? Parse.definition(definition) : definition
       rule = Rule.new(definition: parsed)
       if (existing = @loaded_rules[rule.id]) && rule != existing
@@ -103,6 +109,14 @@ module ActiveRecordRules
       end
 
       @loaded_rules[rule.id] = rule
+      case rule.timing
+      in :after_save
+        @after_save_rules[rule.id] = rule
+      in :after_commit
+        @after_commit_rules[rule.id] = rule
+      in :async
+        @async_rules[rule.id] = rule
+      end
       rule
     end
 
@@ -111,6 +125,8 @@ module ActiveRecordRules
     # @param name_or_id [String, Integer] The rule name or id to find
     # @return [Rule, nil] The rule, or nil if that rule is not defined
     def find_rule(name_or_id)
+      return nil if @loaded_rules.nil?
+
       case name_or_id
       when String
         @loaded_rules[Rule.name_to_id(name_or_id)]
@@ -126,14 +142,14 @@ module ActiveRecordRules
     # @param name [String] The rule name to remove
     # @return [nil]
     def undefine_rule(name)
-      @loaded_rules.delete_if { _2.name == name }
+      id = Rule.name_to_id(name)
+      raise "Cannot find rule to undefine: #{name}" unless @loaded_rules&.delete(id)
+
+      @after_save_rules.delete(id)
+      @after_commit_rules.delete(id)
+      @async_rules.delete(id)
       nil
     end
-
-    # Process a change in an after_create callback. This captures the
-    # attributes of the object, then activates any relevant rules and
-    # executes the matches.
-    def after_create_trigger(record) = after_trigger(capture_create_change(record))
 
     # Capture the details of attributes in an after_create callback.
     # This will only capture attributes that are relevant to the rules
@@ -148,11 +164,6 @@ module ActiveRecordRules
        nil,
        record.attributes.slice("id", *attrs)]
     end
-
-    # Process a change in an after_update callback. This captures the
-    # attributes of the object, then activates any relevant rules and
-    # executes the matches.
-    def after_update_trigger(record) = after_trigger(capture_update_change(record))
 
     # Capture the details of attributes in an after_update callback.
     # This will only capture attributes that are relevant to the rules
@@ -169,11 +180,6 @@ module ActiveRecordRules
 
       [record.class.name, before, after]
     end
-
-    # Process a change in an after_destroy callback. This captures the
-    # attributes of the object, then activates any relevant rules and
-    # executes the matches.
-    def after_destroy_trigger(record) = after_trigger(capture_destroy_change(record))
 
     # Capture the details of attributes in an after_destroy callback.
     # This will only capture attributes that are relevant to the rules
@@ -192,13 +198,27 @@ module ActiveRecordRules
     # Activate all rules relevant to the provided change.
     #
     # @param change The change details to use to activate rules
+    # @param timing [:after_save, :after_commit, :async, :all]
+    #   The timing of this activation, which filters rules that get activated
     # @return [Array<String>] The ids of RuleMatch records which need execution as a result of this activation
-    def activate_rules(change)
+    def activate_rules(change, timing)
       return [] if change.nil?
+
+      rules = case timing
+              in :after_save
+                @after_save_rules
+              in :after_commit
+                @after_commit_rules
+              in :async
+                @async_rules
+              in :all
+                @loaded_rules
+              end
+      return [] if rules.nil?
 
       class_name, previous, current = change
       klass = Object.const_get(class_name)
-      @loaded_rules.flat_map do |_, rule|
+      rules.flat_map do |_, rule|
         next [] if rule.relevant_attributes_by_class[klass].nil?
 
         pending = rule.calculate_required_activations(klass, previous, current)
@@ -206,6 +226,17 @@ module ActiveRecordRules
 
         rule.activate(pending)
       end
+    end
+
+    # Schedule an Async activation process to run. Does nothing if
+    # there are no rules defined.
+    #
+    # @param change The change details to use to activate rules
+    def schedule_async_activation(change)
+      return if change.nil?
+      return if @async_rules.empty?
+
+      ActiveRecordRules::Jobs::ActivateRules.perform_later(change)
     end
 
     # Execute the code from rule bodies which have been matched, and
@@ -237,8 +268,8 @@ module ActiveRecordRules
       run_pending_executions([id])
     end
 
-    def activate_and_execute(change)
-      run_pending_executions(activate_rules(change))
+    def activate_and_execute(change, timing)
+      run_pending_executions(activate_rules(change, timing))
     end
 
     # Activate all rules, for all records. This may generate a *lot*

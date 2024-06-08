@@ -7,10 +7,19 @@ require "active_record_rules/query_definer"
 module ActiveRecordRules
   module Ast
     class Definition < Node
-      attr_reader :name, :constraints, :on_match, :on_update, :on_unmatch
+      attr_reader :location, :timing, :name, :constraints, :on_match, :on_update, :on_unmatch
 
-      def initialize(name, constraints, on_match, on_update, on_unmatch)
+      def initialize(location, timing, name, constraints, on_match, on_update, on_unmatch)
         super()
+        @location = location
+        @timing = case timing
+                  in /post-save/
+                    :after_save
+                  in /post-commit/
+                    :after_commit
+                  in /async/
+                    :async
+                  end
         @name = name
         @constraints = constraints
         @on_match = on_match

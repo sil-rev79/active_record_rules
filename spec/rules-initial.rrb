@@ -1,4 +1,4 @@
-rule Greet People
+async rule: greet people who are greetable
   Salutation(<greeting>)
   Person(<name>, greetable = true)
 on match
@@ -7,7 +7,7 @@ on unmatch
   delete("#{greeting}, #{name}")
 
 
-rule Farewell People
+async rule: Farewell People
   Salutation(
     <farewell>
   )
