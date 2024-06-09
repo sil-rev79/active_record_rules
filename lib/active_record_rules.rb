@@ -201,7 +201,7 @@ module ActiveRecordRules
     # @param timing [:after_save, :after_commit, :async, :all]
     #   The timing of this activation, which filters rules that get activated
     # @return [Array<String>] The ids of RuleMatch records which need execution as a result of this activation
-    def activate_rules(change, timing)
+    def activate_rules(change, timing = :all)
       return [] if change.nil?
 
       rules = case timing
@@ -245,13 +245,8 @@ module ActiveRecordRules
     #
     # @param ids [Array] An array of RuleMatch ids which need to be executed
     # @return nil
-    def run_pending_executions(ids)
-      ids.each do |id|
-        match = Rule.claim_pending_execution!(id)
-        # If we don't find a match, ignore it - it might have
-        # unmatched, or still be running.
-        next unless match
-
+    def run_pending_executions(ids, timing = :all)
+      Rule.claim_pending_executions!(ids, timing).each do |match|
         rule = @loaded_rules[match.rule_id]
         unless rule
           logger.warn("Could not find loaded rule for match (rule id: #{match.rule_id}): ignoring match #{match.id}.")
@@ -264,12 +259,12 @@ module ActiveRecordRules
       nil
     end
 
-    def run_pending_execution(id)
-      run_pending_executions([id])
+    def run_pending_execution(id, timing = :all)
+      run_pending_executions([id], timing)
     end
 
-    def activate_and_execute(change, timing)
-      run_pending_executions(activate_rules(change, timing))
+    def activate_and_execute(change, timing = :all)
+      run_pending_executions(activate_rules(change, timing), timing)
     end
 
     # Activate all rules, for all records. This may generate a *lot*

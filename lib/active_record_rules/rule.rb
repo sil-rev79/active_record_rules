@@ -29,12 +29,15 @@ module ActiveRecordRules
       super || definition.unparse == other.definition.unparse
     end
 
-    def self.claim_pending_execution!(id)
-      attributes = ActiveRecord::Base.connection.execute(<<~SQL.squish!).first
+    def self.claim_pending_executions!(ids, timing)
+      return RuleMatch.find(ids) unless timing == :async
+
+      quoted_ids = ids.map { ActiveRecord::Base.connection.quote(_1) }
+      attributes = ActiveRecord::Base.connection.execute(<<~SQL.squish!)
         update #{RuleMatch.table_name}
            set running_since = current_timestamp,
                queued_since = null
-          where id = #{ActiveRecord::Base.connection.quote(id)}
+          where id in (#{quoted_ids.join(", ")})
             and (queued_since is not null or failed_since is not null)
             and running_since is null
           returning id
@@ -42,12 +45,12 @@ module ActiveRecordRules
 
       # If we don't find attributes, then we haven't claimed anything,
       # so return nil.
-      return nil unless attributes
+      return [] if attributes.empty?
 
       # This hits the database again, which I don't love, but it's
       # tricky to construct a new ActiveRecord object that thinks it's
       # persisted without doing this.
-      RuleMatch.find(attributes["id"])
+      RuleMatch.find(attributes.pluck("id"))
     end
 
     def run_pending_execution(match)

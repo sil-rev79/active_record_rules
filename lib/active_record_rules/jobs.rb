@@ -13,7 +13,7 @@ module ActiveRecordRules
 
     class RunPendingExecutions < ActiveJob::Base
       def perform(id)
-        ActiveRecordRules.run_pending_execution(id)
+        ActiveRecordRules.run_pending_execution(id, :async)
       end
     end
   end
