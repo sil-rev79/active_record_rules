@@ -69,7 +69,7 @@ module ActiveRecordRules
         rescue StandardError => e
           ActiveRecord::Base.connection.execute(<<~SQL.squish!)
             update #{RuleMatch.table_name}
-               set failed_since = current_timestamp
+               set failed_since = coalesce(failed_since, current_timestamp)
              where id = #{ActiveRecord::Base.connection.quote(match.id)}
           SQL
           raise e
@@ -87,7 +87,7 @@ module ActiveRecordRules
           ActiveRecord::Base.connection.execute(<<~SQL.squish!)
             update #{RuleMatch.table_name}
                set running_since = null,
-                   failed_since = current_timestamp
+                   failed_since = coalesce(failed_since, current_timestamp)
              where id = #{ActiveRecord::Base.connection.quote(match.id)}
           SQL
           raise e
@@ -119,7 +119,7 @@ module ActiveRecordRules
           ActiveRecord::Base.connection.execute(<<~SQL.squish!)
             update #{RuleMatch.table_name}
                set running_since = null,
-                   failed_since = current_timestamp
+                   failed_since = coalesce(failed_since, current_timestamp)
              where id = #{ActiveRecord::Base.connection.quote(match.id)}
           SQL
           raise e
