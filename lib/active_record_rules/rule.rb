@@ -33,24 +33,15 @@ module ActiveRecordRules
       return RuleMatch.find(ids) unless timing == :async
 
       quoted_ids = ids.map { ActiveRecord::Base.connection.quote(_1) }
-      attributes = ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+      RuleMatch.find_by_sql(<<~SQL.squish!)
         update #{RuleMatch.table_name}
            set running_since = current_timestamp,
                queued_since = null
           where id in (#{quoted_ids.join(", ")})
             and (queued_since is not null or failed_since is not null)
             and running_since is null
-          returning id
+          returning id, rule_id, ids, live_arguments, next_arguments
       SQL
-
-      # If we don't find attributes, then we haven't claimed anything,
-      # so return nil.
-      return [] if attributes.empty?
-
-      # This hits the database again, which I don't love, but it's
-      # tricky to construct a new ActiveRecord object that thinks it's
-      # persisted without doing this.
-      RuleMatch.find(attributes.pluck("id"))
     end
 
     def run_pending_execution(match)

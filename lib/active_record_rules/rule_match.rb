@@ -20,8 +20,7 @@ module ActiveRecordRules
 
     def deconstruct_keys(_)
       { id: id,
-        queued_since: queued_since,
-        running_since: running_since,
+        rule_id: rule_id,
         ids: ids,
         live_arguments: live_arguments,
         next_arguments: next_arguments }
