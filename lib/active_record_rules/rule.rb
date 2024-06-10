@@ -30,21 +30,24 @@ module ActiveRecordRules
     end
 
     def self.claim_pending_executions!(ids, timing)
-      return RuleMatch.find(ids) unless timing == :async
-
-      quoted_ids = ids.map { ActiveRecord::Base.connection.quote(_1) }
-      RuleMatch.find_by_sql(<<~SQL.squish!)
-        update #{RuleMatch.table_name}
-           set running_since = current_timestamp,
-               queued_since = null
-          where id in (#{quoted_ids.join(", ")})
-            and (queued_since is not null or failed_since is not null)
-            and running_since is null
-          returning id, rule_id, ids, live_arguments, next_arguments
-      SQL
+      if timing == :async
+        quoted_ids = ids.map { ActiveRecord::Base.connection.quote(_1) }
+        ActiveRecord::Base.connection.execute(<<~SQL.squish!).pluck("id", "rule_id")
+          update #{RuleMatch.table_name}
+             set running_since = current_timestamp,
+                 queued_since = null
+            where id in (#{quoted_ids.join(", ")})
+              and (queued_since is not null or failed_since is not null)
+              and running_since is null
+            returning id, rule_id
+        SQL
+      else
+        RuleMatch.where(id: ids).pluck("id", "rule_id")
+      end
     end
 
-    def run_pending_execution(match)
+    def run_pending_execution(match_id)
+      match = RuleMatch.find(match_id)
       raise "Cannot run execution meant for another rule!" unless match.rule_id == id
 
       case match

@@ -6,7 +6,7 @@ class Item < TestRecord; end
 class OrderItem < TestRecord; end
 
 RSpec.describe ActiveRecordRules do
-  subject { order.reload.discount }
+  subject { order.reload.total_price }
 
   let(:matches) { TestHelper.matches }
   let(:customer) { Customer.create! }
@@ -22,6 +22,7 @@ RSpec.describe ActiveRecordRules do
         t.references :customer
         t.string :status, default: "pending"
         t.float :discount, default: 0
+        t.float :total_price
       end
 
       schema.create_table :items do |t|
@@ -37,7 +38,7 @@ RSpec.describe ActiveRecordRules do
     end
 
     described_class.define_rule(<<~RULE)
-      async rule: Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers
+      after save rule: Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers
         Order(id = <order_id>, <customer_id>, status = "pending")
         Customer(id = <customer_id>, vip_customer = true)
         <order_value> = sum(<value> * <quantity>) {
@@ -52,6 +53,16 @@ RSpec.describe ActiveRecordRules do
         # If the order has been completed, then we don't touch it any more
         order.update!(discount: 0) unless order.status == "completed"
     RULE
+
+    described_class.define_rule(<<~RULE)
+      after save rule: Calculate order price from items and discount
+        Order(id = <order_id>, <customer_id>, <discount>)
+        <order_value> = sum(<value> * <quantity>) {
+          OrderItem(<order_id>, <quantity>, <value>)
+        }
+      on match
+        Order.find(order_id).update!(total_price: (1.0 - discount) * order_value)
+    RULE
   end
 
   context "with a non-VIP customer" do
@@ -64,7 +75,7 @@ RSpec.describe ActiveRecordRules do
 
       before { OrderItem.create!(order_id: order.id, item_id: item.id, quantity: 1, value: 101) }
 
-      it { is_expected.to be_zero }
+      it { is_expected.to eq(101.0) }
     end
 
     context "with a quantity worth over 100" do
@@ -72,7 +83,7 @@ RSpec.describe ActiveRecordRules do
 
       before { OrderItem.create!(order_id: order.id, item_id: item.id, quantity: 2, value: 51) }
 
-      it { is_expected.to be_zero }
+      it { is_expected.to eq(102.0) }
     end
 
     context "with two items together worth 100" do
@@ -84,7 +95,7 @@ RSpec.describe ActiveRecordRules do
         OrderItem.create!(order_id: order.id, item_id: item2.id, quantity: 1, value: 71)
       end
 
-      it { is_expected.to be_zero }
+      it { is_expected.to eq(102.0) }
     end
 
     context "with two items together worth 100, but one is on sale" do
@@ -96,7 +107,7 @@ RSpec.describe ActiveRecordRules do
         OrderItem.create!(order_id: order.id, item_id: item2.id, quantity: 1, value: 71)
       end
 
-      it { is_expected.to be_zero }
+      it { is_expected.to eq(102.0) }
     end
   end
 
@@ -110,9 +121,11 @@ RSpec.describe ActiveRecordRules do
     context "with a single item worth over 100" do
       let(:item) { Item.create! }
 
-      before { OrderItem.create!(order_id: order.id, item_id: item.id, quantity: 1, value: 101) }
+      before do
+        OrderItem.create!(order_id: order.id, item_id: item.id, quantity: 1, value: 101)
+      end
 
-      it { is_expected.not_to be_zero }
+      it { is_expected.to eq(90.9) }
     end
 
     context "with a quantity worth over 100" do
@@ -120,12 +133,12 @@ RSpec.describe ActiveRecordRules do
 
       before { OrderItem.create!(order_id: order.id, item_id: item.id, quantity: 2, value: 51) }
 
-      it { is_expected.not_to be_zero }
+      it { is_expected.to eq(91.8) }
 
       describe "transferring the order to non-VIP customer" do
         before { order.update!(customer_id: Customer.create!) }
 
-        it { is_expected.to be_zero }
+        it { is_expected.to eq(102.0) }
       end
     end
 
@@ -138,12 +151,12 @@ RSpec.describe ActiveRecordRules do
         OrderItem.create!(order_id: order.id, item_id: item2.id, quantity: 1, value: 71)
       end
 
-      it { is_expected.not_to be_zero }
+      it { is_expected.to eq(91.8) }
 
       describe "after completing" do
         before { order.update!(status: "completed") }
 
-        it { is_expected.not_to be_zero }
+        it { is_expected.to eq(91.8) }
       end
     end
 
@@ -156,12 +169,12 @@ RSpec.describe ActiveRecordRules do
         OrderItem.create!(order_id: order.id, item_id: item2.id, quantity: 1, value: 71)
       end
 
-      it { is_expected.to be_zero }
+      it { is_expected.to eq(102.0) }
 
       describe "the item coming off sale" do
         before { item2.update!(sale_discount: 0) }
 
-        it { is_expected.not_to be_zero }
+        it { is_expected.to eq(91.8) }
       end
     end
   end

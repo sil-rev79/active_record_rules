@@ -56,6 +56,15 @@ on unmatch
   order = Order.find(order_id)
   # If the order has been completed, then we don't touch it any more
   order.update!(discount: 0) unless order.status == "completed"
+
+after save rule: Calculate order price from items and discount
+  Order(id = <order_id>, <customer_id>, <discount>)
+  <order_value> = sum(<value> * <quantity>) {
+    OrderItem(<order_id>, <quantity>, <value>)
+  }
+on match
+  Order.find(order_id).update!(total_price: (1.0 - discount) * order_value)
+
 ```
 
 Rule executions are remembered by record id and variable bindings, so each rule will match once per set of matching objects, then won't match again for those objects until a relevant value changes. In the rule above, adding or removing an item from an order will automatically re-run the `match` code.
