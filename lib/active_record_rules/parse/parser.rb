@@ -22,7 +22,7 @@ module ActiveRecordRules
 
       rule(:timing) do
         str("async") | (
-          str("post-") >> (str("save") | str("commit"))
+          str("after") >> horizontal_whitespace >> (str("save") | str("commit"))
         )
       end
 

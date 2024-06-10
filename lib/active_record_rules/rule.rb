@@ -156,7 +156,7 @@ module ActiveRecordRules
         logger&.info { "Rule(#{id}): activating rule" }
         logger&.debug do
           "Rule(#{id}): activating for: \n  " + pending_activations.map do |pending_activation|
-            format_plain_sql_conditions([pending_activation])
+            format_plain_sql_conditions([pending_activation]).squish!
           end.join("\n  ")
         end
       end

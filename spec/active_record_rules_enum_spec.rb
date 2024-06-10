@@ -33,7 +33,7 @@ RSpec.describe ActiveRecordRules do
   describe "using enums as strings" do
     before do
       described_class.define_rule(<<~RULE)
-        post-commit rule: A pending work order has a pending approval
+        after commit rule: A pending work order has a pending approval
           WorkOrder(<id>, status:s = "pending_approval")
         on match
           WorkOrderApproval.create!(work_order_id: id, status: 'pending')

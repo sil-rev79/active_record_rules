@@ -13,9 +13,9 @@ module ActiveRecordRules
         super()
         @location = location
         @timing = case timing
-                  in /post-save/
+                  in /after *save/
                     :after_save
-                  in /post-commit/
+                  in /after *commit/
                     :after_commit
                   in /async/
                     :async

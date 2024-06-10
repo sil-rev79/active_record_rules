@@ -42,7 +42,7 @@ At the moment only Postgres and SQLite are supported. Contributions are welcome 
 With the default Rails configuration you can define rules in any file with the `.rules` extension. These rules will be loaded when your Rails application starts. The rules use a custom DSL that looks like this:
 
 ```
-post-save rule: Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers
+after save rule: Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers
   Order(id = <order_id>, <customer_id>, status = "pending")
   Customer(id = <customer_id>, vip_customer = true)
   <order_value> = sum(<value> * <quantity>) {
@@ -77,8 +77,8 @@ Rule evaluation happens in three stages:
  3. *executing*: run the code for each clause which needs to be executed.
 
 Each rule declares how it will be run:
- - `post-save`, i.e. in an `after_save` hook;
- - `post-commit`, i.e. in an `after_commit` hook; or
+ - `after save`, i.e. in an `after_save` hook;
+ - `after commit`, i.e. in an `after_commit` hook; or
  - `async`, i.e. in an `ActiveJob` that is scheduled in an `after_commit` hook.
 
 ## Rule State
