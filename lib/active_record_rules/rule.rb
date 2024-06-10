@@ -67,11 +67,13 @@ module ActiveRecordRules
         begin
           execute_unmatch(live_arguments)
         rescue StandardError => e
-          ActiveRecord::Base.connection.execute(<<~SQL.squish!)
-            update #{RuleMatch.table_name}
-               set failed_since = coalesce(failed_since, current_timestamp)
-             where id = #{ActiveRecord::Base.connection.quote(match.id)}
-          SQL
+          if timing == :async
+            ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+              update #{RuleMatch.table_name}
+                 set failed_since = coalesce(failed_since, current_timestamp)
+               where id = #{ActiveRecord::Base.connection.quote(match.id)}
+            SQL
+          end
           raise e
         end
 
@@ -84,19 +86,20 @@ module ActiveRecordRules
         begin
           execute_match(next_arguments)
         rescue StandardError => e
-          ActiveRecord::Base.connection.execute(<<~SQL.squish!)
-            update #{RuleMatch.table_name}
-               set running_since = null,
-                   failed_since = coalesce(failed_since, current_timestamp)
-             where id = #{ActiveRecord::Base.connection.quote(match.id)}
-          SQL
+          if timing == :async
+            ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+              update #{RuleMatch.table_name}
+                 set running_since = null,
+                     failed_since = coalesce(failed_since, current_timestamp)
+               where id = #{ActiveRecord::Base.connection.quote(match.id)}
+            SQL
+          end
           raise e
         end
 
         ActiveRecord::Base.connection.execute(<<~SQL.squish!)
           update #{RuleMatch.table_name}
-             set running_since = null,
-                 failed_since = null,
+             set #{timing == :async ? "running_since = null, failed_since = null," : ""}
                  live_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)},
                  next_arguments = case when next_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)} then
                                     null
@@ -116,18 +119,20 @@ module ActiveRecordRules
         begin
           execute_update(live_arguments, next_arguments)
         rescue StandardError => e
-          ActiveRecord::Base.connection.execute(<<~SQL.squish!)
-            update #{RuleMatch.table_name}
-               set running_since = null,
-                   failed_since = coalesce(failed_since, current_timestamp)
-             where id = #{ActiveRecord::Base.connection.quote(match.id)}
-          SQL
+          if timing == :async
+            ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+              update #{RuleMatch.table_name}
+                 set running_since = null,
+                     failed_since = coalesce(failed_since, current_timestamp)
+               where id = #{ActiveRecord::Base.connection.quote(match.id)}
+            SQL
+          end
           raise e
         end
 
         ActiveRecord::Base.connection.execute(<<~SQL.squish!)
           update #{RuleMatch.table_name}
-             set running_since = null,
+             set #{timing == :async ? "running_since = null, failed_since = null," : ""}
                  live_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)},
                  next_arguments = case when next_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)} then
                                     null
