@@ -84,17 +84,15 @@ module ActiveRecordRules
 
             paths = []
             while (item, path = candidates.shift)
-              next unless done.add?(item.table)
+              next unless done.add?(item)
 
               if target_tables.include?(item.table)
                 paths << path
-                target_tables.delete(item.table)
-                break if target_tables.empty?
-              end
-
-              @edges[item.table].each do |field, local_edges|
-                local_edges.each do |edge|
-                  candidates << [edge, [[edge, TableField.new(item.table, field)]] + path]
+              else
+                @edges[item.table].each do |field, local_edges|
+                  local_edges.each do |edge|
+                    candidates << [edge, [[edge, TableField.new(item.table, field)]] + path]
+                  end
                 end
               end
             end
@@ -254,26 +252,61 @@ module ActiveRecordRules
         SQL
       end
 
+      class BindingMap
+        def initialize(parent)
+          @parent = parent
+          @values = Hash.new { _1[_2] = [] }
+        end
+
+        def [](key)
+          if @parent
+            @values[key] + @parent[key]
+          else
+            @values[key]
+          end
+        end
+
+        def add(key, value)
+          @values[key] << value
+        end
+
+        def each_value(&block)
+          if @parent
+            @values.each do |key, value|
+              block.call(value + @parent[key])
+            end
+          else
+            @values.each_value(&block)
+          end
+        end
+      end
+
       def populate_table_edges!
         return if @edges
 
         populate_query_parts!
 
-        table_bindings = Hash.new { _1[_2] = [] }
+        binding_maps = []
 
-        to_do = constraints.dup.map { [_1, true] }
+        table_bindings = BindingMap.new(nil)
+        binding_maps << table_bindings
+        to_do = constraints.dup.map { [_1, true, table_bindings] }
         table_index = 0
         @target_tables = []
         @start_tables = Hash.new { _1[_2] = [] }
         @internal_table_names = {}
         @external_table_names = {}
         i = 0
-        while (constraint, top_level = to_do.shift)
+        while (constraint, top_level, bindings = to_do.shift)
           case constraint
           in Aggregate(aggregated_constraints)
-            to_do += aggregated_constraints.map { [_1, false] }
+            subbindings = BindingMap.new(bindings)
+            binding_maps << subbindings
+            to_do += aggregated_constraints.map { [_1, false, subbindings] }
           in Negation(negated_constraints)
-            to_do += negated_constraints.map { [_1, false] }
+            subbindings = BindingMap.new(bindings)
+            binding_maps << subbindings
+            to_do += negated_constraints.map { [_1, false, subbindings] }
           in RecordMatcher(match_klass, clauses)
             table_name = "#{match_klass.table_name}_#{table_index += 1}"
             @internal_table_names[table_name] = match_klass.table_name
@@ -286,19 +319,19 @@ module ActiveRecordRules
             clauses.each do |clause|
               case clause
               in BinaryOperatorExpression(Variable(lhs), "=", RecordField(rhs))
-                table_bindings[lhs] << TableField.new(table_name, rhs)
+                bindings.add(lhs, TableField.new(table_name, rhs))
               in BinaryOperatorExpression(RecordField(lhs), "=", Variable(rhs))
-                table_bindings[rhs] << TableField.new(table_name, lhs)
+                bindings.add(rhs, TableField.new(table_name, lhs))
               else
                 # Recurse into the LHS and RHS to find other relevant tables.
-                to_do << [lhs, false]
-                to_do << [rhs, false]
+                to_do << [lhs, false, bindings]
+                to_do << [rhs, false, bindings]
               end
             end
           in BinaryOperatorExpression(lhs, _, rhs)
             # Recurse into the LHS and RHS to find other relevant tables.
-            to_do << [lhs, false]
-            to_do << [rhs, false]
+            to_do << [lhs, false, bindings]
+            to_do << [rhs, false, bindings]
           else
             # we're not handling anything else
             nil
@@ -306,9 +339,11 @@ module ActiveRecordRules
         end
 
         @edges = Hash.new { _1[_2] = {} } # table => { field => [TableField ...] }
-        table_bindings.each_value do |table_fields|
-          table_fields.each do |table_field|
-            @edges[table_field.table][table_field.field] = table_fields.reject { _1 == table_field }
+        binding_maps.each do |binding_map|
+          binding_map.each_value do |table_fields|
+            table_fields.each do |table_field|
+              @edges[table_field.table][table_field.field] = table_fields.reject { _1 == table_field }
+            end
           end
         end
       end
