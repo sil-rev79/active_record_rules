@@ -142,8 +142,14 @@ module ActiveRecordRules
       definition.affected_ids_sql(klass, previous, current)
     end
 
-    def relevant_attributes_by_class
-      definition.relevant_attributes_by_class
+    def relevant_attributes(klass)
+      @attributes_by_class ||= {}
+      @attributes_by_class[klass] ||=
+        definition.relevant_attributes_by_class.map do |klass_key, attributes|
+          klass <= klass_key ? attributes : Set.new
+        end.reduce(Set.new, &:+)
+
+      @attributes_by_class[klass]
     end
 
     def activate(pending_activations = nil)

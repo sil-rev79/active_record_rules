@@ -53,7 +53,7 @@ module ActiveRecordRules
 
         populate_table_edges!
 
-        @start_tables[klass].each do |table|
+        @start_tables[klass.table_name].each do |table|
           if @target_tables.include?(table)
             # No need to find a path if the record we're changing is
             # one of our ground ids. Nice and easy.
@@ -321,7 +321,7 @@ module ActiveRecordRules
             i += 1
 
             @target_tables << table_name if top_level
-            @start_tables[match_klass] << table_name
+            @start_tables[match_klass.table_name] << table_name
 
             clauses.each do |clause|
               case clause

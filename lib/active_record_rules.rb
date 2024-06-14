@@ -219,7 +219,7 @@ module ActiveRecordRules
       class_name, previous, current = change
       klass = Object.const_get(class_name)
       rules.flat_map do |_, rule|
-        next [] if rule.relevant_attributes_by_class[klass].nil?
+        next [] if rule.relevant_attributes(klass).empty?
 
         pending = rule.calculate_required_activations(klass, previous, current)
         next [] if pending.empty?
@@ -283,8 +283,8 @@ module ActiveRecordRules
 
     def relevant_attributes(klass)
       @loaded_rules.map do |_, rule|
-        rule.relevant_attributes_by_class[klass] || Set.new
-      end.reduce(Set.new, &:+)
+        rule.relevant_attributes(klass)
+      end.compact.reduce(Set.new, &:+)
     end
   end
 end

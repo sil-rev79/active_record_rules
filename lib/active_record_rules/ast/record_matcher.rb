@@ -43,7 +43,7 @@ module ActiveRecordRules
       end
 
       def relevant_change?(klass, previous, current)
-        return false unless klass == @class
+        return false unless klass <= @class
 
         @clauses.any? do |clause|
           clause.relevant_change?(klass, previous, current)
