@@ -118,8 +118,11 @@ module ActiveRecordRules
                 # really need to hit a table at all, we can just return
                 # the values we already know about.
                 selections[first.table] = lambda { |attributes|
-                  ActiveRecord::Base.connection.quote(
-                    attributes[dead_last.field]
+                  id_cast(
+                    ActiveRecord::Base.connection.quote(
+                      attributes[dead_last.field]
+                    ),
+                    klass
                   )
                 }
               else
@@ -132,7 +135,7 @@ module ActiveRecordRules
 
                 wheres << lambda { |attributes|
                   value = ActiveRecord::Base.connection.quote(attributes[dead_last.field])
-                  gen_eq("#{last.table}.#{last.field}", value)
+                  gen_eq("#{last.table}.#{last.field}", id_cast(value, klass))
                 }
               end
             end
