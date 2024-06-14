@@ -306,6 +306,10 @@ module ActiveRecordRules
             subbindings = BindingMap.new(bindings)
             binding_maps << subbindings
             to_do += aggregated_constraints.map { [_1, false, subbindings] }
+          in Any(existential_constraints)
+            subbindings = BindingMap.new(bindings)
+            binding_maps << subbindings
+            to_do += existential_constraints.map { [_1, false, subbindings] }
           in Negation(negated_constraints)
             subbindings = BindingMap.new(bindings)
             binding_maps << subbindings
