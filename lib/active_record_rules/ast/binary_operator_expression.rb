@@ -25,7 +25,7 @@ module ActiveRecordRules
           in "="
             gen_eq(left_str, right_str)
           in "!="
-            "not #{gen_eq(left_str, right_str)}"
+            "not (#{gen_eq(left_str, right_str)})"
           in "in"
             case ActiveRecordRules.dialect
             in :postgres
