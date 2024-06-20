@@ -86,6 +86,18 @@ RSpec.describe ActiveRecordRules do
         expect(slower_racer.reload.winner).to be_nil
       end
     end
+
+    context "with a slower racer in a separate race" do
+      let!(:other_racer) { Racer.create!(race_id: 2, race_time: 15) }
+
+      it "marks the new racer as a winner" do
+        expect(other_racer.reload.winner).to be true
+      end
+
+      it "leaves the existing racer as a winner" do
+        expect(racer.reload.winner).to be true
+      end
+    end
   end
 
   describe "properties" do

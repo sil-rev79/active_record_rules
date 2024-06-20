@@ -75,6 +75,11 @@ module ActiveRecordRules
 
       conditions = [
         *@conditions.compact.map { _1.call(resolved_bindings) },
+        *outer_bindings.flat_map do |name, value|
+          (all_bindings[name] || []).map do |other|
+            gen_eq(value, other)
+          end
+        end,
         *@bindings.keys.flat_map do |name|
           first = all_bindings[name][0]
           (all_bindings[name][1..] || []).map do |other|
