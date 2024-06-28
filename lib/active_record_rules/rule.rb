@@ -155,12 +155,19 @@ module ActiveRecordRules
     def activate(pending_activations = nil)
       conditions = format_sql_conditions(pending_activations)
 
-      if conditions == [["false", "false"]]
+      if conditions == false
         logger&.info { "Rule(#{id}): activating rule with no pending activations - doing nothing" }
         return []
-      elsif conditions.include?(["true", "true"])
+      end
+      conditions.reject! { _1 == "false" }
+
+      if conditions == true
         logger&.info { "Rule(#{id}): activating rule for all records" }
-        conditions = [["true", "true"]]
+        # We need a valid SQL query here, and "select 1" is about as
+        # trivial as I can think of. The conditions being "true" means
+        # that we won't actually use the result of the query, so it
+        # should be fine.
+        conditions = ["select 1", "true", "true"]
       else
         logger&.info { "Rule(#{id}): activating rule" }
         logger&.debug do
@@ -170,39 +177,40 @@ module ActiveRecordRules
         end
       end
 
-      conditions.flat_map do |plain_sql, json_sql|
+      conditions.flat_map do |sql, plain_sql, json_sql|
         ActiveRecord::Base.connection.execute(<<~SQL.squish!).to_a.map { _1["id"] }
-          insert into #{RuleMatch.table_name}(rule_id, ids, queued_since, next_arguments)
-            select #{ActiveRecord::Base.connection.quote(id)},
-                   coalesce(record.ids, match.ids),
-                   case when record.arguments = match.live_arguments then
-                     match.queued_since
-                   else
-                     coalesce(match.queued_since, current_timestamp)
-                   end,
-                   case when record.arguments = match.live_arguments then
-                     match.next_arguments
-                   else
-                     record.arguments
-                   end
-              from (
-                #{definition.to_query_sql.split("\n").join("\n      ")}
-                 where #{plain_sql}
-              ) as record
-              full outer join (
-                select queued_since,
-                       ids,
-                       live_arguments,
-                       next_arguments
-                  from #{RuleMatch.table_name}
-                 where rule_id = #{ActiveRecord::Base.connection.quote(id)}
-                   and #{json_sql}
-              ) as match on match.ids = record.ids
-             where true
-          on conflict(rule_id, ids) do update
-            set queued_since = excluded.queued_since,
-                next_arguments = excluded.next_arguments
-          returning id
+          with __ids as (#{sql})
+            insert into #{RuleMatch.table_name}(rule_id, ids, queued_since, next_arguments)
+              select #{ActiveRecord::Base.connection.quote(id)},
+                     coalesce(record.ids, match.ids),
+                     case when record.arguments = match.live_arguments then
+                       match.queued_since
+                     else
+                       coalesce(match.queued_since, current_timestamp)
+                     end,
+                     case when record.arguments = match.live_arguments then
+                       match.next_arguments
+                     else
+                       record.arguments
+                     end
+                from (
+                  #{definition.to_query_sql.split("\n").join("\n      ")}
+                   where #{plain_sql}
+                ) as record
+                full outer join (
+                  select queued_since,
+                         ids,
+                         live_arguments,
+                         next_arguments
+                    from #{RuleMatch.table_name}
+                   where rule_id = #{ActiveRecord::Base.connection.quote(id)}
+                     and #{json_sql}
+                ) as match on match.ids = record.ids
+               where true
+            on conflict(rule_id, ids) do update
+              set queued_since = excluded.queued_since,
+                  next_arguments = excluded.next_arguments
+            returning id
         SQL
       end.uniq
     end
@@ -212,25 +220,25 @@ module ActiveRecordRules
     private
 
     def format_sql_conditions(pending_activations)
-      return ["true"] if pending_activations.nil? || pending_activations.include?(:all)
-      return ["false"] if pending_activations.empty?
+      return true if pending_activations.nil? || pending_activations.include?(:all)
+      return false if pending_activations.empty?
 
       pending_activations.map do |pending_activation|
         ids = pending_activation.condition_terms.map { "q.__id_#{_1}" }
-        sql_condition = "(#{ids.join(", ")}) in (#{pending_activation.condition_sql})"
+        sql_condition = "(#{ids.join(", ")}) in (select * from __ids)"
         json_condition = case ActiveRecordRules.dialect
                          in :sqlite
                            terms = pending_activation.condition_terms.map { "ids->>'#{_1}'" }
-                           "(#{terms.join(", ")}) in (#{pending_activation.condition_sql})"
+                           "(#{terms.join(", ")}) in (select * from __ids)"
                          in :postgres
-                           terms = pending_activation.condition_terms.flat_map { ["'#{_1}'", "_ids.#{_1}"] }
+                           terms = pending_activation.condition_terms.flat_map { ["'#{_1}'", "__ids.#{_1}"] }
                            <<~SQL
                              ids @> any(
-                               (select jsonb_build_object(#{terms.join(", ")}) from (#{pending_activation.condition_sql}) as _ids)
+                               (select jsonb_build_object(#{terms.join(", ")}) from __ids)
                              )
                            SQL
                          end
-        [sql_condition, json_condition]
+        [pending_activation.condition_sql, sql_condition, json_condition]
       end
     end
 
