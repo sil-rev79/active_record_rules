@@ -100,7 +100,7 @@ The current state of matches is stored in `RuleMatch` records. As the rules them
 
     ```
     ids = ActiveRecordRules.find_rule(rule_name).activate
-    ActiveRecordRules.run_pending_executions(ids, :all)
+    ActiveRecordRules.run_pending_executions(ids)
     ```
 
  3. **Updates to rule logic/code may leave inconsistencies in `update`/`unmatch` clauses.** Due to the way ActiveRecordRules persists the last-matched values for `update` and `unmatch` clauses, the variables provided to these clauses may not match those expected by the rule. Any names not present in the last-matched values will be provided as `nil`, and any binding names removed from the matching logic will not be accessible.
