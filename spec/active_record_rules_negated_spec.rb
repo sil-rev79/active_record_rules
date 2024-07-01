@@ -2,10 +2,6 @@
 
 class Racer < TestRecord; end
 
-class RacerNoTrigger < ActiveRecord::Base
-  self.table_name = "racers"
-end
-
 RSpec.describe ActiveRecordRules do
   before do
     define_tables do |schema|
@@ -17,7 +13,7 @@ RSpec.describe ActiveRecordRules do
     end
 
     described_class.define_rule <<~RULE
-      async rule: the fastest is the winner
+      after commit rule: the fastest is the winner
         Racer(<id>, <race_id>, <race_time>)
         not { Racer(<race_id>, race_time < <race_time>) }
       on match
@@ -25,6 +21,12 @@ RSpec.describe ActiveRecordRules do
       on unmatch
         Racer.find(id).update!(winner: false)
     RULE
+
+    ActiveRecord::Base.logger = Logger.new($stdout)
+  end
+
+  after do
+    ActiveRecord::Base.logger = nil
   end
 
   describe "examples" do
@@ -105,15 +107,32 @@ RSpec.describe ActiveRecordRules do
       generate(times: array(int(0..100), length: 1..).map(&:uniq))
 
       before do
-        # We want to avoid triggering on each rule, to avoid making
-        # this test take forever. Since we work on the database level,
-        # we can use a different Ruby model and it still works.
         times.each { Racer.create!(race_time: _1) }
-        # described_class.trigger_all(Racer)
       end
 
       it_always "has a single winner" do
         expect(Racer.where(winner: true).size).to eq(1)
+      end
+    end
+
+    context "with multiple races" do # rubocop:disable RSpec/EmptyExampleGroup
+      generate(
+        times: array(
+          tuple(maybe(int(1..3)), int(0..100)),
+          length: 1..
+        )
+      )
+
+      before do
+        times.each do |race_id, time|
+          Racer.create!(race_id: race_id, race_time: time)
+        end
+      end
+
+      it_always "marks multiple winners with the same time" do
+        times.map(&:first).uniq.each do |race_id|
+          expect(Racer.where(race_id: race_id, winner: true).pluck(:race_time).uniq.size).to eq(1)
+        end
       end
     end
   end
