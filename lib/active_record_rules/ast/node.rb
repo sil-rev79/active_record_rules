@@ -22,7 +22,9 @@ module ActiveRecordRules
         in _, "NULL"
           "#{left} is NULL"
         else
-          if never_null?(left) || never_null?(right)
+          if never_null?(left) && never_null?(right)
+            "(#{left} = #{right})"
+          elsif never_null?(left) || never_null?(right)
             "(#{left} = #{right}) is true"
           else
             "(#{left} = #{right} or (#{left} is null and #{right} is null)) is true"
