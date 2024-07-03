@@ -29,7 +29,7 @@ module ActiveRecordRules
       super || definition.unparse == other.definition.unparse
     end
 
-    def self.claim_pending_executions!(ids, include_failed: false)
+    def self.claim_pending_executions!(ids)
       return [] if ids.empty?
 
       quoted_ids = ids.map { ActiveRecord::Base.connection.quote(_1) }
@@ -38,7 +38,7 @@ module ActiveRecordRules
            set running_since = current_timestamp,
                queued_since = null
           where id in (#{quoted_ids.join(", ")})
-            and (queued_since is not null#{include_failed ? " or failed_since is not null" : ""})
+            and (queued_since is not null or failed_since is not null)
             and running_since is null
           returning *
       SQL
