@@ -246,7 +246,8 @@ module ActiveRecordRules
     # @param ids [Array] An array of RuleMatch ids which need to be executed
     # @return nil
     def run_pending_executions(ids)
-      until (pending = Rule.claim_pending_executions!(ids)).empty?
+      first_loop = true
+      until (pending = Rule.claim_pending_executions!(ids, include_failed: first_loop)).empty?
         pending.each do |match|
           rule = @loaded_rules[match.rule_id]
           unless rule
@@ -257,6 +258,7 @@ module ActiveRecordRules
 
           rule.run_pending_execution(match)
         end
+        first_loop = false
       end
       nil
     end
