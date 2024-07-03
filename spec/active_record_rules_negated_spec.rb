@@ -21,12 +21,6 @@ RSpec.describe ActiveRecordRules do
       on unmatch
         Racer.find(id).update!(winner: false)
     RULE
-
-    ActiveRecord::Base.logger = Logger.new($stdout)
-  end
-
-  after do
-    ActiveRecord::Base.logger = nil
   end
 
   describe "examples" do
