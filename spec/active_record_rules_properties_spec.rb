@@ -300,18 +300,18 @@ RSpec.describe ActiveRecordRules do
         end
       end
 
-      # describe "four cards, one created with dup" do
-      #   before do
-      #     Card.create!(suit: "heart", rank: "2")
-      #     Card.create!(suit: "heart", rank: "3")
-      #     card = Card.create!(suit: "heart", rank: "4")
-      #     card.dup.save!
-      #   end
+      describe "four cards, one created with dup" do
+        before do
+          Card.create!(suit: "heart", rank: "2")
+          Card.create!(suit: "heart", rank: "3")
+          card = Card.create!(suit: "heart", rank: "4")
+          card.dup.save!
+        end
 
-      #   it "matches the resulting match" do
-      #     expect(TestHelper.matches.sort).to eq([["heart", ["2", "3", "4"]], ["heart", ["2", "3", "4"]]])
-      #   end
-      # end
+        it "matches the resulting match" do
+          expect(TestHelper.matches.sort).to eq([["heart", ["2", "3", "4"]], ["heart", ["2", "3", "4"]]])
+        end
+      end
     end
   end
 end

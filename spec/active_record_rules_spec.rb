@@ -477,7 +477,7 @@ RSpec.describe ActiveRecordRules do
       expect(TestHelper.matches).to be_empty
     end
 
-    it "doesn't match existing objects after an unrelated update", skip: "reconsidering semantics" do
+    it "doesn't match existing objects after an unrelated update" do
       person.update!(greetable: true)
       expect(TestHelper.matches).to be_empty
     end
