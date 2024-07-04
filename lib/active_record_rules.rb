@@ -246,14 +246,19 @@ module ActiveRecordRules
     # @param ids [Array] An array of RuleMatch ids which need to be executed
     # @return nil
     def run_pending_executions(ids)
-      Rule.claim_pending_executions!(ids).each do |match|
-        rule = @loaded_rules[match.rule_id]
-        unless rule
-          logger.warn("Could not find loaded rule for match (rule id: #{match.rule_id}): ignoring match #{match.id}.")
-          next
-        end
+      keep_going = true
+      while keep_going
+        keep_going = false
+        Rule.claim_pending_executions!(ids).each do |match|
+          rule = @loaded_rules[match.rule_id]
+          unless rule
+            logger.warn("Could not find loaded rule for match (rule id: #{match.rule_id}): ignoring match #{match.id}.")
+            next
+          end
 
-        rule.run_pending_execution(match)
+          needs_execution = rule.run_pending_execution(match)
+          keep_going ||= needs_execution
+        end
       end
       nil
     end

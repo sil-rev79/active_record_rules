@@ -50,6 +50,7 @@ module ActiveRecordRules
       case match
       in RuleMatch(live_arguments: nil, next_arguments: nil)
         match.delete
+        false # does not need execution
 
       in RuleMatch(ids:, live_arguments:, next_arguments: nil)
         logger&.info { "Rule(#{id}): unmatched for #{ids.to_json}" }
@@ -66,12 +67,13 @@ module ActiveRecordRules
           raise e
         end
 
-        ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+        ActiveRecord::Base.connection.execute(<<~SQL.squish!).pluck("needs_execution").any?
           update #{RuleMatch.table_name}
              set running_since = null,
                  failed_since = null,
                  live_arguments = null
            where id = #{ActiveRecord::Base.connection.quote(match.id)}
+           returning (queued_since is not null) as needs_execution
         SQL
 
       in RuleMatch(ids:, live_arguments: nil, next_arguments:)
@@ -90,7 +92,7 @@ module ActiveRecordRules
           raise e
         end
 
-        ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+        ActiveRecord::Base.connection.execute(<<~SQL.squish!).pluck("needs_execution").any?
           update #{RuleMatch.table_name}
              set running_since = null,
                   failed_since = null,
@@ -101,7 +103,7 @@ module ActiveRecordRules
                                     next_arguments
                                   end
            where id = #{ActiveRecord::Base.connection.quote(match.id)}
-           returning *
+           returning (queued_since is not null) as needs_execution
         SQL
 
       in RuleMatch(ids:, live_arguments:, next_arguments:)
@@ -125,7 +127,7 @@ module ActiveRecordRules
           raise e
         end
 
-        ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+        ActiveRecord::Base.connection.execute(<<~SQL.squish!).pluck("needs_execution").any?
           update #{RuleMatch.table_name}
              set running_since = null,
                  failed_since = null,
@@ -136,6 +138,7 @@ module ActiveRecordRules
                                     next_arguments
                                   end
            where id = #{ActiveRecord::Base.connection.quote(match.id)}
+           returning (queued_since is not null) as needs_execution
         SQL
       end
     end
@@ -180,7 +183,7 @@ module ActiveRecordRules
       end
 
       conditions.flat_map do |sql, plain_sql, json_sql|
-        ActiveRecord::Base.connection.execute(<<~SQL.squish!).to_a.map { _1["id"] }
+        ActiveRecord::Base.connection.execute(<<~SQL.squish!).to_a.pluck("id")
           with __ids as (#{sql})
             insert into #{RuleMatch.table_name}(rule_id, ids, queued_since, next_arguments)
               select #{ActiveRecord::Base.connection.quote(id)},
