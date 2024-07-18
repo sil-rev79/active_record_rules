@@ -44,6 +44,7 @@ module ActiveRecordRules
       SQL
     end
 
+    # @return [Boolean] whether this rule has further pending executions
     def run_pending_execution(match)
       raise "Cannot run execution meant for another rule!" unless match.rule_id == id
 
