@@ -148,6 +148,18 @@ module ActiveRecordRules
               end.uniq.join(",\n       ")
 
               tables_sql = tables.sort_by { _2.length }.map do |name, ons|
+                ons = ons.map do |clause|
+                  if clause.end_with?(" is true")
+                    # In the context of a joins on clause, the "is
+                    # true" is unnecessary, because NULL is
+                    # interpreted as false. However, leaving the "is
+                    # true" there prevents Postgres from using
+                    # indexes, so stripping it off is *really* useful.
+                    clause[0...-" is true".size]
+                  else
+                    clause
+                  end
+                end
                 if ons.empty?
                   " cross join #{@internal_table_names[name]} as #{name}"
                 else
@@ -164,7 +176,17 @@ module ActiveRecordRules
               tables_sql = tables_sql[(" cross join ".size)..]
 
               wheres_sql = wheres.map do |maker|
-                maker.call(attributes)
+                clause = maker.call(attributes)
+                if clause.end_with?(" is true")
+                  # In the context of a where clause, the "is true" is
+                  # unnecessary, because NULL is interpreted as
+                  # false. However, leaving the "is true" there
+                  # prevents Postgres from using indexes, so stripping
+                  # it off is *really* useful.
+                  clause[0...-" is true".size]
+                else
+                  clause
+                end
               end.uniq.join("\n   and ")
 
               pending_activations << Rule::PendingActivation.new(

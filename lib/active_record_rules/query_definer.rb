@@ -74,7 +74,19 @@ module ActiveRecordRules
       end.join
 
       conditions = [
-        *@conditions.compact.map { _1.call(resolved_bindings) },
+        *@conditions.compact.map do |condition|
+          clause = condition.call(resolved_bindings)
+          if clause.end_with?(" is true")
+            # In the context of a where clause, the "is true" is
+            # unnecessary, because NULL is interpreted as
+            # false. However, leaving the "is true" there
+            # prevents Postgres from using indexes, so stripping
+            # it off is *really* useful.
+            clause[0...-" is true".size]
+          else
+            clause
+          end
+        end,
         *outer_bindings.flat_map do |name, value|
           (all_bindings[name] || []).map do |other|
             gen_eq(value, other)
