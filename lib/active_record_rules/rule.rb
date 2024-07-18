@@ -158,6 +158,22 @@ module ActiveRecordRules
     end
 
     def activate(pending_activations = nil)
+      build_queries(pending_activations, logger).flat_map do |query|
+        ActiveRecord::Base.connection.execute(query).to_a.pluck("id")
+      end.uniq
+    end
+
+    def explain(pending_activations = nil)
+      build_queries(pending_activations, nil).map do |query|
+        ActiveRecord::Base.connection.execute("explain #{query}").to_a.map { _1.values.first }
+      end
+    end
+
+    PendingActivation = Struct.new(:condition_terms, :condition_sql)
+
+    private
+
+    def build_queries(pending_activations, logger)
       conditions = format_sql_conditions(pending_activations)
 
       if conditions == false
@@ -182,8 +198,8 @@ module ActiveRecordRules
         end
       end
 
-      conditions.flat_map do |sql, plain_sql, json_sql|
-        ActiveRecord::Base.connection.execute(<<~SQL.squish!).to_a.pluck("id")
+      conditions.map do |sql, plain_sql, json_sql|
+        <<~SQL.squish!
           with __ids as (#{sql})
             insert into #{RuleMatch.table_name}(rule_id, ids, queued_since, next_arguments)
               select #{ActiveRecord::Base.connection.quote(id)},
@@ -217,12 +233,8 @@ module ActiveRecordRules
                   next_arguments = excluded.next_arguments
             returning id
         SQL
-      end.uniq
+      end
     end
-
-    PendingActivation = Struct.new(:condition_terms, :condition_sql)
-
-    private
 
     def format_sql_conditions(pending_activations)
       return true if pending_activations.nil? || pending_activations.include?(:all)

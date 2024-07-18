@@ -228,6 +228,25 @@ module ActiveRecordRules
       end
     end
 
+    # Print the output of SQL's "explain" for each rule that would be
+    # activated for the provided change.
+    #
+    # @param change The change details to use to explain rules
+    # @param output The IO object to write to
+    def explain_rules(change, output = $stdout)
+      class_name, previous, current = change
+      klass = Object.const_get(class_name)
+      @loaded_rules.each do |_, rule|
+        next if rule.relevant_attributes(klass).empty?
+
+        pending = rule.calculate_required_activations(klass, previous, current)
+        next [] if pending.empty?
+
+        output.puts(rule.explain(pending))
+      end
+      nil
+    end
+
     # Schedule an Async activation process to run. Does nothing if
     # there are no rules defined.
     #
