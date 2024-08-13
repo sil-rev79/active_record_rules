@@ -604,4 +604,36 @@ RSpec.describe ActiveRecordRules do
       expect(TestHelper.matches).not_to be_empty
     end
   end
+
+  describe "updating without callbacks" do
+    before do
+      described_class.define_rule(<<~RULE)
+        async rule: find salutations with "hello" as their greeting
+          Salutation(<id> = id, greeting = "hello" or (greeting = "hi" and farewell = "bye"))
+        on match
+          TestHelper.matches.add(id)
+        on unmatch
+          TestHelper.matches.delete(id)
+      RULE
+      TestHelper.matches = Set.new
+    end
+
+    it "matches one branch of an or" do
+      Salutation.insert!({ greeting: "hello" })
+      described_class.evaluate_rules_for(Salutation.first)
+      expect(TestHelper.matches).not_to be_empty
+    end
+
+    it "fails to match one branch of an and" do
+      Salutation.insert!({ greeting: "hi" })
+      described_class.evaluate_rules_for(Salutation.first)
+      expect(TestHelper.matches).to be_empty
+    end
+
+    it "matches both branches of an and" do
+      Salutation.insert!({ greeting: "hi", farewell: "bye" })
+      described_class.evaluate_rules_for(Salutation.first)
+      expect(TestHelper.matches).not_to be_empty
+    end
+  end
 end

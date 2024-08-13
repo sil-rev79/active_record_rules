@@ -291,6 +291,34 @@ module ActiveRecordRules
       run_pending_executions(activate_rules(change, timing))
     end
 
+    # Evaluate all the rules relevant to a given record, running
+    # "after save" and "after commit" rules immediately, and
+    # scheduling "async" rules to run.
+    #
+    # This processes rules as if every record in the field was
+    # changed, but rule bodies will only be run if there has been an
+    # actual change. This may result in more *activations* than are
+    # strictly necessary, but it should not cause any additional
+    # *executions*.
+    #
+    # @param record A record to use to evaluate rules
+    def evaluate_rules_for(record)
+      change = if record.destroyed?
+                 # if the record is marked as destroyed then we want
+                 # to process it as a destroy
+                 capture_destroy_change(record)
+               else
+                 # a "create" change is the same as changing every
+                 # attribute to its current value, so will trigger
+                 # anything it needs to.
+                 capture_create_change(record)
+               end
+      ActiveRecordRules.activate_and_execute(change, :after_save)
+      ActiveRecordRules.activate_and_execute(change, :after_commit)
+      ActiveRecordRules.schedule_async_activation(change)
+      nil
+    end
+
     # Activate all rules, for all records. This may generate a *lot*
     # of ids to process. These ids should then be passed into the
     # ActiveRecordRules.run_pending_executions method.
