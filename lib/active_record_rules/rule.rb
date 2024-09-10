@@ -184,7 +184,6 @@ module ActiveRecordRules
         logger&.info { "Rule(#{id}): activating rule with no pending activations - doing nothing" }
         return []
       end
-      conditions.reject! { _1 == "false" }
 
       if conditions == true
         logger&.info { "Rule(#{id}): activating rule for all records" }
@@ -192,7 +191,7 @@ module ActiveRecordRules
         # trivial as I can think of. The conditions being "true" means
         # that we won't actually use the result of the query, so it
         # should be fine.
-        conditions = ["select 1", "true", "true"]
+        conditions = [["select 1", "true", "true"]]
       else
         logger&.info { "Rule(#{id}): activating rule" }
         logger&.debug do
