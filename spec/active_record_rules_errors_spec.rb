@@ -32,7 +32,7 @@ RSpec.describe ActiveRecordRules do
     let(:fraction) { Fraction.create!(numerator: 1, denominator: 0) }
 
     it "stores an error" do # rubocop:disable RSpec/MultipleExpectations
-      expect { fraction }.to raise_error(/divided by 0/)
+      expect { fraction }.to raise_error(/1 of 1 failed/)
       expect(ActiveRecordRules::RuleMatch.pluck(:failed_since).compact).not_to be_empty
     end
   end
