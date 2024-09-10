@@ -25,5 +25,15 @@ module ActiveRecordRules
         live_arguments: live_arguments,
         next_arguments: next_arguments }
     end
+
+    def execute!
+      rule = ActiveRecordRules.find_rule(rule_id)
+      unless rule
+        logger.warn("Could not find loaded rule for match (rule id: #{rule_id}): ignoring match #{id}.")
+        return
+      end
+
+      rule.run_pending_execution(self)
+    end
   end
 end
