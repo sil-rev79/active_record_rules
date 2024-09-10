@@ -108,24 +108,27 @@ module ActiveRecordRules
         SQL
 
       in RuleMatch(ids:, live_arguments:, next_arguments:)
-        return if live_arguments == next_arguments
+        if live_arguments == next_arguments
+          logger&.info { "Rule(#{id}): not executing - no change for #{ids.to_json}" }
+          logger&.debug { "Rule(#{id}): leaving match as #{live_arguments.to_json}" }
+        else
+          logger&.info { "Rule(#{id}): updated for #{ids.to_json}" }
+          logger&.debug do
+            "Rule(#{id}): updating from #{live_arguments.to_json} " \
+              "=> #{next_arguments.to_json}"
+          end
 
-        logger&.info { "Rule(#{id}): updated for #{ids.to_json}" }
-        logger&.debug do
-          "Rule(#{id}): updating from #{live_arguments.to_json} " \
-            "=> #{next_arguments.to_json}"
-        end
-
-        begin
-          execute_update(live_arguments, next_arguments)
-        rescue StandardError => e
-          ActiveRecord::Base.connection.execute(<<~SQL.squish!)
-            update #{RuleMatch.table_name}
-               set running_since = null,
-                   failed_since = coalesce(failed_since, current_timestamp)
-             where id = #{ActiveRecord::Base.connection.quote(match.id)}
-          SQL
-          raise e
+          begin
+            execute_update(live_arguments, next_arguments)
+          rescue StandardError => e
+            ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+              update #{RuleMatch.table_name}
+                 set running_since = null,
+                     failed_since = coalesce(failed_since, current_timestamp)
+               where id = #{ActiveRecord::Base.connection.quote(match.id)}
+            SQL
+            raise e
+          end
         end
 
         ActiveRecord::Base.connection.execute(<<~SQL.squish!).pluck("needs_execution").any?
