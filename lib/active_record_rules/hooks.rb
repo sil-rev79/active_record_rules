@@ -8,6 +8,7 @@ module ActiveRecordRules
           @arr__transaction_changes ||= Set.new
           ActiveRecordRules.activate_and_execute(change, :after_save)
           @arr__transaction_changes << change
+          Thread.current[:pending_active_record_rules_changes]&.push(change)
         end
       end
       klass.after_update do
@@ -15,6 +16,7 @@ module ActiveRecordRules
           @arr__transaction_changes ||= Set.new
           ActiveRecordRules.activate_and_execute(change, :after_save)
           @arr__transaction_changes << change
+          Thread.current[:pending_active_record_rules_changes]&.push(change)
         end
       end
       klass.after_destroy do
@@ -22,6 +24,7 @@ module ActiveRecordRules
           @arr__transaction_changes ||= Set.new
           ActiveRecordRules.activate_and_execute(change, :after_save)
           @arr__transaction_changes << change
+          Thread.current[:pending_active_record_rules_changes]&.push(change)
         end
       end
 
@@ -29,6 +32,9 @@ module ActiveRecordRules
       klass.after_commit do
         @arr__transaction_changes&.each do |change|
           ActiveRecordRules.activate_and_execute(change, :after_commit)
+          unless Thread.current[:pending_active_record_rules_changes]
+            ActiveRecordRules.activate_and_execute(change, :after_request)
+          end
           ActiveRecordRules.schedule_async_activation(change)
         end
       ensure

@@ -88,6 +88,7 @@ Rule evaluation happens in three stages:
 Each rule declares how it will be run:
  - `after save`, i.e. in an `after_save` hook;
  - `after commit`, i.e. in an `after_commit` hook; or
+ - `after request`, i.e. at the end of the nearest `ActiveRecord.wrap_request` block (or `after_commit` if no such block is active); or
  - `async`, i.e. in an `ActiveJob` that is scheduled in an `after_commit` hook.
 
 ## Rule State

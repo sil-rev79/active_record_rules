@@ -84,6 +84,7 @@ module ActiveRecordRules
       @loaded_rules = {}
       @after_save_rules = {}
       @after_commit_rules = {}
+      @after_request_rules = {}
       @async_rules = {}
     end
 
@@ -96,6 +97,7 @@ module ActiveRecordRules
       @loaded_rules ||= {}
       @after_save_rules ||= {}
       @after_commit_rules ||= {}
+      @after_request_rules ||= {}
       @async_rules ||= {}
 
       parsed = definition.is_a?(String) ? Parse.definition(definition) : definition
@@ -114,6 +116,8 @@ module ActiveRecordRules
         @after_save_rules[rule.id] = rule
       in :after_commit
         @after_commit_rules[rule.id] = rule
+      in :after_request
+        @after_request_rules[rule.id] = rule
       in :async
         @async_rules[rule.id] = rule
       end
@@ -147,6 +151,7 @@ module ActiveRecordRules
 
       @after_save_rules.delete(id)
       @after_commit_rules.delete(id)
+      @after_request_rules.delete(id)
       @async_rules.delete(id)
       nil
     end
@@ -198,7 +203,7 @@ module ActiveRecordRules
     # Activate all rules relevant to the provided change.
     #
     # @param change The change details to use to activate rules
-    # @param timing [:after_save, :after_commit, :async, :all]
+    # @param timing [:after_save, :after_commit, :after_request, :async, :all]
     #   The timing of this activation, which filters rules that get activated
     # @return [Array<String>] The ids of RuleMatch records which need execution as a result of this activation
     def activate_rules(change, timing = :all)
@@ -209,6 +214,8 @@ module ActiveRecordRules
                 @after_save_rules
               in :after_commit
                 @after_commit_rules
+              in :after_request
+                @after_request_rules
               in :async
                 @async_rules
               in :all
@@ -326,6 +333,7 @@ module ActiveRecordRules
                end
       ActiveRecordRules.activate_and_execute(change, :after_save)
       ActiveRecordRules.activate_and_execute(change, :after_commit)
+      ActiveRecordRules.activate_and_execute(change, :after_request)
       ActiveRecordRules.schedule_async_activation(change)
       nil
     end
@@ -365,6 +373,24 @@ module ActiveRecordRules
     # values before deleting them.
     def defunct_matches
       ActiveRecordRules::RuleMatch.where.not(rule_id: @loaded_rules.keys)
+    end
+
+    # Run the provided block, activating and executing any pending
+    # "after request" rules from within.
+    #
+    # This is intended to be registered in a Rack middleware or a
+    # Rails "around action" callback.
+    def wrap_request(&block)
+      old = Thread.current[:pending_active_record_rules_changes]
+      Thread.current[:pending_active_record_rules_changes] = []
+
+      block.call
+    ensure
+      Thread.current[:pending_active_record_rules_changes].each do |change|
+        ActiveRecordRules.activate_and_execute(change, :after_request)
+      end
+
+      Thread.current[:pending_active_record_rules_changes] = old
     end
 
     private

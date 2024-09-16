@@ -17,6 +17,8 @@ module ActiveRecordRules
                     :after_save
                   in /after *commit/
                     :after_commit
+                  in /after *request/
+                    :after_request
                   in /async/
                     :async
                   end
