@@ -30,6 +30,13 @@ module ActiveRecordRules
       end
     end
 
+    def id_type
+      config = Rails.configuration.generators
+      config.options[config.orm][:primary_key_type] || :primary_key
+    rescue StandardError
+      :integer
+    end
+
     def migration_version
       format("[%d.%d]", ActiveRecord::VERSION::MAJOR, ActiveRecord::VERSION::MINOR) # rubocop:disable Style/FormatStringToken
     end

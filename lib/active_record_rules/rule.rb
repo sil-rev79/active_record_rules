@@ -162,9 +162,12 @@ module ActiveRecordRules
     end
 
     def activate(pending_activations = nil)
-      build_queries(pending_activations, logger).flat_map do |query|
+      result = build_queries(pending_activations, logger).flat_map do |query|
         ActiveRecord::Base.connection.execute(query).to_a.pluck("id")
       end.uniq
+      fixup_missing_ids!
+
+      result
     end
 
     def explain(pending_activations = nil)
@@ -176,6 +179,36 @@ module ActiveRecordRules
     PendingActivation = Struct.new(:condition_terms, :condition_sql)
 
     private
+
+    # Add records to the "ids" join table where needed
+    def fixup_missing_ids!
+      missing_ids = ActiveRecord::Base.connection.execute(<<~SQL.squish!).pluck("id")
+        update #{RuleMatch.table_name}
+           set missing_ids = false
+         where missing_ids
+         returning id
+      SQL
+
+      return if missing_ids.empty?
+
+      json_each, id_cast = case ActiveRecordRules.dialect
+                           in :sqlite
+                             ["json_each",
+                              ""]
+                           in :postgres
+                             ["jsonb_each_text",
+                              ":: #{RuleMatchId.attribute_types["record_id"]&.type}"]
+                           end
+
+      quoted_ids = missing_ids.map { ActiveRecord::Base.connection.quote(_1) }
+
+      ActiveRecord::Base.connection.execute(<<~SQL.squish!)
+        insert into #{RuleMatchId.table_name}(rule_id, rule_match_id, name, record_id)
+          select rule_id, #{RuleMatch.table_name}.id, ref.key, ref.value#{id_cast}
+            from #{RuleMatch.table_name}, #{json_each}(ids) as ref
+           where #{RuleMatch.table_name}.id in (#{quoted_ids.join(",")})
+      SQL
+    end
 
     def build_queries(pending_activations, logger)
       conditions = format_sql_conditions(pending_activations)
@@ -226,7 +259,7 @@ module ActiveRecordRules
                          ids,
                          live_arguments,
                          next_arguments
-                    from #{RuleMatch.table_name}
+                    from #{RuleMatch.table_name}, __ids
                    where rule_id = #{ActiveRecord::Base.connection.quote(id)}
                      and #{json_sql}
                 ) as match on match.ids = record.ids
@@ -246,18 +279,14 @@ module ActiveRecordRules
       pending_activations.map do |pending_activation|
         ids = pending_activation.condition_terms.map { "q.__id_#{_1}" }
         sql_condition = "(#{ids.join(", ")}) in (select * from __ids)"
-        json_condition = case ActiveRecordRules.dialect
-                         in :sqlite
-                           terms = pending_activation.condition_terms.map { "ids->>'#{_1}'" }
-                           "(#{terms.join(", ")}) in (select * from __ids)"
-                         in :postgres
-                           terms = pending_activation.condition_terms.flat_map { ["'#{_1}'", "__ids.#{_1}"] }
-                           <<~SQL
-                             ids @> any(
-                               (select jsonb_build_object(#{terms.join(", ")}) from __ids)
-                             )
-                           SQL
-                         end
+        json_condition = pending_activation.condition_terms.map do |term|
+          "exists (select 1
+                     from #{RuleMatchId.table_name}
+                    where rule_id = #{ActiveRecord::Base.connection.quote(id)}
+                      and rule_match_id = #{RuleMatch.table_name}.id
+                      and name = #{ActiveRecord::Base.connection.quote(term)}
+                      and record_id = __ids.#{term})"
+        end.join(" and ")
         [pending_activation.condition_sql, sql_condition, json_condition]
       end
     end

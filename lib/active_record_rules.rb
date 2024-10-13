@@ -6,6 +6,7 @@ require "active_record_rules/jobs"
 require "active_record_rules/parse"
 require "active_record_rules/rule"
 require "active_record_rules/rule_match"
+require "active_record_rules/rule_match_id"
 
 # A production rule system for ActiveRecord objects.
 #
