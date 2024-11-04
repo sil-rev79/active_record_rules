@@ -23,18 +23,24 @@ module ActiveRecordRules
 
           case @operator
           in "="
-            gen_eq(left_str, right_str)
+            QueryDefiner::SqlExpr.new(gen_eq(left_str, right_str), false)
           in "!="
-            "not (#{gen_eq(left_str, right_str)})"
+            QueryDefiner::SqlExpr.new("not (#{gen_eq(left_str, right_str)})", false)
           in "in"
             case ActiveRecordRules.dialect
             in :postgres
-              "array[#{left_str}] <@ #{right_str}"
+              QueryDefiner::SqlExpr.new("array[#{left_str}] <@ #{right_str}", left_str.nullable? || right_str.nullable?)
             in :sqlite
-              "exists (select 1 from json_each(#{right_str}) where json_each.value = #{left_str})"
+              QueryDefiner::SqlExpr.new(
+                "exists (select 1 from json_each(#{right_str}) where json_each.value = #{left_str})",
+                false
+              )
             end
           else
-            "(#{left_str} #{@operator} #{right_str})"
+            QueryDefiner::SqlExpr.new(
+              "(#{left_str.sql} #{@operator} #{right_str.sql})",
+              left_str.nullable? || right_str.nullable?
+            )
           end
         end
       end

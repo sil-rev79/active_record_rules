@@ -78,9 +78,9 @@ module ActiveRecordRules
             target_tables = Set.new(@target_tables)
             candidates = []
             done = Set.new([table])
-            @edges[table].each do |field, local_edges|
+            @edges[table].each do |table_field, local_edges|
               local_edges.each do |edge|
-                candidates << [edge, [[edge, TableField.new(table, field)]]]
+                candidates << [edge, [[edge, table_field]]]
               end
             end
 
@@ -91,9 +91,9 @@ module ActiveRecordRules
               if target_tables.include?(item.table)
                 paths << path
               else
-                @edges[item.table].each do |field, local_edges|
+                @edges[item.table].each do |table_field, local_edges|
                   local_edges.each do |edge|
-                    candidates << [edge, [[edge, TableField.new(item.table, field)]] + path]
+                    candidates << [edge, [[edge, table_field]] + path]
                   end
                 end
               end
@@ -115,14 +115,14 @@ module ActiveRecordRules
               first, = full_path.first
               last, dead_last = full_path.last
 
-              if first == last && first.field == "id"
+              if first == last && klass.primary_key.is_a?(String) && first.field_name == klass.primary_key
                 # A single-segment path connecting to "id" doesn't
                 # really need to hit a table at all, we can just return
                 # the values we already know about.
                 selections[first.table] = lambda { |attributes|
                   id_cast(
                     ActiveRecord::Base.connection.quote(
-                      attributes[dead_last.field]
+                      attributes[dead_last.field_name]
                     ),
                     klass
                   )
@@ -132,12 +132,15 @@ module ActiveRecordRules
 
                 tables[first.table] ||= []
                 full_path[...-1].each do |from, to|
-                  tables[to.table] << gen_eq("#{from.table}.#{from.field}", "#{to.table}.#{to.field}")
+                  tables[to.table] << gen_eq(from.field, to.field)
                 end
 
                 wheres << lambda { |attributes|
-                  value = ActiveRecord::Base.connection.quote(attributes[dead_last.field])
-                  gen_eq("#{last.table}.#{last.field}", id_cast(value, klass))
+                  value = ActiveRecord::Base.connection.quote(attributes[dead_last.field_name])
+                  gen_eq(last.field, QueryDefiner::SqlExpr.new(
+                                       id_cast(value, klass),
+                                       attributes[dead_last.field_name].nil?
+                                     ))
                 }
               end
             end
@@ -247,7 +250,7 @@ module ActiveRecordRules
 
       private
 
-      TableField = Struct.new(:table, :field)
+      TableField = Struct.new(:table, :field, :field_name)
 
       def populate_query_parts!
         return if @query_sql
@@ -350,9 +353,17 @@ module ActiveRecordRules
             clauses.each do |clause|
               case clause
               in BinaryOperatorExpression(Variable(lhs), "=", RecordField(rhs))
-                bindings.add(lhs, TableField.new(table_name, rhs))
+                expr = QueryDefiner::SqlExpr.new(
+                  "#{table_name}.#{rhs}",
+                  match_klass.columns_hash[rhs].null
+                )
+                bindings.add(lhs, TableField.new(table_name, expr, rhs))
               in BinaryOperatorExpression(RecordField(lhs), "=", Variable(rhs))
-                bindings.add(rhs, TableField.new(table_name, lhs))
+                expr = QueryDefiner::SqlExpr.new(
+                  "#{table_name}.#{lhs}",
+                  match_klass.columns_hash[lhs].null
+                )
+                bindings.add(rhs, TableField.new(table_name, expr, lhs))
               else
                 # Recurse into the LHS and RHS to find other relevant tables.
                 to_do << [lhs, false, bindings]
@@ -373,7 +384,7 @@ module ActiveRecordRules
         binding_maps.each do |binding_map|
           binding_map.each_value do |table_fields|
             table_fields.each do |table_field|
-              @edges[table_field.table][table_field.field] = table_fields.reject { _1 == table_field }
+              @edges[table_field.table][table_field] = table_fields.reject { _1 == table_field }
             end
           end
         end

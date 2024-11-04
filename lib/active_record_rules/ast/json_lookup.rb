@@ -19,43 +19,46 @@ module ActiveRecordRules
         path_emitters = @json_path.map { _1.to_query(definer) }
         lambda do |bindings|
           expr = emitter.call(bindings)
-          path_parts = path_emitters.map { _1.call(bindings) }
-          case ActiveRecordRules.dialect
-          in :postgres
-            array = false
-            json_bit = path_parts.reduce("@#{expr}!") do |e, part|
-              if part == "'*'"
-                array = true
-                e.sub(/@([^!]+)!/, "(select @e! from jsonb_array_elements(\\1) as e order by 1)")
-              else
-                e.sub(/@([^!]+)!/, "@(\\1)->#{part}!")
+          path_parts = path_emitters.map { _1.call(bindings).sql }
+          QueryDefiner::SqlExpr.new(
+            case ActiveRecordRules.dialect
+            in :postgres
+              array = false
+              json_bit = path_parts.reduce("@#{expr}!") do |e, part|
+                if part == "'*'"
+                  array = true
+                  e.sub(/@([^!]+)!/, "(select @e! from jsonb_array_elements(\\1) as e order by 1)")
+                else
+                  e.sub(/@([^!]+)!/, "@(\\1)->#{part}!")
+                end
               end
-            end
-            if array
-              raise "Array JSON selection needs array type: #{unparse}" unless type.end_with?("[]")
+              if array
+                raise "Array JSON selection needs array type: #{unparse}" unless type.end_with?("[]")
 
-              json_bit.sub(/@([^!]+)!/, "array_agg(((\\1)#>>'{}') :: #{type[0..-3]})")
-            else
-              json_bit.sub(/@([^!]+)!/, "((\\1)#>>'{}') :: #{type}")
-            end
-          in :sqlite
-            array = false
-            json_bit = path_parts.reduce("@#{expr}!") do |e, part|
-              if part == "'*'"
-                array = true
-                e.sub(/@([^!]+)!/, "(select @json_each.value! from json_each(\\1) order by 1)")
+                json_bit.sub(/@([^!]+)!/, "array_agg(((\\1)#>>'{}') :: #{type[0..-3]})")
               else
-                e.sub(/@([^!]+)!/, "@(\\1)->#{part}!")
+                json_bit.sub(/@([^!]+)!/, "((\\1)#>>'{}') :: #{type}")
               end
-            end
-            if array
-              raise "Array JSON selection needs array type: #{unparse}" unless type.end_with?("[]")
+            in :sqlite
+              array = false
+              json_bit = path_parts.reduce("@#{expr}!") do |e, part|
+                if part == "'*'"
+                  array = true
+                  e.sub(/@([^!]+)!/, "(select @json_each.value! from json_each(\\1) order by 1)")
+                else
+                  e.sub(/@([^!]+)!/, "@(\\1)->#{part}!")
+                end
+              end
+              if array
+                raise "Array JSON selection needs array type: #{unparse}" unless type.end_with?("[]")
 
-              json_bit.sub(/@([^!]+)!/, "json_group_array(\\1)")
-            else
-              json_bit.sub(/@([^!]+)!/, "\\1")
-            end
-          end
+                json_bit.sub(/@([^!]+)!/, "json_group_array(\\1)")
+              else
+                json_bit.sub(/@([^!]+)!/, "\\1")
+              end
+            end,
+            true
+          )
         end
       end
 

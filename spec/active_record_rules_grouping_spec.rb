@@ -21,8 +21,8 @@ RSpec.describe ActiveRecordRules do
         t.string :status
       end
       schema.create_table :course_students do |t|
-        t.references :course
-        t.references :student
+        t.references :course, null: false
+        t.references :student, null: false
         t.integer :rego_time
       end
     end

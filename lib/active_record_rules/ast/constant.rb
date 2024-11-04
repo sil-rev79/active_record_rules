@@ -13,7 +13,7 @@ module ActiveRecordRules
       end
 
       def relevant_change?(_, _, _) = false
-      def to_query(_) = ->(_) { ActiveRecord::Base.connection.quote(@value) }
+      def to_query(_) = ->(_) { QueryDefiner::SqlExpr.new(ActiveRecord::Base.connection.quote(@value), @value.nil?) }
       def unparse = @value.nil? ? "nil" : JSON.dump(@value)
       def deconstruct = [@value]
     end

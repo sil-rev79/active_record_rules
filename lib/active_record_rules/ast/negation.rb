@@ -31,7 +31,7 @@ module ActiveRecordRules
 
         lambda do |bindings|
           sql = query_definer.to_sql(bindings, ["__value"])
-          "not exists (#{sql.split("\n").join("\n            ")})"
+          QueryDefiner::SqlExpr.new("not exists (#{sql.split("\n").join("\n            ")})", false)
         end
       end
 

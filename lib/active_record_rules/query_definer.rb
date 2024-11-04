@@ -39,7 +39,14 @@ module ActiveRecordRules
         if @bindings.key?(key)
           # Note the circularity here. Bindings can refer to other
           # bindings, so we allow them to be resolved during resolution.
-          all_bindings[key] = @bindings[key].map { _1.call(hash) }.sort_by(&:length)
+          all_bindings[key] = @bindings[key].map do |builder|
+            value = builder.call(hash)
+            if value.is_a?(SqlExpr)
+              value
+            else
+              SqlExpr.new(value, true)
+            end
+          end.sort_by(&:length)
           hash[key] = all_bindings[key].first
         else
           hash[key] = outer_bindings[key]
@@ -53,13 +60,10 @@ module ActiveRecordRules
       outer_bindings.each_key { resolved_bindings[_1] }
       @bindings.each_key { resolved_bindings[_1] }
 
-      names = if interesting_binding_names
-                interesting_binding_names & @bindings.keys
-              else
-                @bindings.keys
-              end
+      names = @bindings.keys
+      names &= interesting_binding_names if interesting_binding_names
 
-      bindings = names.map { "#{resolved_bindings[_1].split("\n").join("\n        ")} as #{_1}" }.join(",\n       ")
+      bindings = names.map { "#{resolved_bindings[_1].sql.split("\n").join("\n        ")} as #{_1}" }.join(",\n       ")
 
       left_joins = []
       tables = @tables.map do |name, real_name|
@@ -76,15 +80,15 @@ module ActiveRecordRules
       conditions = [
         *@conditions.compact.map do |condition|
           clause = condition.call(resolved_bindings)
-          if clause.end_with?(" is true")
+          if clause.sql.end_with?(" is true")
             # In the context of a where clause, the "is true" is
             # unnecessary, because NULL is interpreted as
             # false. However, leaving the "is true" there
             # prevents Postgres from using indexes, so stripping
             # it off is *really* useful.
-            clause[0...-" is true".size]
+            clause.sql[0...-" is true".size]
           else
-            clause
+            clause.sql
           end
         end,
         *outer_bindings.flat_map do |name, value|
@@ -92,9 +96,9 @@ module ActiveRecordRules
             gen_eq(value, other)
           end
         end,
-        *@bindings.keys.flat_map do |name|
-          first = all_bindings[name][0]
-          (all_bindings[name][1..] || []).map do |other|
+        *all_bindings.values.flat_map do |values|
+          first = values[0]
+          (values[1..] || []).map do |other|
             gen_eq(first, other)
           end
         end
@@ -110,6 +114,11 @@ module ActiveRecordRules
         "  from #{tables}",
         (" where #{conditions.split("\n").join("\n       ")}" unless conditions.empty?)
       ].compact.join("\n")
+    end
+
+    SqlExpr = Struct.new(:sql, :nullable?) do
+      def to_s = sql.to_s
+      def length = sql.length
     end
 
     class TableDefiner
@@ -135,7 +144,7 @@ module ActiveRecordRules
     end
 
     def gen_eq(left, right)
-      case [left, right]
+      case [left.to_s, right.to_s]
       in "NULL", "NULL"
         "TRUE"
       in "NULL", _
@@ -143,27 +152,12 @@ module ActiveRecordRules
       in _, "NULL"
         "#{left} is NULL"
       else
-        if never_null?(left) || never_null?(right)
-          "#{left} = #{right}"
+        if left.nullable? && right.nullable?
+          "(#{left.sql} = #{right.sql} or (#{left.sql} is null and #{right.sql} is null))"
         else
-          "(#{left} = #{right} or (#{left} is null and #{right} is null))"
+          "#{left.sql} = #{right.sql}"
         end
       end
-    end
-
-    def never_null?(value)
-      value = value.downcase
-      # If the value starts with one of these characters then it's a constant, and thus not null.
-      "0123456789'".include?(value.first) ||
-        # Constant true/false is not null
-        value == "true" ||
-        value == "false" ||
-        # This is hacky: we're assuming that "id" fields are never
-        # null. Ideally this would be based on actually knowing the
-        # database structure so this can work for other fields, too,
-        # but that's too hard right now and this is necessary to get
-        # Postgres to use primary key indexes.
-        value.end_with?(".id")
     end
   end
 end

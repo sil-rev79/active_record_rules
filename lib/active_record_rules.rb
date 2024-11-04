@@ -274,7 +274,7 @@ module ActiveRecordRules
     # @return nil
     def run_pending_executions(ids)
       ids_to_execute = ids
-      failed = 0
+      failures = []
       total = 0
       until ids_to_execute.empty?
         executing_ids = ids_to_execute
@@ -295,11 +295,14 @@ module ActiveRecordRules
               ["Rule execution failed for match (rule id: #{match.rule_id}, match id: #{match.id}): #{e.message}",
                *e.backtrace].join("\n")
             )
-            failed += 1
+            failures << e
           end
         end
       end
-      raise "Error running pending executions: #{failed} of #{total} failed" unless failed.zero?
+      return if failures.empty?
+      raise failures.first if failures.size == 1
+
+      raise "Error running pending executions: #{failed} of #{total} failed"
     end
 
     def run_pending_execution(id)

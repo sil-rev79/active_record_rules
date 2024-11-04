@@ -20,7 +20,7 @@ module ActiveRecordRules
       end
 
       def final_result(self_expression)
-        self_expression
+        QueryDefiner::SqlExpr.new(self_expression, true)
       end
 
       def unparse

@@ -18,36 +18,39 @@ module ActiveRecordRules
         klass = definer.table_class
         lambda do |_|
           type = klass.attribute_types[@name]&.type
-          case type
-          in nil
-            raise "Unknown attribute referenced in rule: #{klass}##{@name} (at #{@location.join(":")})"
-          in :integer
-            if (defn = klass.defined_enums[@name])
-              if @flags.include?("i")
-                # as an integer
-                "#{definer.table_name}.#{@name}"
-              elsif @flags.include?("s")
-                # as a string
-                clauses = defn.map do |value, key|
-                  "when #{definer.table_name}.#{@name} = #{key} then #{ActiveRecord::Base.connection.quote(value)}"
+          QueryDefiner::SqlExpr.new(
+            case type
+            in nil
+              raise "Unknown attribute referenced in rule: #{klass}##{@name} (at #{@location.join(":")})"
+            in :integer
+              if (defn = klass.defined_enums[@name])
+                if @flags.include?("i")
+                  # as an integer
+                  "#{definer.table_name}.#{@name}"
+                elsif @flags.include?("s")
+                  # as a string
+                  clauses = defn.map do |value, key|
+                    "when #{definer.table_name}.#{@name} = #{key} then #{ActiveRecord::Base.connection.quote(value)}"
+                  end
+                  "case #{clauses.join("\n     ")}\nend"
+                else
+                  raise "Don't know what to return for enum #{definer.table_class}##{@name}: " \
+                        "add :i or :s to cast to int/string (at #{@location.join(":")})"
                 end
-                "case #{clauses.join("\n     ")}\nend"
               else
-                raise "Don't know what to return for enum #{definer.table_class}##{@name}: " \
-                      "add :i or :s to cast to int/string (at #{@location.join(":")})"
+                unless @flags.empty?
+                  ActiveRecordRules.logger&.warn do
+                    "Flags provided for #{definer.table_class}##{@name}, but attribute is not an enum"
+                  end
+                end
+
+                "#{definer.table_name}.#{@name}"
               end
             else
-              unless @flags.empty?
-                ActiveRecordRules.logger&.warn do
-                  "Flags provided for #{definer.table_class}##{@name}, but attribute is not an enum"
-                end
-              end
-
               "#{definer.table_name}.#{@name}"
-            end
-          else
-            "#{definer.table_name}.#{@name}"
-          end
+            end,
+            klass.columns_hash[@name].null
+          )
         end
       end
 

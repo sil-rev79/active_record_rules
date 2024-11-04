@@ -14,7 +14,7 @@ module ActiveRecordRules
       # we could use the IS NOT DISTINCT FROM operator in SQL, but in
       # practice it doesn't use indexes in Postgres, so it's no good.
       def gen_eq(left, right)
-        case [left, right]
+        case [left.to_s, right.to_s]
         in "NULL", "NULL"
           "TRUE"
         in "NULL", _
@@ -22,29 +22,14 @@ module ActiveRecordRules
         in _, "NULL"
           "#{left} is NULL"
         else
-          if never_null?(left) && never_null?(right)
-            "(#{left} = #{right})"
-          elsif never_null?(left) || never_null?(right)
-            "(#{left} = #{right}) is true"
+          if left.nullable? && right.nullable?
+            "(#{left.sql} = #{right.sql} or (#{left.sql} is null and #{right.sql} is null)) is true"
+          elsif left.nullable? || right.nullable?
+            "(#{left.sql} = #{right.sql}) is true"
           else
-            "(#{left} = #{right} or (#{left} is null and #{right} is null)) is true"
+            "(#{left.sql} = #{right.sql})"
           end
         end
-      end
-
-      def never_null?(value)
-        value = value.downcase
-        # If the value starts with one of these characters then it's a constant, and thus not null.
-        "0123456789'".include?(value.first) ||
-          # Constant true/false is not null
-          value == "true" ||
-          value == "false" ||
-          # This is hacky: we're assuming that "id" fields are never
-          # null. Ideally this would be based on actually knowing the
-          # database structure so this can work for other fields, too,
-          # but that's too hard right now and this is necessary to get
-          # Postgres to use primary key indexes.
-          value.end_with?(".id")
       end
     end
   end

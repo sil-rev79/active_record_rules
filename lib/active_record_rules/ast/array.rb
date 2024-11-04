@@ -26,7 +26,7 @@ module ActiveRecordRules
       end
 
       def final_result(self_expression)
-        "coalesce(#{self_expression}, '{}')"
+        QueryDefiner::SqlExpr.new("coalesce(#{self_expression}, '{}')", false)
       end
 
       def unparse

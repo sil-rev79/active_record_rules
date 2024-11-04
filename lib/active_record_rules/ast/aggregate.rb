@@ -32,7 +32,10 @@ module ActiveRecordRules
             # get a value that's valid in the subquery, rather than in
             # the parent query.
             query_definer.add_condition do
-              gen_eq(bindings[name], query_definer.bindings[name].first.call(bindings))
+              QueryDefiner::SqlExpr.new(
+                gen_eq(bindings[name], query_definer.bindings[name].first.call(bindings)),
+                false
+              )
             end
           end
           sql = query_definer.to_sql(bindings, ["__value"]) # Then we only emit __value here

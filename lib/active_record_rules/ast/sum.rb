@@ -17,7 +17,7 @@ module ActiveRecordRules
         ->(bindings) { "sum(#{expr.call(bindings)})" }
       end
 
-      def final_result(self_expression) = "coalesce(#{self_expression}, 0)"
+      def final_result(self_expression) = QueryDefiner::SqlExpr.new("coalesce(#{self_expression}, 0)", false)
 
       def unparse
         "sum(#{expression.unparse}) { #{@constraints.map(&:unparse).join("; ")} }"
