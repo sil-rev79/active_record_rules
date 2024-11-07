@@ -96,6 +96,32 @@ RSpec.describe ActiveRecordRules do
     end
   end
 
+  describe "a rule with a negation in a boolean" do
+    before do
+      # Redefine the rule that we're working with
+      described_class.undefine_rule("the fastest is the winner")
+      described_class.define_rule <<~RULE
+        after commit rule: the fastest is the winner
+          Racer(<id>, <race_id>, <race_time>)
+          (<race_id> = 1 or not { Racer(<race_id>, race_time < <race_time>) })
+        on match
+          Racer.find(id).update!(winner: true)
+        on unmatch
+          Racer.find(id).update!(winner: false)
+      RULE
+    end
+
+    it "marks everyone as the winner for race_id=1" do
+      racers = 5.times.map { Racer.create!(race_id: 1, race_time: _1) }
+      expect(racers.map(&:reload).pluck(:winner)).to contain_exactly(true, true, true, true, true)
+    end
+
+    it "does not mark everyone as winner for other race ids" do
+      racers = 5.times.map { Racer.create!(race_id: 2, race_time: _1) }
+      expect(racers.map(&:reload).pluck(:winner)).to contain_exactly(true, nil, nil, nil, nil)
+    end
+  end
+
   describe "properties" do
     context "with no duplicate times" do # rubocop:disable RSpec/EmptyExampleGroup
       generate(times: array(int(0..100), length: 1..).map(&:uniq))

@@ -35,26 +35,15 @@ module ActiveRecordRules
           (horizontal_whitespace.maybe >> newline).repeat >> (
             # This is a line with content:
             horizontal_whitespace >>
-            (record_matcher | boolean_constraint) >>
+            (record_matcher | boolean_expression) >>
             horizontal_whitespace.maybe >> newline
           )
         ).repeat >> (horizontal_whitespace.maybe >> newline).repeat
       end
 
       rule(:inline_constraints) do
-        (record_matcher | boolean_constraint).repeat(1, 1) >>
-          (whitespace.maybe >> (record_matcher | boolean_constraint)).repeat
-      end
-
-      rule(:boolean_constraint) do
-        boolean_expression | (
-          (
-            str("not") | str("any")
-          ).as(:operation) >> horizontal_whitespace.maybe >>
-          str("{") >> whitespace.maybe >>
-          inline_constraints.as(:constraints) >> whitespace.maybe >>
-          str("}")
-        )
+        (record_matcher | boolean_expression).repeat(1, 1) >>
+          (whitespace.maybe >> (record_matcher | boolean_expression)).repeat
       end
 
       rule(:record_matcher) do
@@ -79,6 +68,14 @@ module ActiveRecordRules
       rule(:boolean_expression) do
         infix_expression(
           (str("(") >> boolean_expression >> str(")")) |
+          (
+            (
+              str("not") | str("any")
+            ).as(:operation) >> horizontal_whitespace.maybe >>
+            str("{") >> whitespace.maybe >>
+            inline_constraints.as(:constraints) >> whitespace.maybe >>
+            str("}")
+          ) |
           (
             expression.as(:lhs) >> whitespace.maybe >>
             comparison.as(:op) >> whitespace.maybe >>

@@ -6,7 +6,7 @@ require "active_record_rules/query_definer"
 
 module ActiveRecordRules
   module Ast
-    class Negation < Node
+    class Negation < ExpressionNode
       attr_reader :constraints
 
       def initialize(constraints)
