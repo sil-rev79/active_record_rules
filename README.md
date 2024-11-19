@@ -5,7 +5,7 @@ A [production system][] within ActiveRecord to execute code when matching rule c
 Rules are a great way to simplify business logic, but too often their target audience has been non-developers. Instead, ActiveRecordRules sees itself as a tool for _developers_ to express the complex logic of their system. The matching logic for rules is written in a custom DSL, but the resulting behaviours are regular Ruby code:
 
 ```
-async rule Unapproved customers must be in "pending" state
+async rule: Unapproved customers must be in "pending" state
   # Custom matching DSL. '<id>' denotes a variable called `id`.
   Customer(<id>, status != "pending")
   not { CustomerApproval(customer_id = <id>, status = "approved") }
@@ -25,7 +25,9 @@ rails generate active_record_rules:install
 rails db:migrate
 ```
 
-Once you have done this, you need to decide on how you will *trigger* rules that are evaluated. The simplest way to do this is to add some callbacks to your `ApplicationRecord` class. This will resolve rules within the same transaction as the create/update/destroy operation. This is the simplest way to get started, but it has some pretty substantial drawbacks. See the [Triggering rules](#triggering-rules) below for more information.
+Once you have done this, you need to include `ActiveRecordRules::Hooks` into your record class. This will add `after_create`, `after_update`, `after_destroy`, and `after_commit` hooks which trigger rules at the appropriate times. Rules try to avoid triggering based on irrelevant field changes to keep these callbacks as cheap as possible.
+
+The simplest way to do this is include `ActiveRecordRules::Hooks` in your `ApplicationRecord`, like this:
 
 ```ruby
 class ApplicationRecord < ActiveRecord::Base
@@ -108,7 +110,7 @@ The current state of matches is stored in `RuleMatch` records. As the rules them
 
     ```
     # Initial definition
-    async rule Example
+    async rule: Example
       Record(<id>, <name>)
     on match
       pp [id, name] # available names
@@ -117,7 +119,7 @@ The current state of matches is stored in `RuleMatch` records. As the rules them
       pp [id, name]
 
     # redefined to
-    async rule Example
+    async rule: Example
       Record(<id>, <nickname>)
     on match
       # nickname may be nil for records which activated with the old definition,
@@ -136,6 +138,12 @@ This project uses Guix as its main dependency management system. A development e
 
 ```sh
 guix shell --development --file=guix.scm
+```
+
+If you don't use Guix, then Bundler can also be used to install the needed dependencies, in the usual way:
+
+```sh
+bundle install
 ```
 
 ## Contributing
