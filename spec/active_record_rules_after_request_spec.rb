@@ -17,22 +17,28 @@ RSpec.describe ActiveRecordRules do
       end
     end
 
-    described_class.define_rule(<<~RULE)
-      after request rule: a classroom with no teachers gets John
+    described_class.define_rule("a classroom with no teachers gets John") do
+      after_request(<<~MATCH)
         Classroom(<id>)
         not { Teacher(classroom_id = <id>) }
-      on match
-        Teacher.create!(name: "John", classroom_id: id)
-    RULE
+      MATCH
 
-    described_class.define_rule(<<~RULE)
-      after request rule: a classroom with other teachers loses John
+      on_match do
+        Teacher.create!(name: "John", classroom_id: id)
+      end
+    end
+
+    described_class.define_rule("a classroom with other teachers loses John") do
+      after_request(<<~MATCH)
         Classroom(<id>)
         Teacher(<john_id> = id, classroom_id = <id>, name = "John")
         Teacher(classroom_id = <id>, name != "John")
-      on match
+      MATCH
+
+      on_match do
         Teacher.find(john_id).destroy!
-    RULE
+      end
+    end
   end
 
   describe "not calling wrap_request" do

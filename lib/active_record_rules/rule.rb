@@ -4,15 +4,32 @@ require "digest/md5"
 
 module ActiveRecordRules
   class Rule
-    attr_reader :id, :name, :definition
+    attr_reader :id, :name, :timing, :constraints, :on_match, :on_update, :on_unmatch, :context
 
-    def initialize(definition:)
-      @name = definition.name
-      @definition = definition
-      @id, = Rule.name_to_id(definition.name)
+    def initialize(name:, timing:, constraints:, on_match:, on_update:, on_unmatch:, context:)
+      @name = name
+      @timing = timing
+      @constraints = constraints
+      @on_match = on_match
+      @on_update = on_update
+      @on_unmatch = on_unmatch
+      @context = context
+      context_class = ExecutionContext.for_variables(constraints.bound_names)
+      @context_builder = case @context
+                         when Proc
+                           ->(args) { context_class.new(@context.call, args) }
+                         else
+                           ->(args) { context_class.new(@context, args) }
+                         end
+
+      @id = Rule.name_to_id(@name)
+
+      # This is a lazily populated cache of details per-class.
+      # TODO: construct this up-front
+      @attributes_by_class = {}
+
+      freeze # We want these to be immutable, so we'll at least freeze the top-level
     end
-
-    def timing = definition.timing
 
     # The id is the MD5 hash of the definition's name, truncated to a
     # 32 bit integer, in network (big) endian byte order. These
@@ -26,7 +43,7 @@ module ActiveRecordRules
     def rule_matches = RuleMatch.where(id: id)
 
     def ==(other)
-      super || definition.unparse == other.definition.unparse
+      super || constraints.unparse == other.constraints.unparse
     end
 
     def self.claim_pending_executions!(ids)
@@ -148,13 +165,12 @@ module ActiveRecordRules
     end
 
     def calculate_required_activations(klass, previous, current)
-      definition.affected_ids_sql(klass, previous, current)
+      constraints.affected_ids_sql(klass, previous, current)
     end
 
     def relevant_attributes(klass)
-      @attributes_by_class ||= {}
       @attributes_by_class[klass] ||=
-        definition.relevant_attributes_by_class.map do |klass_key, attributes|
+        constraints.relevant_attributes_by_class.map do |klass_key, attributes|
           klass <= klass_key ? attributes : Set.new
         end.reduce(Set.new, &:+)
 
@@ -251,7 +267,7 @@ module ActiveRecordRules
                        record.arguments
                      end
                 from (
-                  #{definition.to_query_sql.split("\n").join("\n      ")}
+                  #{constraints.to_query_sql.split("\n").join("\n      ")}
                    where #{plain_sql}
                 ) as record
                 full outer join (
@@ -295,81 +311,45 @@ module ActiveRecordRules
       ActiveRecordRules.logger
     end
 
-    def argument_binding_parts(args_name)
-      @argument_binding_parts ||=
-        definition.bound_names.map { "#{_1} = #{args_name}[\"#{_1}\"]" }
-    end
-
-    def on_match_proc
-      @on_match_proc ||= Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
-        # ->(__arguments) {
-        #   a = __arguments["a"]
-        #   code to run when matching
-        # }
-        ->(__arguments) {
-          #{argument_binding_parts("__arguments").join("\n  ")}
-          #{definition.on_match}
-        }
-      RUBY
-    end
-
-    def on_unmatch_proc
-      @on_unmatch_proc ||= Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
-        # ->(__arguments) {
-        #   a = __arguments["a"]
-        #   code to run when matching
-        # }
-        ->(__arguments) {
-          #{argument_binding_parts("__arguments").join("\n  ")}
-          #{definition.on_unmatch}
-        }
-      RUBY
-    end
-
-    def on_update_proc
-      return unless definition.on_update
-
-      @on_update_proc ||= Object.new.instance_eval(<<~RUBY, __FILE__, __LINE__ + 1)
-        # ->(__arguments) {
-        #   a = __arguments["a"]
-        #   code to run when updating
-        # }
-        ->(__arguments) {
-          #{argument_binding_parts("__arguments").join("\n  ")}
-          #{definition.on_update}
-        }
-      RUBY
-    end
-
     def execute_match(args)
-      context.instance_exec(args, &on_match_proc)
+      @context_builder.call(args).instance_exec(&@on_match) if @on_match
     end
 
     ArgumentPair = Struct.new(:old, :new)
 
     def execute_update(old_args, new_args)
-      if on_update_proc
+      if @on_update
         arg_pairs = (old_args.keys.to_set + new_args.keys.to_set).to_h do |key|
           [key, ArgumentPair.new(old_args[key], new_args[key])]
         end
-        context.instance_exec(arg_pairs, &on_update_proc)
+        @context_builder.call(arg_pairs).instance_exec(&@on_update)
       else
-        context.instance_exec(old_args, &on_unmatch_proc)
-        context.instance_exec(new_args, &on_match_proc)
+        execute_unmatch(old_args)
+        execute_match(new_args)
       end
     end
 
     def execute_unmatch(args)
-      context.instance_exec(args, &on_unmatch_proc)
+      @context_builder.call(args).instance_exec(&@on_unmatch) if @on_unmatch
     end
 
-    def context
-      if ActiveRecordRules.execution_context.nil?
-        Object.new
-      elsif ActiveRecordRules.execution_context.is_a?(Proc)
-        ActiveRecordRules.execution_context.call
-      else
-        ActiveRecordRules.execution_context
+    class ExecutionContext < SimpleDelegator
+      def initialize(base, values)
+        super(base)
+        @values = values
+      end
+
+      def self.for_variables(names)
+        Class.new(ExecutionContext) do
+          names.each do |name|
+            sym_name = name.to_sym
+            if instance_methods.include?(sym_name)
+              raise "Bound variable #{sym_name} conflict with method in execution context"
+            end
+
+            define_method(sym_name) { @values[name] }
+          end
+        end
       end
     end
   end

@@ -6,27 +6,12 @@ require "active_record_rules/query_definer"
 
 module ActiveRecordRules
   module Ast
-    class Definition < Node
-      attr_reader :location, :timing, :name, :constraints, :on_match, :on_update, :on_unmatch
+    class ConstraintSet < Node
+      attr_reader :constraints
 
-      def initialize(location, timing, name, constraints, on_match, on_update, on_unmatch)
+      def initialize(constraints)
         super()
-        @location = location
-        @timing = case timing
-                  in /after *save/
-                    :after_save
-                  in /after *commit/
-                    :after_commit
-                  in /after *request/
-                    :after_request
-                  in /async/
-                    :async
-                  end
-        @name = name
         @constraints = constraints
-        @on_match = on_match
-        @on_update = on_update
-        @on_unmatch = on_unmatch
       end
 
       def to_query_sql
@@ -237,16 +222,7 @@ module ActiveRecordRules
         end.reduce(&:+)
       end
 
-      def unparse
-        on_match = @on_match && "on match\n  #{@on_match.split("\n").join("\n  ")}\n"
-        on_update = @on_update && "on update\n  #{@on_update.split("\n").join("\n  ")}\n"
-        on_unmatch = @on_unmatch && "on unmatch\n  #{@on_unmatch.split("\n").join("\n  ")}\n"
-        [
-          "rule #{@name}",
-          "  #{@constraints.map(&:unparse).join("\n  ")}",
-          "#{on_match}#{on_update}#{on_unmatch}"
-        ].join("\n")
-      end
+      def unparse = @constraints.map(&:unparse).join("\n  ")
 
       private
 

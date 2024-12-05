@@ -74,7 +74,7 @@ RSpec.configure do |config|
 
   config.around do |example|
     # Reset the in-memory loaded rules before each run.
-    ActiveRecordRules.unload_all_rules!
+    ActiveRecordRules.all_rules.each { ActiveRecordRules.deregister_rule!(_1) }
 
     if connection_string.start_with?("postgres")
       # Connect to the "postgres" database and drop+create the

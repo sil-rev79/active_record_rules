@@ -33,13 +33,15 @@ RSpec.describe ActiveRecordRules do
         end
       end
 
-      described_class.define_rule(<<~RULE)
-        async rule: notify client representative for high importance requests
+      described_class.define_rule("notify client representative for high importance requests") do
+        async(<<~MATCH)
           SupportRequest(<client>, level = "high")
           ClientRepresentative(<client>, <name>)
-        on match
+        MATCH
+        on_match do
           TestHelper.matches << [:notify, name]
-      RULE
+        end
+      end
 
       TestHelper.matches = []
       described_class.logger = nil # to speed these tests up, we turn off the logging entirely
@@ -87,19 +89,22 @@ RSpec.describe ActiveRecordRules do
         end
       end
 
-      described_class.execution_context = counts
+      # described_class.execution_context = counts
+      counts.extend(ActiveRecordRules::Definer)
 
       steps.each do |step|
         case step
         in [suit, rank]
           Card.create!(suit: suit, rank: rank)
         in rank
-          described_class.define_rule(<<~RULE)
-            async rule: counting #{rank}s
+          counts.define_rule("counting #{rank}s") do
+            async(<<~MATCH)
               Card(rank = "#{rank}", <rank>)
-            on match
+            MATCH
+            on_match do
               self[rank] += 1
-          RULE
+            end
+          end
         end
       end
     end
@@ -133,18 +138,21 @@ RSpec.describe ActiveRecordRules do
         end
       end
 
-      described_class.define_rule(<<~RULE)
-        async rule: three of the same suit
+      described_class.define_rule("three of the same suit") do
+        async(<<~MATCH)
           Card(<suit>, rank = <rank1>)
           Card(<suit>, rank = <rank2>, rank > <rank1>)
           Card(<suit>, rank = <rank3>, rank > <rank2>)
-        on match
+        MATCH
+        on_match do
           TestHelper.matches << [suit, [rank1, rank2, rank3]]
-        on unmatch
+        end
+        on_unmatch do
           # What an annoying construction to delete a single element
           # of an array that possibly contains duplicates!
           TestHelper.matches.delete_at(TestHelper.matches.index([suit, [rank1, rank2, rank3]]))
-      RULE
+        end
+      end
 
       TestHelper.matches = []
       described_class.logger = nil # to speed these tests up, we turn off the logging entirely

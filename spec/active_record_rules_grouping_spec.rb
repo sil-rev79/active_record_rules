@@ -36,16 +36,18 @@ RSpec.describe ActiveRecordRules do
         Course.create!(early_cutoff: i)
       end
 
-      described_class.define_rule <<~RULE
-        async rule: Reify student counts on classes
+      described_class.define_rule("Reify student counts on classes") do
+        async(<<~MATCH)
           Course(id = <course_id>, <early_cutoff>)
           <count> = count(<student_id>) {
             CourseStudent(<course_id>, <student_id>, rego_time < <early_cutoff>)
             Student(id = <student_id>, status = "active")
           }
-        on match
+        MATCH
+        on_match do
           Course.update(course_id, early_rego_count: count)
-      RULE
+        end
+      end
     end
 
     let(:course) { Course.create!(early_cutoff: 10) }
@@ -92,16 +94,18 @@ RSpec.describe ActiveRecordRules do
     let(:student) { Student.create!(name: "John Doe", status: "active") }
 
     before do
-      described_class.define_rule <<~RULE
-        async rule: Reify student names on classes
+      described_class.define_rule("Reify student names on classes") do
+        async(<<~MATCH)
           Course(id = <course_id>)
           <names> = array(<name>) {
             CourseStudent(<course_id>, <student_id>)
             Student(id = <student_id>, <name>)
           }
-        on match
-          Course.update(course_id, student_names: names.sort.join(', '))
-      RULE
+        MATCH
+        on_match do
+          Course.update(course_id, student_names: names.sort.join(", "))
+        end
+      end
     end
 
     it "sets an empty course to the empty string" do

@@ -14,12 +14,14 @@ RSpec.describe ActiveRecordRules do
       end
     end
 
-    described_class.define_rule(<<~RULE)
-      after commit rule: increments number to 10
+    described_class.define_rule("increments number to 10") do
+      after_commit(<<~MATCH)
         Number(<id>, <value>, value < 10)
-      on match
+      MATCH
+      on_match do
         Number.find(id).update!(value: value + 1)
-    RULE
+      end
+    end
   end
 
   it { is_expected.to eq(10) }

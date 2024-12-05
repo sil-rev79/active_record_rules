@@ -5,13 +5,17 @@ A [production system][] within ActiveRecord to execute code when matching rule c
 Rules are a great way to simplify business logic, but too often their target audience has been non-developers. Instead, ActiveRecordRules sees itself as a tool for _developers_ to express the complex logic of their system. The matching logic for rules is written in a custom DSL, but the resulting behaviours are regular Ruby code:
 
 ```
-async rule: Unapproved customers must be in "pending" state
-  # Custom matching DSL. '<id>' denotes a variable called `id`.
-  Customer(<id>, status != "pending")
-  not { CustomerApproval(customer_id = <id>, status = "approved") }
-on match
-  # Regular Ruby code
-  Customer.find(id).update!(status: 'pending')
+define_rule('Unapproved customers must be in "pending" state') do
+  async(<<~MATCH)
+    # Custom matching DSL. '<id>' denotes a variable called `id`.
+    Customer(<id>, status != "pending")
+    not { CustomerApproval(customer_id = <id>, status = "approved") }
+  MATCH
+  on_match do
+    # Any bound varibles above are available in this block
+    Customer.find(id).update!(status: 'pending')
+  end
+end
 ```
 
 [production system]: https://en.wikipedia.org/wiki/Production_system_(computer_science)
@@ -41,32 +45,39 @@ At the moment only Postgres and SQLite are supported. Contributions are welcome 
 
 ### Defining rules
 
-With the default Rails configuration you can define rules in any file with the `.rules` extension. These rules will be loaded when your Rails application starts. The rules use a custom DSL that looks like this:
-
 ```
-after save rule: Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers
-  Order(id = <order_id>, <customer_id>, status = "pending")
-  Customer(id = <customer_id>, vip_customer = true)
-  <order_value> = sum(<value> * <quantity>) {
-    OrderItem(<order_id>, <item_id>, <quantity>, <value>)
-    Item(id = <item_id>, sale_discount = 0)
-  }
-  <order_value> > 100
-on match
-  Order.find(order_id).update!(discount: 0.1)
-on unmatch
-  order = Order.find(order_id)
-  # If the order has been completed, then we don't touch it any more
-  order.update!(discount: 0) unless order.status == "completed"
+define_rule('Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers') do
+  after_save(<<~MATCH)
+    Order(id = <order_id>, <customer_id>, status = "pending")
+    Customer(id = <customer_id>, vip_customer = true)
+    <order_value> = sum(<value> * <quantity>) {
+      OrderItem(<order_id>, <item_id>, <quantity>, <value>)
+      Item(id = <item_id>, sale_discount = 0)
+    }
+    <order_value> > 100
+  MATCH
 
-after save rule: Calculate order price from items and discount
-  Order(id = <order_id>, <customer_id>, <discount>)
-  <order_value> = sum(<value> * <quantity>) {
-    OrderItem(<order_id>, <quantity>, <value>)
-  }
-on match
-  Order.find(order_id).update!(total_price: (1.0 - discount) * order_value)
+  on_match do
+    Order.find(order_id).update!(discount: 0.1)
+  end
+  on_unmatch do
+    order = Order.find(order_id)
+    # If the order has been completed, then we don't touch it any more
+    order.update!(discount: 0) unless order.status == "completed"
+  end
+end
 
+define_rule('Calculate order price from items and discount') do
+  after_save(<<~MATCH)
+    Order(id = <order_id>, <customer_id>, <discount>)
+    <order_value> = sum(<value> * <quantity>) {
+      OrderItem(<order_id>, <quantity>, <value>)
+    }
+  MATCH
+  on_match
+    Order.find(order_id).update!(total_price: (1.0 - discount) * order_value)
+  end
+end
 ```
 
 Rule executions are remembered by record id and variable bindings, so each rule will match once per set of matching objects, then won't match again for those objects until a relevant value changes. In the rule above, adding or removing an item from an order will automatically re-run the `match` code.
@@ -110,26 +121,36 @@ The current state of matches is stored in `RuleMatch` records. As the rules them
 
     ```
     # Initial definition
-    async rule: Example
-      Record(<id>, <name>)
-    on match
-      pp [id, name] # available names
-    on unmatch
-      # both id and name are available, and will be the value from the matched record
-      pp [id, name]
+    define_rule("Example") do
+      async(<<~MATCH)
+        Record(<id>, <name>)
+      MATCH
+      on_match do
+        pp [id, name] # available names
+      end
+      on_unmatch do
+        # both id and name are available, and will be the value from the matched record
+        pp [id, name]
+      end
+    end
 
     # redefined to
-    async rule: Example
-      Record(<id>, <nickname>)
-    on match
-      # nickname may be nil for records which activated with the old definition,
-      #   but haven't been executed yet
-      # name is not exposed, and cannot be used
-      pp [id, nickname]
-    on unmatch
-      # nickname may be nil, for old matches which have "name" instead
-      # name is not exposed, and cannot be used
-      pp [id, nickname]
+    define_rule("Example") do
+      async(<<~MATCH)
+        Record(<id>, <nickname>)
+      MATCH
+      on_match do
+        # nickname may be nil for records which activated with the old definition,
+        #   but haven't been executed yet
+        # name is not exposed, and cannot be used
+        pp [id, nickname]
+      end
+      on_unmatch do
+        # nickname may be nil, for old matches which have "name" instead
+        # name is not exposed, and cannot be used
+        pp [id, nickname]
+      end
+    end
     ```
 
 ## Development

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "active_record"
+require "active_record_rules/definer"
 require "active_record_rules/hooks"
 require "active_record_rules/jobs"
 require "active_record_rules/parse"
@@ -10,19 +11,24 @@ require "active_record_rules/rule_match_id"
 
 # A production rule system for ActiveRecord objects.
 #
-# Rules are defined using a DSL which looks like this:
+# Rules are defined using a eDSL which looks like this:
 #
-# @example Define a simple rule#
-#   ActiveRecordRules.define_rule(<<~RULE)
-#     async rule: Update number of posts for user
+# @example Define a simple rule
+#   ActiveRecordRules.define_rule("Update number of posts for user")
+#     async(<<~MATCH)
 #       Post(<author_id>, status = "published")
 #       User(id = <author_id>)
-#     on match
+#     MATCH
+#     on_match do
 #       User.find(author_id).increment!(:post_count)
-#     on unmatch
+#     end
+#     on_unmatch do
 #       User.find(author_id).decrement!(:post_count)
+#     end
 #   RULE
 module ActiveRecordRules
+  extend Definer
+
   cattr_accessor :execution_context
 
   class << self
@@ -49,63 +55,19 @@ module ActiveRecordRules
       end
     end
 
-    # Load rules from a set of files. The rules will be checked for
-    # duplicates before being loaded into the system.
+    # Register a new rule with the system, to be executed when events happen.
     #
-    # The provided filenames will be flattened prior to loading.
-    #
-    # @param filenames [Array<String>] The files to load rules from
-    # @return [Array<Rule>] The rules that were just defined
-    def load_rules(*filenames)
-      # Flatten any arrays in the arguments, just for convenience.
-      definition_hashes = filenames.flatten.flat_map do |filename|
-        File.open(filename) do |file|
-          Parse.definitions(file.read).map do |definition|
-            { definition.name => [definition, filename] }
-          end
-        end
-      end
-
-      definitions = definition_hashes.reduce({}) do |left, right|
-        left.merge(right) do |key, (l, lfilename), (r, rfilename)|
-          lloc = "#{lfilename}:#{l.location[0]}"
-          rloc = "#{rfilename}:#{r.location[0]}"
-          raise "Multiple definitions with same rule name: #{key}, #{lloc} and #{rloc}"
-        end
-      end
-
-      definitions.map do |_, (definition, _)|
-        define_rule(definition)
-      end
-    end
-
-    # Remove all rules from the in-memory database. This is unlikely
-    # to be what you want.
-    def unload_all_rules!
-      @loaded_rules = {}
-      @after_save_rules = {}
-      @after_commit_rules = {}
-      @after_request_rules = {}
-      @async_rules = {}
-    end
-
-    # Define a new rule by providing a definition, either as a string
-    # or as a parsed Definition object.
-    #
-    # @param definition [String, Definition] The definition of the rule
-    # @return [Rule] The newly defined Rule object.
-    def define_rule(definition)
+    # @param rule [Rule] The rule being registered
+    def register_rule!(rule)
       @loaded_rules ||= {}
       @after_save_rules ||= {}
       @after_commit_rules ||= {}
       @after_request_rules ||= {}
       @async_rules ||= {}
 
-      parsed = definition.is_a?(String) ? Parse.definition(definition) : definition
-      rule = Rule.new(definition: parsed)
       if (existing = @loaded_rules[rule.id]) && rule != existing
         raise <<~TEXT
-          Error: hash collision between rules. Change one of the names slighly to produce different hashes.
+          Error: hash collision between rules. Change one of the names to produce different truncated MD5 hashes.
             Existing rule: #{existing.name}
             New rule:      #{rule.name}
         TEXT
@@ -122,7 +84,9 @@ module ActiveRecordRules
       in :async
         @async_rules[rule.id] = rule
       end
-      rule
+
+      # Return nothing, this is just for the mutation.
+      nil
     end
 
     # Retrieve a Rule by name
@@ -142,12 +106,27 @@ module ActiveRecordRules
       end
     end
 
-    # Remove a Rule definition by name
+    # Return all rules in the system
     #
-    # @param name [String] The rule name to remove
+    # @return [Enumerable<Rule>] All rules in the system.
+    def all_rules = @loaded_rules&.values || []
+
+    # Deregister a rule definition by Rule object. If the provided
+    # argument is not a Rule then it will be passed to find_rule to
+    # find the appropriate Rule.
+    #
+    # @param name [Rule, String, Integer] The rule to deregister
     # @return [nil]
-    def undefine_rule(name)
-      id = Rule.name_to_id(name)
+    def deregister_rule!(rule)
+      rule = case rule
+             when String, Integer
+               find_rule(rule)
+             when Rule
+               rule
+             else
+               raise "Rules can only be deregistered by name (a string), an id (an Integer), or a Rule object"
+             end
+      id = rule.id
       raise "Cannot find rule to undefine: #{name}" unless @loaded_rules&.delete(id)
 
       @after_save_rules.delete(id)

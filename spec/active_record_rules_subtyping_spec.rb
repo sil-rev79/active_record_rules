@@ -23,15 +23,18 @@ RSpec.describe ActiveRecordRules do
 
   describe "a rule on vehicles" do
     before do
-      described_class.define_rule(<<~RULE)
-        async rule: list passengers
+      described_class.define_rule("list passengers") do
+        async(<<~MATCH)
           Vehicle(<id>, <name>)
           Passenger(vehicle_id = <id>, name = <passenger>)
-        on match
+        MATCH
+        on_match do
           TestHelper.matches += [[name, passenger]]
-        on unmatch
+        end
+        on_unmatch do
           TestHelper.matches -= [[name, passenger]]
-      RULE
+        end
+      end
 
       TestHelper.matches = []
     end

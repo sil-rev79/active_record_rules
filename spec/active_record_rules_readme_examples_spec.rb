@@ -37,8 +37,10 @@ RSpec.describe ActiveRecordRules do
       end
     end
 
-    described_class.define_rule(<<~RULE)
-      after save rule: Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers
+    described_class.define_rule(
+      "Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers"
+    ) do
+      after_save(<<~MATCH)
         Order(id = <order_id>, <customer_id>, status = "pending")
         Customer(id = <customer_id>, vip_customer = true)
         <order_value> = sum(<value> * <quantity>) {
@@ -46,23 +48,29 @@ RSpec.describe ActiveRecordRules do
           Item(id = <item_id>, sale_discount = 0)
         }
         <order_value> > 100
-      on match
+      MATCH
+      on_match do
         Order.find(order_id).update!(discount: 0.1)
-      on unmatch
+      end
+      on_unmatch do
         order = Order.find(order_id)
         # If the order has been completed, then we don't touch it any more
         order.update!(discount: 0) unless order.status == "completed"
-    RULE
+      end
+    end
 
-    described_class.define_rule(<<~RULE)
-      after save rule: Calculate order price from items and discount
+    described_class.define_rule("Calculate order price from items and discount") do
+      after_save(<<~MATCH)
         Order(id = <order_id>, <customer_id>, <discount>)
         <order_value> = sum(<value> * <quantity>) {
           OrderItem(<order_id>, <quantity>, <value>)
         }
-      on match
+      MATCH
+
+      on_match do
         Order.find(order_id).update!(total_price: (1.0 - discount) * order_value)
-    RULE
+      end
+    end
   end
 
   context "with a non-VIP customer" do

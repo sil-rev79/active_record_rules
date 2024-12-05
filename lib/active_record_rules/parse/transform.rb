@@ -16,6 +16,7 @@ module ActiveRecordRules
       rule(boolean: simple(:value)) { Constant.new(value.to_s == "true") }
       rule(nil: simple(:value)) { Constant.new(nil) }
       rule(binding_name: simple(:value)) { Variable.new(value.to_s) }
+      rule(tuple_elements: sequence(:tuple_elements)) { Tuple.new(tuple_elements) }
       rule(record_name: simple(:value)) do
         RecordField.new(value.line_and_column, *value.to_s.split(":"))
       end
@@ -61,6 +62,10 @@ module ActiveRecordRules
 
       rule(class_name: simple(:class_name), boolean_clauses: subtree(:clauses)) do
         RecordMatcher.new(class_name.to_s, clauses || [])
+      end
+
+      rule(constraints: sequence(:constraints)) do
+        ConstraintSet.new(constraints)
       end
 
       rule(line: simple(:line)) do

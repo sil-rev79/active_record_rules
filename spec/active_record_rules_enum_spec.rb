@@ -32,12 +32,15 @@ RSpec.describe ActiveRecordRules do
 
   describe "using enums as strings" do
     before do
-      described_class.define_rule(<<~RULE)
-        after commit rule: A pending work order has a pending approval
+      described_class.define_rule("A pending work order has a pending approval") do
+        after_commit(<<~MATCH)
           WorkOrder(<id>, status:s = "pending_approval")
-        on match
-          WorkOrderApproval.create!(work_order_id: id, status: 'pending')
-      RULE
+        MATCH
+
+        on_match do
+          WorkOrderApproval.create!(work_order_id: id, status: "pending")
+        end
+      end
     end
 
     let(:work_order) { WorkOrder.create!(status: "pending_approval") }
@@ -49,13 +52,16 @@ RSpec.describe ActiveRecordRules do
 
   describe "bindings enums as strings" do
     before do
-      described_class.define_rule(<<~RULE)
-        async rule: A pending work order has a pending approval
+      described_class.define_rule("A pending work order has a pending approval") do
+        async(<<~MATCH)
           WorkOrder(<id>, <status:s>)
           <status> = "pending_approval"
-        on match
-          WorkOrderApproval.create!(work_order_id: id, status: 'pending')
-      RULE
+        MATCH
+
+        on_match do
+          WorkOrderApproval.create!(work_order_id: id, status: "pending")
+        end
+      end
     end
 
     let(:work_order) { WorkOrder.create!(status: "pending_approval") }
@@ -67,12 +73,14 @@ RSpec.describe ActiveRecordRules do
 
   describe "using enums as integers" do
     before do
-      described_class.define_rule(<<~RULE)
-        async rule: A pending work order has a pending approval
+      described_class.define_rule("A pending work order has a pending approval") do
+        async(<<~MATCH)
           WorkOrder(<id>, status:i = 0)
-        on match
-          WorkOrderApproval.create!(work_order_id: id, status: 'pending')
-      RULE
+        MATCH
+        on_match do
+          WorkOrderApproval.create!(work_order_id: id, status: "pending")
+        end
+      end
     end
 
     let(:work_order) { WorkOrder.create!(status: "pending_approval") }
@@ -84,13 +92,15 @@ RSpec.describe ActiveRecordRules do
 
   describe "binding enums as integers" do
     before do
-      described_class.define_rule(<<~RULE)
-        async rule: A pending work order has a pending approval
+      described_class.define_rule("A pending work order has a pending approval") do
+        async(<<~MATCH)
           WorkOrder(<id>, <status:i>)
           <status> = 0
-        on match
-          WorkOrderApproval.create!(work_order_id: id, status: 'pending')
-      RULE
+        MATCH
+        on_match do
+          WorkOrderApproval.create!(work_order_id: id, status: "pending")
+        end
+      end
     end
 
     let(:work_order) { WorkOrder.create!(status: "pending_approval") }

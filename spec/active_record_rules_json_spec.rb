@@ -32,8 +32,8 @@ RSpec.describe ActiveRecordRules do
 
   describe "a counter using JSON-based conditions" do
     before do
-      described_class.define_rule(<<~RULE)
-        async rule: A rule
+      described_class.define_rule("A rule") do
+        async(<<~MATCH)
           Counter(<id>,
                   <statuses> = definition.statuses[*].text as text[],
                   <lower_bound> = definition.lower_bound as integer,
@@ -43,11 +43,15 @@ RSpec.describe ActiveRecordRules do
             value < <upper_bound>,
             status:s in <statuses>
           )
-        on match
+        MATCH
+
+        on_match do
           Counter.find(id).increment!(:count)
-        on unmatch
+        end
+        on_unmatch do
           Counter.find(id).decrement!(:count)
-      RULE
+        end
+      end
     end
 
     let!(:counter) do
