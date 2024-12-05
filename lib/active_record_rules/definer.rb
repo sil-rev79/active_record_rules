@@ -2,6 +2,15 @@
 
 module ActiveRecordRules
   module Definer
+    # Define a rule and register it with the global ActiveRecordRules
+    # object.
+    #
+    # By default this will take the reciever as the evaluation context
+    # for the rule bodies (on_match, on_update, on_unmatch).
+    #
+    # @param name [String] The name of this rule
+    # @param context [any] The context to use when evaluating the rule (with bound vars added)
+    # @yieldself [DefinitionContext] A builder used to define this rule
     def define_rule(name, context: nil, &block)
       values = DefinitionContext.new
       values.instance_eval(&block)
@@ -20,9 +29,23 @@ module ActiveRecordRules
       def after_request(constraints) = save_timing(:after_request, constraints)
       def async(constraints) = save_timing(:async, constraints)
 
-      def on_match(&block) = (@on_match = block)
-      def on_update(&block) = (@on_update = block)
-      def on_unmatch(&block) = (@on_unmatch = block)
+      def on_match(&block)
+        raise "Redefinition of on_match block not permitted" if @on_match
+
+        @on_match = block
+      end
+
+      def on_update(&block)
+        raise "Redefinition of on_update block not permitted" if @on_update
+
+        @on_update = block
+      end
+
+      def on_unmatch(&block)
+        raise "Redefinition of on_unmatch block not permitted" if @on_unmatch
+
+        @on_unmatch = block
+      end
 
       def to_h
         {
