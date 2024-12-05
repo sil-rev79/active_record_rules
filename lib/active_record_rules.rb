@@ -115,7 +115,7 @@ module ActiveRecordRules
     # argument is not a Rule then it will be passed to find_rule to
     # find the appropriate Rule.
     #
-    # @param name [Rule, String, Integer] The rule to deregister
+    # @param rule [Rule, String, Integer] The rule to deregister
     # @return [nil]
     def deregister_rule!(rule)
       rule = case rule
