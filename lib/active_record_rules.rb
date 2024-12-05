@@ -379,7 +379,7 @@ module ActiveRecordRules
     private
 
     def relevant_attributes(klass)
-      @loaded_rules.map do |_, rule|
+      all_rules.map do |rule|
         rule.relevant_attributes(klass)
       end.compact.reduce(Set.new, &:+)
     end

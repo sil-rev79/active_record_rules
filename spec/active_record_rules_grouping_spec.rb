@@ -125,4 +125,42 @@ RSpec.describe ActiveRecordRules do
       end
     end
   end
+
+  describe "array aggregation with tuples", restrict_database: :postgres do
+    let(:course) { Course.create! }
+    let(:student) { Student.create!(name: "John Doe", status: "active") }
+
+    before do
+      described_class.define_rule("Reify student names on classes") do
+        async <<~MATCH
+          Course(id = <course_id>)
+          <ids_and_names> = array([<student_id>, <name>]) {
+            CourseStudent(<course_id>, <student_id>)
+            Student(id = <student_id>, <name>)
+          }
+        MATCH
+
+        on_match do
+          Course.update(course_id, student_names: ids_and_names.sort.join(", "))
+        end
+      end
+    end
+
+    it "sets an empty course to the empty string" do
+      expect(course.reload.student_names).to eq ""
+    end
+
+    context "with a student in the course" do
+      let!(:course_student) { CourseStudent.create(course: course, student: student) }
+
+      it "includes the student's name" do
+        expect(course.reload.student_names).to eq "1, John Doe"
+      end
+
+      it "does not include the student's name after removing them" do
+        course_student.destroy!
+        expect(course.reload.student_names).to eq ""
+      end
+    end
+  end
 end
