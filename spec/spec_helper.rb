@@ -49,6 +49,7 @@ end
 
 class TestRecord < ActiveRecord::Base
   include ActiveRecordRules::Hooks
+  extend ActiveRecordRules::Definer
 
   self.abstract_class = true
 end

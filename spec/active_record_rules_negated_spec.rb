@@ -12,17 +12,13 @@ RSpec.describe ActiveRecordRules do
       end
     end
 
-    described_class.define_rule("the fastest is the winner") do
+    Racer.define_rule("the fastest is the winner") do
       after_commit(<<~MATCH)
         Racer(<id>, <race_id>, <race_time>)
         not { Racer(<race_id>, race_time < <race_time>) }
       MATCH
-      on_match do
-        Racer.find(id).update!(winner: true)
-      end
-      on_unmatch do
-        Racer.find(id).update!(winner: false)
-      end
+      on_match { find(id).update!(winner: true) }
+      on_unmatch { find(id).update!(winner: false) }
     end
   end
 
@@ -103,17 +99,13 @@ RSpec.describe ActiveRecordRules do
     before do
       # Redefine the rule that we're working with
       described_class.deregister_rule!("the fastest is the winner")
-      described_class.define_rule("the fastest is the winner") do
+      Racer.define_rule("the fastest is the winner") do
         after_commit(<<~MATCH)
           Racer(<id>, <race_id>, <race_time>)
           (<race_id> = 1 or not { Racer(<race_id>, race_time < <race_time>) })
         MATCH
-        on_match do
-          Racer.find(id).update!(winner: true)
-        end
-        on_unmatch do
-          Racer.find(id).update!(winner: false)
-        end
+        on_match { find(id).update!(winner: true) }
+        on_unmatch { Racer.find(id).update!(winner: false) }
       end
     end
 
