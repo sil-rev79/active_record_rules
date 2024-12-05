@@ -1,5 +1,5 @@
 Rails.application.config.after_initialize do
-  ActiveRecordRules.load_rules(
-    Dir[Rails.root.join('app/**/*.rules')]
+  ActiveRecordRules.load_files(
+    Dir[Rails.root.join('app/**/*.rules.rb')]
   )
 end

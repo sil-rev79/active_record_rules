@@ -55,6 +55,16 @@ module ActiveRecordRules
       end
     end
 
+    # Load rules from the provided filenames by evaluating them as
+    # Ruby code within the context of the ActiveRecordRules object.
+    #
+    # @param files [Array<String>] The filenames to load
+    def load_files(filenames)
+      filenames.each do |filename|
+        Module.new.extend(Definer).module_eval(File.read(filename), filename)
+      end
+    end
+
     # Register a new rule with the system, to be executed when events happen.
     #
     # @param rule [Rule] The rule being registered
@@ -65,12 +75,14 @@ module ActiveRecordRules
       @after_request_rules ||= {}
       @later_rules ||= {}
 
-      if (existing = @loaded_rules[rule.id]) && rule != existing
-        raise <<~TEXT
+      if (existing = @loaded_rules[rule.id])
+        raise <<~TEXT if rule.name != existing.name
           Error: hash collision between rules. Change one of the names to produce different truncated MD5 hashes.
             Existing rule: #{existing.name}
             New rule:      #{rule.name}
         TEXT
+
+        logger.warn("Redefining rule: #{rule.name}")
       end
 
       @loaded_rules[rule.id] = rule

@@ -31,13 +31,13 @@ rails db:migrate
 
 Once you have done this, you need to include `ActiveRecordRules::Hooks` into your record class. This will add `after_create`, `after_update`, `after_destroy`, and `after_commit` hooks which trigger rules at the appropriate times. Rules try to avoid triggering based on irrelevant field changes to keep these callbacks as cheap as possible.
 
-The simplest way to do this is include `ActiveRecordRules::Hooks` in your `ApplicationRecord`, like this:
-
 ```ruby
 class ApplicationRecord < ActiveRecord::Base
   include ActiveRecordRules::Hooks
 end
 ```
+
+With the default configuration you can define rules in a `.rules.rb` file anywhere in your project. Alternatively, you can add `extend ActiveRecordRules::Definer` to any of your classes to define rules local to a specific class.
 
 At the moment only Postgres and SQLite are supported. Contributions are welcome to add support for other database engines.
 
@@ -83,11 +83,11 @@ end
 Rule executions are remembered by record id and variable bindings, so each rule will match once per set of matching objects, then won't match again for those objects until a relevant value changes. In the rule above, adding or removing an item from an order will automatically re-run the `match` code.
 
 There are three types of clauses that can be run on updates:
- - `on match`: when the rule matches a new set of records.
- - `on update`: when the rule matches the same set of records (by id), but with different bound values. If this is not provided then updates are treated as an unmatch then a match.
- - `on unmatch`: when the rule no longer matches a set of records.
+ - `on_match`: when the rule matches a new set of records.
+ - `on_update`: when the rule matches the same set of records (by id), but with different bound values. If this is not provided then updates are treated as an unmatch then a match.
+ - `on_unmatch`: when the rule no longer matches a set of records.
 
-Note that `on update` blocks must use `.old` and `.new` to access the last-seen and current values.
+Note that `on_update` blocks must use `.old` and `.new` to access the last-seen and current values.
 
 ### Triggering rules
 
@@ -99,9 +99,9 @@ Rule evaluation happens in three stages:
  3. *executing*: run the code for each clause which needs to be executed.
 
 Each rule declares how it will be run:
- - `after save`, i.e. in an `after_save` hook;
- - `after commit`, i.e. in an `after_commit` hook; or
- - `after request`, i.e. at the end of the nearest `ActiveRecord.wrap_request` block (or `after_commit` if no such block is active); or
+ - `after_save`, i.e. in an `after_save` hook;
+ - `after_commit`, i.e. in an `after_commit` hook; or
+ - `after_request`, i.e. at the end of the nearest `ActiveRecord.wrap_request` block (or `after_commit` if no such block is active); or
  - `later`, i.e. in an `ActiveJob` that is scheduled in an `after_commit` hook.
 
 ## Rule State
