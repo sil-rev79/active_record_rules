@@ -13,7 +13,7 @@ RSpec.describe ActiveRecordRules do
     end
 
     described_class.define_rule("calculate fraction value") do
-      async(<<~MATCH)
+      later(<<~MATCH)
         Fraction(<id>, <numerator>, <denominator>)
       MATCH
       on_match do

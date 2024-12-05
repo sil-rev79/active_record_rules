@@ -27,7 +27,7 @@ module ActiveRecordRules
       def after_save(constraints) = save_timing(:after_save, constraints)
       def after_commit(constraints) = save_timing(:after_commit, constraints)
       def after_request(constraints) = save_timing(:after_request, constraints)
-      def async(constraints) = save_timing(:async, constraints)
+      def later(constraints) = save_timing(:later, constraints)
 
       def on_match(&block)
         raise "Redefinition of on_match block not permitted" if @on_match

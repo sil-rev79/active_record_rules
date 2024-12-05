@@ -27,7 +27,7 @@ RSpec.describe ActiveRecordRules do
   describe "rules with no constraints" do
     before do
       described_class.define_rule("greet") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Salutation(<greeting>)
           Person(<name>)
         MATCH
@@ -96,7 +96,7 @@ RSpec.describe ActiveRecordRules do
   describe "rules with a class in a module" do
     before do
       described_class.define_rule("greet") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           TestRecordModule::Salutation(<greeting>)
           TestRecordModule::Person(<name>)
         MATCH
@@ -165,7 +165,7 @@ RSpec.describe ActiveRecordRules do
   describe "rules with constant constraints" do
     before do
       described_class.define_rule("greet") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Salutation(<greeting>)
           Person(<name>, greetable = true)
         MATCH
@@ -178,7 +178,7 @@ RSpec.describe ActiveRecordRules do
       end
 
       described_class.define_rule("farewell") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Salutation(<greeting>, <farewell>)
           Person(<name>, greetable = true)
           Person(<name>, farewellable = true)
@@ -224,7 +224,7 @@ RSpec.describe ActiveRecordRules do
   describe "rules with constraints between three conditions" do
     before do
       described_class.define_rule("greet") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Salutation(<greeting>)
           Person(name = <name1>)
           Person(name = <name2>, name > <name1>)
@@ -262,7 +262,7 @@ RSpec.describe ActiveRecordRules do
   describe "rules which only match a subset of records" do
     before do
       described_class.define_rule("greet") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Salutation(<greeting>)
           Person(name = <name1>, greetable = true)
           Person(name = <name2>, name > <name1>)
@@ -300,7 +300,7 @@ RSpec.describe ActiveRecordRules do
     it "fails if the class is not an ActiveRecord::Base" do
       expect do
         described_class.define_rule("fail at defining") do
-          async("Object()")
+          later("Object()")
         end
       end.to raise_error(/subclasses of ActiveRecord::Base/)
     end
@@ -309,7 +309,7 @@ RSpec.describe ActiveRecordRules do
   describe "multiple rules at the same time" do
     before do
       described_class.define_rule("greet") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Salutation(<greeting>, greeting != nil)
           Person(<name>)
         MATCH
@@ -322,7 +322,7 @@ RSpec.describe ActiveRecordRules do
       end
 
       described_class.define_rule("farewell") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Salutation(<farewell>, farewell != nil)
           Person(<name>)
         MATCH
@@ -420,7 +420,7 @@ RSpec.describe ActiveRecordRules do
   describe "rules with updates" do
     before do
       described_class.define_rule("greet") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Salutation(<greeting>)
           Person(<name>)
         MATCH
@@ -458,7 +458,7 @@ RSpec.describe ActiveRecordRules do
       TestHelper.matches = []
 
       described_class.define_rule("run custom methods", context: context) do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Person(<name>)
         MATCH
         on_match do
@@ -491,7 +491,7 @@ RSpec.describe ActiveRecordRules do
       person # force person to be created before the rule is defined
 
       described_class.define_rule("run custom methods") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Person(<name>)
         MATCH
         on_match do
@@ -527,7 +527,7 @@ RSpec.describe ActiveRecordRules do
   describe "rule deletion" do
     before do
       described_class.define_rule("run custom methods") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Person(<name>)
         MATCH
         on_unmatch do # NOTE: on UNmatch
@@ -547,7 +547,7 @@ RSpec.describe ActiveRecordRules do
   describe "modifications with lots of people" do
     before do
       described_class.define_rule("run custom methods") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Salutation(<greeting>)
           Person(<name>)
         MATCH
@@ -579,7 +579,7 @@ RSpec.describe ActiveRecordRules do
   describe "top-level expression constraints" do
     before do
       described_class.define_rule("find salutations with \"hello\" as their greeting") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Salutation(<id>, <greeting>)
           "hello" = <greeting>
         MATCH
@@ -618,7 +618,7 @@ RSpec.describe ActiveRecordRules do
   describe "boolean operators" do
     before do
       described_class.define_rule("find salutations with \"hello\" as their greeting") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Salutation(<id> = id, greeting = "hello" or (greeting = "hi" and farewell = "bye"))
         MATCH
         on_match do
@@ -650,7 +650,7 @@ RSpec.describe ActiveRecordRules do
   describe "updating without callbacks" do
     before do
       described_class.define_rule("find salutations with \"hello\" as their greeting") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Salutation(<id> = id, greeting = "hello" or (greeting = "hi" and farewell = "bye"))
         MATCH
         on_match do

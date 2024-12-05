@@ -6,7 +6,7 @@ module ActiveRecordRules
   module Jobs
     class ActivateRules < ActiveJob::Base
       def perform(change)
-        ids = ActiveRecordRules.activate_rules(change, :async)
+        ids = ActiveRecordRules.activate_rules(change, :later)
         ids.each { RunPendingExecutions.perform_later(_1) }
       end
     end

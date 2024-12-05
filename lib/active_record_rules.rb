@@ -15,7 +15,7 @@ require "active_record_rules/rule_match_id"
 #
 # @example Define a simple rule
 #   ActiveRecordRules.define_rule("Update number of posts for user")
-#     async(<<~MATCH)
+#     later(<<~MATCH)
 #       Post(<author_id>, status = "published")
 #       User(id = <author_id>)
 #     MATCH
@@ -63,7 +63,7 @@ module ActiveRecordRules
       @after_save_rules ||= {}
       @after_commit_rules ||= {}
       @after_request_rules ||= {}
-      @async_rules ||= {}
+      @later_rules ||= {}
 
       if (existing = @loaded_rules[rule.id]) && rule != existing
         raise <<~TEXT
@@ -81,8 +81,8 @@ module ActiveRecordRules
         @after_commit_rules[rule.id] = rule
       in :after_request
         @after_request_rules[rule.id] = rule
-      in :async
-        @async_rules[rule.id] = rule
+      in :later
+        @later_rules[rule.id] = rule
       end
 
       # Return nothing, this is just for the mutation.
@@ -132,7 +132,7 @@ module ActiveRecordRules
       @after_save_rules.delete(id)
       @after_commit_rules.delete(id)
       @after_request_rules.delete(id)
-      @async_rules.delete(id)
+      @later_rules.delete(id)
       nil
     end
 
@@ -183,7 +183,7 @@ module ActiveRecordRules
     # Activate all rules relevant to the provided change.
     #
     # @param change The change details to use to activate rules
-    # @param timing [:after_save, :after_commit, :after_request, :async, :all]
+    # @param timing [:after_save, :after_commit, :after_request, :later, :all]
     #   The timing of this activation, which filters rules that get activated
     # @return [Array<String>] The ids of RuleMatch records which need execution as a result of this activation
     def activate_rules(change, timing = :all)
@@ -196,8 +196,8 @@ module ActiveRecordRules
                 @after_commit_rules
               in :after_request
                 @after_request_rules
-              in :async
-                @async_rules
+              in :later
+                @later_rules
               in :all
                 @loaded_rules
               end
@@ -234,13 +234,13 @@ module ActiveRecordRules
       nil
     end
 
-    # Schedule an Async activation process to run. Does nothing if
+    # Schedule a "later" activation process to run. Does nothing if
     # there are no rules defined.
     #
     # @param change The change details to use to activate rules
-    def schedule_async_activation(change)
+    def schedule_later_activation(change)
       return if change.nil?
-      return if @async_rules.empty?
+      return if @later_rules.empty?
 
       ActiveRecordRules::Jobs::ActivateRules.perform_later(change)
     end
@@ -294,7 +294,7 @@ module ActiveRecordRules
 
     # Evaluate all the rules relevant to a given record, running
     # "after save" and "after commit" rules immediately, and
-    # scheduling "async" rules to run.
+    # scheduling "later" rules to run.
     #
     # This processes rules as if every record in the field was
     # changed, but rule bodies will only be run if there has been an
@@ -317,7 +317,7 @@ module ActiveRecordRules
       ActiveRecordRules.activate_and_execute(change, :after_save)
       ActiveRecordRules.activate_and_execute(change, :after_commit)
       ActiveRecordRules.activate_and_execute(change, :after_request)
-      ActiveRecordRules.schedule_async_activation(change)
+      ActiveRecordRules.schedule_later_activation(change)
       nil
     end
 

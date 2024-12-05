@@ -24,7 +24,7 @@ RSpec.describe ActiveRecordRules do
   describe "a rule on vehicles" do
     before do
       described_class.define_rule("list passengers") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Vehicle(<id>, <name>)
           Passenger(vehicle_id = <id>, name = <passenger>)
         MATCH

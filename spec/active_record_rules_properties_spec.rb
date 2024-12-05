@@ -34,7 +34,7 @@ RSpec.describe ActiveRecordRules do
       end
 
       described_class.define_rule("notify client representative for high importance requests") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           SupportRequest(<client>, level = "high")
           ClientRepresentative(<client>, <name>)
         MATCH
@@ -98,7 +98,7 @@ RSpec.describe ActiveRecordRules do
           Card.create!(suit: suit, rank: rank)
         in rank
           counts.define_rule("counting #{rank}s") do
-            async(<<~MATCH)
+            later(<<~MATCH)
               Card(rank = "#{rank}", <rank>)
             MATCH
             on_match do
@@ -139,7 +139,7 @@ RSpec.describe ActiveRecordRules do
       end
 
       described_class.define_rule("three of the same suit") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Card(<suit>, rank = <rank1>)
           Card(<suit>, rank = <rank2>, rank > <rank1>)
           Card(<suit>, rank = <rank3>, rank > <rank2>)

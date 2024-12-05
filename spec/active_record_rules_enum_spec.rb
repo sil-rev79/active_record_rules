@@ -53,7 +53,7 @@ RSpec.describe ActiveRecordRules do
   describe "bindings enums as strings" do
     before do
       described_class.define_rule("A pending work order has a pending approval") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           WorkOrder(<id>, <status:s>)
           <status> = "pending_approval"
         MATCH
@@ -74,7 +74,7 @@ RSpec.describe ActiveRecordRules do
   describe "using enums as integers" do
     before do
       described_class.define_rule("A pending work order has a pending approval") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           WorkOrder(<id>, status:i = 0)
         MATCH
         on_match do
@@ -93,7 +93,7 @@ RSpec.describe ActiveRecordRules do
   describe "binding enums as integers" do
     before do
       described_class.define_rule("A pending work order has a pending approval") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           WorkOrder(<id>, <status:i>)
           <status> = 0
         MATCH

@@ -37,7 +37,7 @@ RSpec.describe ActiveRecordRules do
       end
 
       described_class.define_rule("Reify student counts on classes") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Course(id = <course_id>, <early_cutoff>)
           <count> = count(<student_id>) {
             CourseStudent(<course_id>, <student_id>, rego_time < <early_cutoff>)
@@ -95,7 +95,7 @@ RSpec.describe ActiveRecordRules do
 
     before do
       described_class.define_rule("Reify student names on classes") do
-        async(<<~MATCH)
+        later(<<~MATCH)
           Course(id = <course_id>)
           <names> = array(<name>) {
             CourseStudent(<course_id>, <student_id>)
@@ -132,7 +132,7 @@ RSpec.describe ActiveRecordRules do
 
     before do
       described_class.define_rule("Reify student names on classes") do
-        async <<~MATCH
+        later(<<~MATCH)
           Course(id = <course_id>)
           <ids_and_names> = array([<student_id>, <name>]) {
             CourseStudent(<course_id>, <student_id>)

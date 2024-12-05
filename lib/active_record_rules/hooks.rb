@@ -35,7 +35,7 @@ module ActiveRecordRules
           unless Thread.current[:pending_active_record_rules_changes]
             ActiveRecordRules.activate_and_execute(change, :after_request)
           end
-          ActiveRecordRules.schedule_async_activation(change)
+          ActiveRecordRules.schedule_later_activation(change)
         end
       ensure
         @arr__transaction_changes = nil
