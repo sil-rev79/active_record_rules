@@ -16,10 +16,21 @@ module ActiveRecordRules
       def to_query(definer)
         query_definer = QueryDefiner.new(definer)
         constraints.each do |constraint|
-          emitter = constraint.to_query(query_definer)
-          query_definer.add_condition(&emitter) if emitter
+          case constraint
+          in BinaryOperatorExpression(Variable(left), "=", Variable(right))
+            query_definer.add_binding(left) { _1[right] }
+            query_definer.add_binding(right) { _1[left] }
+          in BinaryOperatorExpression(Variable(left), "=", right)
+            query_definer.add_binding(left, &right.to_query(query_definer))
+          in BinaryOperatorExpression(left, "=", Variable(right))
+            query_definer.add_binding(right, &left.to_query(query_definer))
+          else
+            emitter = constraint.to_query(query_definer)
+            query_definer.add_condition(&emitter) if emitter
+          end
         end
-        query_definer.add_binding("__value", &define_expression(query_definer))
+        value_name = "__value#{definer.next_index}"
+        query_definer.add_binding(value_name, &define_expression(query_definer))
 
         # I had intended for these to be left joins, but the queries
         # that get constructed might need to interact with the outside
@@ -33,16 +44,19 @@ module ActiveRecordRules
             # the parent query.
             query_definer.add_condition do
               QueryDefiner::SqlExpr.new(
-                gen_eq(bindings[name], query_definer.bindings[name].first.call(bindings)),
+                gen_eq(
+                  bindings[name],
+                  query_definer.bindings[name].map { _1.call(bindings) }.min_by(&:length)
+                ),
                 false
               )
             end
           end
-          sql = query_definer.to_sql(bindings, ["__value"]) # Then we only emit __value here
+          sql = query_definer.to_sql(bindings, [value_name]) # Then we only emit __value here
 
           # We order by __value here to make the array aggregate
           # deterministic. It shouldn't really affect anything else.
-          final_result("(#{sql}\n order by __value)")
+          final_result("(#{sql}\n order by #{value_name})")
         end
       end
 

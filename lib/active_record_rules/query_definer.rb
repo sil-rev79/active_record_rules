@@ -29,16 +29,19 @@ module ActiveRecordRules
       nil
     end
 
+    class CircularReference < StandardError; end
+
     def to_sql(outer_bindings = {}, interesting_binding_names = nil)
       resolving = Set.new
       all_bindings = {}
       resolved_bindings = Hash.new do |hash, key|
-        raise "Circular variable reference containing: #{resolving}" unless resolving.add?(key)
+        raise CircularReference, "Circular variable reference containing: #{resolving}" unless resolving.add?(key)
         raise "Unknown variable reference: #{key}" unless @bindings.key?(key) || outer_bindings.key?(key)
 
         if @bindings.key?(key)
           # Note the circularity here. Bindings can refer to other
           # bindings, so we allow them to be resolved during resolution.
+          errors = []
           all_bindings[key] = @bindings[key].map do |builder|
             value = builder.call(hash)
             if value.is_a?(SqlExpr)
@@ -46,7 +49,16 @@ module ActiveRecordRules
             else
               SqlExpr.new(value, true)
             end
-          end.sort_by(&:length)
+          rescue CircularReference => e
+            errors << e
+            nil
+          end.compact.sort_by(&:length)
+          if all_bindings[key].empty?
+            raise errors.first if errors.size == 1
+
+            raise "Errors resolving binding: #{e.map(&:message).join("; ")}"
+          end
+
           hash[key] = all_bindings[key].first
         else
           hash[key] = outer_bindings[key]

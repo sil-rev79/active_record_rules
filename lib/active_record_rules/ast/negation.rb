@@ -24,13 +24,24 @@ module ActiveRecordRules
 
         query_definer = QueryDefiner.new(definer)
         constraints.each do |constraint|
-          emitter = constraint.to_query(query_definer)
-          query_definer.add_condition(&emitter) if emitter
+          case constraint
+          in BinaryOperatorExpression(Variable(left), "=", Variable(right))
+            query_definer.add_binding(left) { _1[right] }
+            query_definer.add_binding(right) { _1[left] }
+          in BinaryOperatorExpression(Variable(left), "=", right)
+            query_definer.add_binding(left, &right.to_query(query_definer))
+          in BinaryOperatorExpression(left, "=", Variable(right))
+            query_definer.add_binding(right, &left.to_query(query_definer))
+          else
+            emitter = constraint.to_query(query_definer)
+            query_definer.add_condition(&emitter) if emitter
+          end
         end.compact
-        query_definer.add_binding("__value") { "1" }
+        value_name = "__value#{definer.next_index}"
+        query_definer.add_binding(value_name) { "1" }
 
         lambda do |bindings|
-          sql = query_definer.to_sql(bindings, ["__value"])
+          sql = query_definer.to_sql(bindings, [value_name])
           QueryDefiner::SqlExpr.new("not exists (#{sql.split("\n").join("\n            ")})", false)
         end
       end

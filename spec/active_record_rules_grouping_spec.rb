@@ -135,8 +135,11 @@ RSpec.describe ActiveRecordRules do
         later(<<~MATCH)
           Course(id = <course_id>)
           <ids_and_names> = array([<student_id>, <name>]) {
-            CourseStudent(<course_id>, <student_id>)
+            # CourseStudent(<course_id>, <student_id>)
             Student(id = <student_id>, <name>)
+            any {
+              CourseStudent(<course_id>, <student_id>)
+            }
           }
         MATCH
 
