@@ -1,3 +1,7 @@
+Rails.autoloaders.each do |loader|
+  loader.ignore(Rails.root.join('app/**/*.rules.rb'))
+end
+
 Rails.application.config.after_initialize do
   ActiveRecordRules.load_files(
     Dir[Rails.root.join('app/**/*.rules.rb')]
