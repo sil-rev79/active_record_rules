@@ -345,12 +345,33 @@ module ActiveRecordRules
       end
     end
 
+    # Find matches which are in the "queued" state, and are waiting to
+    # be executed. These will likely have an outstanding background
+    # job which will execute them. If matches are stuck in a queued
+    # state for a long time, this may indicate a problem with your job
+    # runner.
+    #
+    # Matches in this list can be executed using #execute!, but this
+    # will not change the queued_since value. This must be cleared
+    # manually, but doing so may introduce race conditions if an
+    # update to the match occurs at the same time as you are executing
+    # it.
+    #
+    # @param limit [ActiveSupport::Duration]
+    #   A timeframe beyond which a job should be reported. This is
+    #   intended to find jobs which are queued and which have not run,
+    #   despite a reasonable expectation that they should have been.
+    def queued_matches(limit = 10.minutes)
+      ActiveRecordRules::RuleMatch.where(queued_since: ..(Time.now - limit))
+    end
+
     # Find matches which are stuck in the "running" state, and might
     # need to be executed again. It is likely that you want to run
     # #execute! on each match, but you may wish to inspect the values
     # before executing them.
     #
-    # @param limit [ActiveSupport::Duration] A timeframe beyond which a job is considered "stuck" (default 10 minutes)
+    # @param limit [ActiveSupport::Duration]
+    #   A timeframe beyond which a job is considered "stuck" (default 10 minutes)
     def stuck_matches(limit = 10.minutes)
       ActiveRecordRules::RuleMatch.where(running_since: ..(Time.now - limit))
     end
