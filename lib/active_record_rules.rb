@@ -29,10 +29,7 @@ require "active_record_rules/rule_match_id"
 module ActiveRecordRules
   extend Definer
 
-  cattr_accessor :execution_context
-
   class << self
-    attr_accessor :execution_context
     attr_writer :logger, :dialect
 
     # Get the current logger. Defaults to ActiveRecord::Base.logger if
@@ -52,6 +49,22 @@ module ActiveRecordRules
         :postgres
       else
         "Unknown database adapter: #{name} (only SQLite and PostgreSQL are supported)."
+      end
+    end
+
+    # Define a block to wrap around all rule executions. The block
+    # will be provided with the rule that is being executed, and a
+    # block to yield as the execution.
+    #
+    # @yieldparam [ActiveRecordRules::Rule] rule
+    #   The rule being executed
+    # @yieldparam [Proc] execution
+    #   A Proc of the execution to be performed
+    def around_execution(&block)
+      if block
+        @around_execution = block
+      else
+        @around_execution || ->(_, execution) { execution.call }
       end
     end
 

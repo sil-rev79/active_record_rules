@@ -691,4 +691,86 @@ RSpec.describe ActiveRecordRules do
       expect(TestHelper.matches).not_to be_empty
     end
   end
+
+  describe "global execution hooks" do
+    before do
+      described_class.define_rule("match a person once") do
+        later(<<~MATCH)
+          Person(<name>)
+        MATCH
+        on_match { TestHelper.matches << [:match, Thread.current[:rule_name]] }
+        on_update { TestHelper.matches << [:update, Thread.current[:rule_name]] }
+        on_unmatch { TestHelper.matches << [:unmatch, Thread.current[:rule_name]] }
+      end
+      TestHelper.matches = Set.new
+    end
+
+    context "with a hook setting a thread local" do
+      around do |example|
+        described_class.around_execution do |rule, execution|
+          Thread.current[:rule_name] = rule.name
+          execution.call
+        end
+        example.run
+      ensure
+        # Set it back to the "do nothing" hook
+        described_class.around_execution do |_, execution|
+          execution.call
+        end
+      end
+
+      it "exposes the threadlocal on match" do
+        Person.create!(name: "John")
+        expect(TestHelper.matches).to include([:match, "match a person once"])
+      end
+
+      it "exposes the threadlocal on update" do
+        Person.create!(name: "John").update!(name: "abc")
+        expect(TestHelper.matches).to include([:update, "match a person once"])
+      end
+
+      it "exposes the threadlocal on unmatch" do
+        Person.create!(name: "John").destroy!
+        expect(TestHelper.matches).to include([:unmatch, "match a person once"])
+      end
+    end
+
+    context "with a hook which doesn't call the execution" do
+      around do |example|
+        described_class.around_execution do |rule, _|
+          Thread.current[:rule_name] = rule.name
+        end
+        example.run
+      ensure
+        # Set it back to the "do nothing" hook
+        described_class.around_execution do |_, execution|
+          execution.call
+        end
+      end
+
+      it "raises an error" do
+        expect { Person.create!(name: "John") }.to raise_error(/did not execute/)
+      end
+    end
+
+    context "with a hook which calls the execution too many times" do
+      around do |example|
+        described_class.around_execution do |rule, execution|
+          Thread.current[:rule_name] = rule.name
+          execution.call
+          execution.call
+        end
+        example.run
+      ensure
+        # Set it back to the "do nothing" hook
+        described_class.around_execution do |_, execution|
+          execution.call
+        end
+      end
+
+      it "raises an error" do
+        expect { Person.create!(name: "John") }.to raise_error(/executed rule body 2 times/)
+      end
+    end
+  end
 end

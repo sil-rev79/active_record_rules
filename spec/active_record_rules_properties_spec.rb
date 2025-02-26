@@ -89,7 +89,6 @@ RSpec.describe ActiveRecordRules do
         end
       end
 
-      # described_class.execution_context = counts
       counts.extend(ActiveRecordRules::Definer)
 
       steps.each do |step|

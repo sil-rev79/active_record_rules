@@ -4,7 +4,7 @@ require "digest/md5"
 
 module ActiveRecordRules
   class Rule
-    attr_reader :id, :name, :timing, :constraints, :on_match, :on_update, :on_unmatch, :context
+    attr_reader :id, :name, :timing, :constraints, :on_match, :on_update, :on_unmatch, :context, :source_location
 
     def initialize(name:, timing:, constraints:, on_match:, on_update:, on_unmatch:, context:, source_location:)
       @name = name
@@ -99,7 +99,7 @@ module ActiveRecordRules
     PendingActivation = Struct.new(:condition_terms, :condition_sql)
 
     def execute_match(args)
-      @context_builder.call(args).instance_exec(&@on_match) if @on_match
+      wrap_execution { @context_builder.call(args).instance_exec(&@on_match) } if @on_match
     end
 
     def execute_update(old_args, new_args)
@@ -107,7 +107,9 @@ module ActiveRecordRules
         arg_pairs = (old_args.keys.to_set + new_args.keys.to_set).to_h do |key|
           [key, ArgumentPair.new(old_args[key], new_args[key])]
         end
-        @context_builder.call(arg_pairs).instance_exec(&@on_update)
+        wrap_execution do
+          @context_builder.call(arg_pairs).instance_exec(&@on_update)
+        end
       else
         execute_unmatch(old_args)
         execute_match(new_args)
@@ -115,10 +117,25 @@ module ActiveRecordRules
     end
 
     def execute_unmatch(args)
-      @context_builder.call(args).instance_exec(&@on_unmatch) if @on_unmatch
+      wrap_execution { @context_builder.call(args).instance_exec(&@on_unmatch) } if @on_unmatch
     end
 
     private
+
+    def wrap_execution(&block)
+      count = 0
+      execution = lambda do
+        count += 1
+        block.call
+      end
+      ActiveRecordRules.around_execution.call(self, execution)
+      return if count == 1
+
+      location = ActiveRecordRules.around_execution.source_location.join(":")
+      raise "Execution context did not execute rule body for rule #{id} (context at #{location})" if count.zero?
+
+      raise "Execution context executed rule body #{count} times for rule #{id} (context at #{location})"
+    end
 
     # Add records to the "ids" join table where needed
     def fixup_missing_ids!
@@ -245,7 +262,7 @@ module ActiveRecordRules
 
       def self.for_variables(names)
         Class.new(ExecutionContext) do
-          names.each do |name|
+          names&.each do |name|
             sym_name = name.to_sym
             if instance_methods.include?(sym_name)
               raise "Bound variable #{sym_name} conflict with method in execution context"
