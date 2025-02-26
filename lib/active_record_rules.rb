@@ -271,15 +271,9 @@ module ActiveRecordRules
         executing_ids = ids_to_execute
         ids_to_execute = []
         Rule.claim_pending_executions!(executing_ids).each do |match|
-          rule = @loaded_rules[match.rule_id]
-          unless rule
-            logger.warn("Could not find loaded rule for match (rule id: #{match.rule_id}): ignoring match #{match.id}.")
-            next
-          end
-
           total += 1
           begin
-            needs_execution = rule.run_pending_execution(match)
+            needs_execution = match.execute!
             ids_to_execute << match.id if needs_execution
           rescue StandardError => e
             logger.error(

@@ -68,109 +68,6 @@ module ActiveRecordRules
       SQL
     end
 
-    # @return [Boolean] whether this rule has further pending executions
-    def run_pending_execution(match)
-      raise "Cannot run execution meant for another rule!" unless match.rule_id == id
-
-      case match
-      in RuleMatch(live_arguments: nil, next_arguments: nil)
-        match.delete
-        false # does not need execution
-
-      in RuleMatch(ids:, live_arguments:, next_arguments: nil)
-        logger&.info { "Rule(#{id}): unmatched for #{ids.to_json}" }
-        logger&.debug { "Rule(#{id}): unmatched with arguments #{live_arguments.to_json}" }
-
-        begin
-          execute_unmatch(live_arguments)
-        rescue StandardError => e
-          ActiveRecord::Base.connection.execute(<<~SQL.squish!)
-            update #{RuleMatch.table_name}
-               set failed_since = coalesce(failed_since, current_timestamp)
-             where id = #{ActiveRecord::Base.connection.quote(match.id)}
-          SQL
-          raise e
-        end
-
-        ActiveRecord::Base.connection.execute(<<~SQL.squish!).pluck("needs_execution").any?
-          update #{RuleMatch.table_name}
-             set running_since = null,
-                 failed_since = null,
-                 live_arguments = null
-           where id = #{ActiveRecord::Base.connection.quote(match.id)}
-           returning (queued_since is not null) as needs_execution
-        SQL
-
-      in RuleMatch(ids:, live_arguments: nil, next_arguments:)
-        logger&.info { "Rule(#{id}): matched for #{ids.to_json}" }
-        logger&.debug { "Rule(#{id}): matched with arguments #{next_arguments.to_json}" }
-
-        begin
-          execute_match(next_arguments)
-        rescue StandardError => e
-          ActiveRecord::Base.connection.execute(<<~SQL.squish!)
-            update #{RuleMatch.table_name}
-               set running_since = null,
-                   failed_since = coalesce(failed_since, current_timestamp)
-             where id = #{ActiveRecord::Base.connection.quote(match.id)}
-          SQL
-          raise e
-        end
-
-        ActiveRecord::Base.connection.execute(<<~SQL.squish!).pluck("needs_execution").any?
-          update #{RuleMatch.table_name}
-             set running_since = null,
-                  failed_since = null,
-                 live_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)},
-                 next_arguments = case when next_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)} then
-                                    null
-                                  else
-                                    next_arguments
-                                  end
-           where id = #{ActiveRecord::Base.connection.quote(match.id)}
-           returning (queued_since is not null) as needs_execution
-        SQL
-
-      in RuleMatch(ids:, live_arguments:, next_arguments:)
-        if live_arguments == next_arguments
-          logger&.info { "Rule(#{id}): not executing - no change for #{ids.to_json}" }
-          logger&.debug { "Rule(#{id}): leaving match as #{live_arguments.to_json}" }
-        else
-          logger&.info { "Rule(#{id}): updated for #{ids.to_json}" }
-          logger&.debug do
-            "Rule(#{id}): updating from #{live_arguments.to_json} " \
-              "=> #{next_arguments.to_json}"
-          end
-
-          begin
-            execute_update(live_arguments, next_arguments)
-          rescue StandardError => e
-            ActiveRecord::Base.connection.execute(<<~SQL.squish!)
-              update #{RuleMatch.table_name}
-                 set running_since = null,
-                     failed_since = coalesce(failed_since, current_timestamp)
-               where id = #{ActiveRecord::Base.connection.quote(match.id)}
-            SQL
-            raise e
-          end
-        end
-
-        ActiveRecord::Base.connection.execute(<<~SQL.squish!).pluck("needs_execution").any?
-          update #{RuleMatch.table_name}
-             set running_since = null,
-                 failed_since = null,
-                 live_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)},
-                 next_arguments = case when next_arguments = #{ActiveRecord::Base.connection.quote(next_arguments.to_json)} then
-                                    null
-                                  else
-                                    next_arguments
-                                  end
-           where id = #{ActiveRecord::Base.connection.quote(match.id)}
-           returning (queued_since is not null) as needs_execution
-        SQL
-      end
-    end
-
     def calculate_required_activations(klass, previous, current)
       constraints.affected_ids_sql(klass, previous, current)
     end
@@ -200,6 +97,26 @@ module ActiveRecordRules
     end
 
     PendingActivation = Struct.new(:condition_terms, :condition_sql)
+
+    def execute_match(args)
+      @context_builder.call(args).instance_exec(&@on_match) if @on_match
+    end
+
+    def execute_update(old_args, new_args)
+      if @on_update
+        arg_pairs = (old_args.keys.to_set + new_args.keys.to_set).to_h do |key|
+          [key, ArgumentPair.new(old_args[key], new_args[key])]
+        end
+        @context_builder.call(arg_pairs).instance_exec(&@on_update)
+      else
+        execute_unmatch(old_args)
+        execute_match(new_args)
+      end
+    end
+
+    def execute_unmatch(args)
+      @context_builder.call(args).instance_exec(&@on_unmatch) if @on_unmatch
+    end
 
     private
 
@@ -318,27 +235,7 @@ module ActiveRecordRules
       ActiveRecordRules.logger
     end
 
-    def execute_match(args)
-      @context_builder.call(args).instance_exec(&@on_match) if @on_match
-    end
-
     ArgumentPair = Struct.new(:old, :new)
-
-    def execute_update(old_args, new_args)
-      if @on_update
-        arg_pairs = (old_args.keys.to_set + new_args.keys.to_set).to_h do |key|
-          [key, ArgumentPair.new(old_args[key], new_args[key])]
-        end
-        @context_builder.call(arg_pairs).instance_exec(&@on_update)
-      else
-        execute_unmatch(old_args)
-        execute_match(new_args)
-      end
-    end
-
-    def execute_unmatch(args)
-      @context_builder.call(args).instance_exec(&@on_unmatch) if @on_unmatch
-    end
 
     class ExecutionContext < SimpleDelegator
       def initialize(base, values)
