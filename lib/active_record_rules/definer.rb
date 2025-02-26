@@ -14,13 +14,14 @@ module ActiveRecordRules
     def define_rule(name, context: nil, &block)
       values = DefinitionContext.new
       values.instance_eval(&block)
-      ActiveRecordRules.register_rule!(
-        Rule.new(
-          name: name,
-          **values.to_h,
-          context: context || self
-        )
+      rule = Rule.new(
+        name: name,
+        source_location: block.source_location,
+        **values.to_h,
+        context: context || self
       )
+      ActiveRecordRules.register_rule!(rule)
+      rule
     end
 
     class DefinitionContext

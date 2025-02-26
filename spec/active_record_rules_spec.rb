@@ -24,6 +24,16 @@ RSpec.describe ActiveRecordRules do
     end
   end
 
+  it "prints a rule with its name, id, and block source location" do # rubocop:disable RSpec/ExampleLength
+    location = nil
+    rule = described_class.define_rule("The name of the rule") do
+      location = "#{__FILE__}:#{__LINE__ - 1}"
+      later("Person(<name>)")
+    end
+    expect(rule.inspect)
+      .to eq("#<ActiveRecordRules::Rule id=-2000564292 name=The name of the rule (#{location})>")
+  end
+
   describe "rules with no constraints" do
     before do
       described_class.define_rule("greet") do

@@ -6,7 +6,7 @@ module ActiveRecordRules
   class Rule
     attr_reader :id, :name, :timing, :constraints, :on_match, :on_update, :on_unmatch, :context
 
-    def initialize(name:, timing:, constraints:, on_match:, on_update:, on_unmatch:, context:)
+    def initialize(name:, timing:, constraints:, on_match:, on_update:, on_unmatch:, context:, source_location:)
       @name = name
       @timing = timing
       @constraints = constraints
@@ -21,6 +21,7 @@ module ActiveRecordRules
                          else
                            ->(args) { context_class.new(@context, args) }
                          end
+      @source_location = source_location
 
       @id = Rule.name_to_id(@name)
 
@@ -45,6 +46,12 @@ module ActiveRecordRules
     def ==(other)
       super || constraints.unparse == other.constraints.unparse
     end
+
+    def inspect
+      "#<#{self.class.name} id=#{id} name=#{name} (#{@source_location.join(":")})>"
+    end
+
+    def to_s = inspect
 
     def self.claim_pending_executions!(ids)
       return [] if ids.empty?
