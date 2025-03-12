@@ -41,7 +41,7 @@ module ActiveRecordRules
       Digest::MD5.digest(name).unpack1("l>")
     end
 
-    def rule_matches = RuleMatch.where(id: id)
+    def rule_matches = RuleMatch.where(rule_id: id)
 
     def ==(other)
       super || constraints.unparse == other.constraints.unparse
