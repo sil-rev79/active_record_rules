@@ -11,20 +11,25 @@
     (gem
       (transformers gem-transformers)
       (name "ruby--actioncable")
-      (version "6.1.7.6")
+      (version "7.1.5.1")
       (propagated-inputs
-        (list ruby--actionpack ruby--activesupport ruby--nio4r ruby--websocket-driver))
+        (list
+          ruby--actionpack
+          ruby--activesupport
+          ruby--nio4r
+          ruby--websocket-driver
+          ruby--zeitwerk))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "actioncable" version))
-          (sha256 (base32 "1fdbks9byqqlkd6glj6lkz5f1z6948hh8fhv9x5pzqciralmz142"))))
+          (sha256 (base32 "03dai8z2dxb2cf29hp6md7bhysyipxvw2qnm2bj98yyrnaskfikn"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--actionmailbox
     (gem
       (transformers gem-transformers)
       (name "ruby--actionmailbox")
-      (version "6.1.7.6")
+      (version "7.1.5.1")
       (propagated-inputs
         (list
           ruby--actionpack
@@ -32,18 +37,21 @@
           ruby--activerecord
           ruby--activestorage
           ruby--activesupport
-          ruby--mail))
+          ruby--mail
+          ruby--net-imap
+          ruby--net-pop
+          ruby--net-smtp))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "actionmailbox" version))
-          (sha256 (base32 "1rfya6qgsl14cm9l2w7h7lg4znsyg3gqiskhqr8wn76sh0x2hln0"))))
+          (sha256 (base32 "02inlpsmjz8rz159ljhzac1dvzq5k1pnmmx2pf4gmrj3zs4hbhn3"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--actionmailer
     (gem
       (transformers gem-transformers)
       (name "ruby--actionmailer")
-      (version "6.1.7.6")
+      (version "7.1.5.1")
       (propagated-inputs
         (list
           ruby--actionpack
@@ -51,23 +59,29 @@
           ruby--activejob
           ruby--activesupport
           ruby--mail
+          ruby--net-imap
+          ruby--net-pop
+          ruby--net-smtp
           ruby--rails-dom-testing))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "actionmailer" version))
-          (sha256 (base32 "0jr9jpf542svzqz8x68s08jnf30shxrrh7rq1a0s7jia5a5zx3qd"))))
+          (sha256 (base32 "0ncplhcrxldj6jvbaw9g8ik4cznjlf3lyfzgrwy0jfxjh3cdc4xj"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--actionpack
     (gem
       (transformers gem-transformers)
       (name "ruby--actionpack")
-      (version "6.1.7.6")
+      (version "7.1.5.1")
       (propagated-inputs
         (list
           ruby--actionview
           ruby--activesupport
+          ruby--nokogiri
+          ruby--racc
           ruby--rack
+          ruby--rack-session
           ruby--rack-test
           ruby--rails-dom-testing
           ruby--rails-html-sanitizer))
@@ -75,31 +89,32 @@
         (origin
           (method url-fetch)
           (uri (rubygems-uri "actionpack" version))
-          (sha256 (base32 "0vf6ncs647psa9p23d2108zgmlf0pr7gcjr080yg5yf68gyhs53k"))))
+          (sha256 (base32 "066p70mngqk8m7qp3wq2frbl1w8imdcrdxb06cxwq5izykcn7hib"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--actiontext
     (gem
       (transformers gem-transformers)
       (name "ruby--actiontext")
-      (version "6.1.7.6")
+      (version "7.1.5.1")
       (propagated-inputs
         (list
           ruby--actionpack
           ruby--activerecord
           ruby--activestorage
           ruby--activesupport
+          ruby--globalid
           ruby--nokogiri))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "actiontext" version))
-          (sha256 (base32 "1i8s3v6m8q3y17c40l6d3k2vs1mdqr0y1lfm7i6dfbj2y673lk9r"))))
+          (sha256 (base32 "1v7psa946frm79x04vywnd0h069jgxy5xghm7y5sgijvmp7n3qmq"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--actionview
     (gem
       (transformers gem-transformers)
       (name "ruby--actionview")
-      (version "6.1.7.6")
+      (version "7.1.5.1")
       (propagated-inputs
         (list
           ruby--activesupport
@@ -111,75 +126,81 @@
         (origin
           (method url-fetch)
           (uri (rubygems-uri "actionview" version))
-          (sha256 (base32 "1s4c1n5lv31sc7w4w74xz8gzyq3sann00bm4l7lxgy3vgi2wqkid"))))
+          (sha256 (base32 "1apnqjfwbvyhf7svlamal1pvy2x78fk42lqbnllqwy816lhrlmcc"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--activejob
     (gem
       (transformers gem-transformers)
       (name "ruby--activejob")
-      (version "6.1.7.6")
+      (version "7.1.5.1")
       (propagated-inputs (list ruby--activesupport ruby--globalid))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "activejob" version))
-          (sha256 (base32 "1641003plszig5ybhrqy90fv43l1vcai5h35qmhh9j12byk5hp26"))))
+          (sha256 (base32 "0rspwfvhxs5by6im90rrjp2sy1wzdpcgb9xm0qfljk3zhmn3fcvn"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--activemodel
     (gem
       (transformers gem-transformers)
       (name "ruby--activemodel")
-      (version "6.1.7.6")
+      (version "7.1.5.1")
       (propagated-inputs (list ruby--activesupport))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "activemodel" version))
-          (sha256 (base32 "148szdj5jlnfpv3nmy8cby8rxgpdvs43f3rzqby1f7a0l2knd3va"))))
+          (sha256 (base32 "1wci45aas8g909zby9j91m87ff5j28qwl0i7izzbszsahmk78wkl"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--activerecord
     (gem
       (transformers gem-transformers)
       (name "ruby--activerecord")
-      (version "6.1.7.6")
-      (propagated-inputs (list ruby--activemodel ruby--activesupport))
+      (version "7.1.5.1")
+      (propagated-inputs (list ruby--activemodel ruby--activesupport ruby--timeout))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "activerecord" version))
-          (sha256 (base32 "0n7hg582ajdncilfk1kkw8qfdchymp2gqgkad1znlhlmclihsafr"))))
+          (sha256 (base32 "1qzij5xmsqqxsc9v9kil68aif5bvly06vqf4pnjrnfzkkdhd22pl"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--activestorage
     (gem
       (transformers gem-transformers)
       (name "ruby--activestorage")
-      (version "6.1.7.6")
+      (version "7.1.5.1")
       (propagated-inputs
-        (list
-          ruby--actionpack
-          ruby--activejob
-          ruby--activerecord
-          ruby--activesupport
-          ruby--marcel
-          ruby--mini-mime))
+        (list ruby--actionpack ruby--activejob ruby--activerecord ruby--activesupport ruby--marcel))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "activestorage" version))
-          (sha256 (base32 "16pylwnqsbvq2wxhl7k1rnravbr3dgpjmnj0psz5gijgkydd52yc"))))
+          (sha256 (base32 "0qzz8dxwj70zys1lmqk1x0sl4rb7ddw6v2bgmpm6dijqd03qnsxf"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--activesupport
     (gem
       (transformers gem-transformers)
       (name "ruby--activesupport")
-      (version "6.1.7.6")
+      (version "7.1.5.1")
       (propagated-inputs
-        (list ruby--concurrent-ruby ruby--i18n ruby--minitest ruby--tzinfo ruby--zeitwerk))
+        (list
+          ruby--base64
+          ruby--benchmark
+          ruby--bigdecimal
+          ruby--concurrent-ruby
+          ruby--connection-pool
+          ruby--drb
+          ruby--i18n
+          ruby--logger
+          ruby--minitest
+          ruby--mutex-m
+          ruby--securerandom
+          ruby--tzinfo))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "activesupport" version))
-          (sha256 (base32 "1nhrdih0rk46i0s6x7nqhbypmj1hf23zl5gfl9xasb6k4r2a1dxk"))))
+          (sha256 (base32 "1f6gqyl49hdabid5jkrfq0127gd396srsgpy7p5ni61v8wp4h34z"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--ast
     (gem
@@ -193,17 +214,53 @@
           (uri (rubygems-uri "ast" version))
           (sha256 (base32 "04nc8x27hlzlrr5c2gn7mar4vdr0apw5xg22wp6m8dx3wqr04a0y"))))
       (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--base64
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--base64")
+      (version "0.2.0")
+      (propagated-inputs (list))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "base64" version))
+          (sha256 (base32 "01qml0yilb9basf7is2614skjp8384h2pycfx86cr8023arfj98g"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--benchmark
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--benchmark")
+      (version "0.4.0")
+      (propagated-inputs (list))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "benchmark" version))
+          (sha256 (base32 "0jl71qcgamm96dzyqk695j24qszhcc7liw74qc83fpjljp2gh4hg"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--bigdecimal
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--bigdecimal")
+      (version "3.1.9")
+      (propagated-inputs (list))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "bigdecimal" version))
+          (sha256 (base32 "1k6qzammv9r6b2cw3siasaik18i6wjc5m0gw5nfdc6jj64h79z1g"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--builder
     (gem
       (transformers gem-transformers)
       (name "ruby--builder")
-      (version "3.2.4")
+      (version "3.3.0")
       (propagated-inputs (list))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "builder" version))
-          (sha256 (base32 "045wzckxpwcqzrjr353cxnyaxgf0qg22jh00dcx7z38cys5g1jlr"))))
+          (sha256 (base32 "0pw3r2lyagsxkm71bf44v5b74f7l9r7di22brbyji9fwz791hya9"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--concurrent-ruby
     (gem
@@ -216,6 +273,18 @@
           (method url-fetch)
           (uri (rubygems-uri "concurrent-ruby" version))
           (sha256 (base32 "0krcwb6mn0iklajwngwsg850nk8k9b35dhmc2qkbdqvmifdi2y9q"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--connection-pool
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--connection_pool")
+      (version "2.5.0")
+      (propagated-inputs (list))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "connection_pool" version))
+          (sha256 (base32 "1z7bag6zb2vwi7wp2bkdkmk7swkj6zfnbsnc949qq0wfsgw94fr3"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--crass
     (gem
@@ -233,13 +302,13 @@
     (gem
       (transformers gem-transformers)
       (name "ruby--date")
-      (version "3.3.4")
+      (version "3.4.1")
       (propagated-inputs (list))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "date" version))
-          (sha256 (base32 "149jknsq999gnhy865n33fkk22s0r447k76x9pmcnnwldfv2q7wp"))))
+          (sha256 (base32 "0kz6mc4b9m49iaans6cbx031j9y7ldghpi5fzsdh0n3ixwa8w9mz"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--diff-lcs
     (gem
@@ -253,17 +322,41 @@
           (uri (rubygems-uri "diff-lcs" version))
           (sha256 (base32 "0rwvjahnp7cpmracd8x732rjgnilqv2sx7d1gfrysslc3h039fa9"))))
       (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--docile
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--docile")
+      (version "1.4.1")
+      (propagated-inputs (list))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "docile" version))
+          (sha256 (base32 "07pj4z3h8wk4fgdn6s62vw1lwvhj0ac0x10vfbdkr9xzk7krn5cn"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--drb
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--drb")
+      (version "2.2.1")
+      (propagated-inputs (list))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "drb" version))
+          (sha256 (base32 "0h5kbj9hvg5hb3c7l425zpds0vb42phvln2knab8nmazg2zp5m79"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--erubi
     (gem
       (transformers gem-transformers)
       (name "ruby--erubi")
-      (version "1.12.0")
+      (version "1.13.1")
       (propagated-inputs (list))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "erubi" version))
-          (sha256 (base32 "08s75vs9cxlc4r1q2bjg4br8g9wc5lc5x5vl0vv4zq5ivxsdpgi7"))))
+          (sha256 (base32 "1naaxsqkv5b3vklab5sbb9sdpszrjzlfsbqpy7ncbnw510xi10m0"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--globalid
     (gem
@@ -289,6 +382,30 @@
           (uri (rubygems-uri "i18n" version))
           (sha256 (base32 "0qaamqsh5f3szhcakkak8ikxlzxqnv49n2p7504hcz2l0f4nj0wx"))))
       (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--io-console
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--io-console")
+      (version "0.8.0")
+      (propagated-inputs (list))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "io-console" version))
+          (sha256 (base32 "18pgvl7lfjpichdfh1g50rpz0zpaqrpr52ybn9liv1v9pjn9ysnd"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--irb
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--irb")
+      (version "1.15.1")
+      (propagated-inputs (list ruby--pp ruby--rdoc ruby--reline))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "irb" version))
+          (sha256 (base32 "1478m97wiy6nwg6lnl0szy39p46acsvrhax552vsh1s2mi2sgg6r"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--json
     (gem
       (transformers gem-transformers)
@@ -313,17 +430,29 @@
           (uri (rubygems-uri "language_server-protocol" version))
           (sha256 (base32 "0gvb1j8xsqxms9mww01rmdl78zkd72zgxaap56bhv8j45z05hp1x"))))
       (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--logger
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--logger")
+      (version "1.6.6")
+      (propagated-inputs (list))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "logger" version))
+          (sha256 (base32 "05s008w9vy7is3njblmavrbdzyrwwc1fsziffdr58w9pwqj8sqfx"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--loofah
     (gem
       (transformers gem-transformers)
       (name "ruby--loofah")
-      (version "2.22.0")
+      (version "2.24.0")
       (propagated-inputs (list ruby--crass ruby--nokogiri))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "loofah" version))
-          (sha256 (base32 "1zkjqf37v2d7s11176cb35cl83wls5gm3adnfkn2zcc61h3nxmqh"))))
+          (sha256 (base32 "07pfa5kgl7k2hxlzzn89qna6bmiyrxlchgbzi0885frsi08agrk1"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--mail
     (gem
@@ -341,25 +470,13 @@
     (gem
       (transformers gem-transformers)
       (name "ruby--marcel")
-      (version "1.0.2")
+      (version "1.0.4")
       (propagated-inputs (list))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "marcel" version))
-          (sha256 (base32 "0kky3yiwagsk8gfbzn3mvl2fxlh3b39v6nawzm4wpjs6xxvvc4x0"))))
-      (arguments (list #:ruby ruby #:tests? #f))))
-  (define ruby--method-source
-    (gem
-      (transformers gem-transformers)
-      (name "ruby--method_source")
-      (version "1.0.0")
-      (propagated-inputs (list))
-      (source
-        (origin
-          (method url-fetch)
-          (uri (rubygems-uri "method_source" version))
-          (sha256 (base32 "1pnyh44qycnf9mzi1j6fywd5fkskv3x7nmsqrrws0rjn5dd4ayfp"))))
+          (sha256 (base32 "190n2mk8m1l708kr88fh6mip9sdsh339d2s6sgrik3sbnvz4jmhd"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--mini-mime
     (gem
@@ -385,17 +502,29 @@
           (uri (rubygems-uri "minitest" version))
           (sha256 (base32 "0bkmfi9mb49m0fkdhl2g38i3xxa02d411gg0m8x0gvbwfmmg5ym3"))))
       (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--mutex-m
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--mutex_m")
+      (version "0.3.0")
+      (propagated-inputs (list))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "mutex_m" version))
+          (sha256 (base32 "0l875dw0lk7b2ywa54l0wjcggs94vb7gs8khfw9li75n2sn09jyg"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--net-imap
     (gem
       (transformers gem-transformers)
       (name "ruby--net-imap")
-      (version "0.4.7")
+      (version "0.5.6")
       (propagated-inputs (list ruby--date ruby--net-protocol))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "net-imap" version))
-          (sha256 (base32 "0541lfqaz46h8s3fks11vsd1iqzmgjjw3c0jp9agg92zblwj0axs"))))
+          (sha256 (base32 "1rgva7p9gvns2ndnqpw503mbd36i2skkggv0c0h192k8xr481phy"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--net-pop
     (gem
@@ -425,35 +554,35 @@
     (gem
       (transformers gem-transformers)
       (name "ruby--net-smtp")
-      (version "0.4.0")
+      (version "0.5.1")
       (propagated-inputs (list ruby--net-protocol))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "net-smtp" version))
-          (sha256 (base32 "1rx3758w0bmbr21s2nsc6llflsrnp50fwdnly3ixra4v53gbhzid"))))
+          (sha256 (base32 "0dh7nzjp0fiaqq1jz90nv4nxhc2w359d7c199gmzq965cfps15pd"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--nio4r
     (gem
       (transformers gem-transformers)
       (name "ruby--nio4r")
-      (version "2.7.0")
+      (version "2.7.4")
       (propagated-inputs (list))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "nio4r" version))
-          (sha256 (base32 "0xkjz56qc7hl7zy7i7bhiyw5pl85wwjsa4p70rj6s958xj2sd1lm"))))
+          (sha256 (base32 "1a9www524fl1ykspznz54i0phfqya4x45hqaz67in9dvw1lfwpfr"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--nokogiri
     (gem
       (transformers gem-transformers)
       (name "ruby--nokogiri")
-      (version "1.15.5")
+      (version "1.18.4")
       (propagated-inputs
         (or
           (match (%current-system) ("x86_64-linux" (list ruby--racc)))
-          (error "No supported system found for ~a@~a" "ruby--nokogiri" "1.15.5")))
+          (error "No supported system found for ~a@~a" "ruby--nokogiri" "1.18.4")))
       (source
         (or
           (match
@@ -461,9 +590,9 @@
             ("x86_64-linux"
              (origin
                (method url-fetch)
-               (uri (list "https://rubygems.org/gems/nokogiri-1.15.5-x86_64-linux.gem"))
-               (sha256 (base32 "1pvajkp9bajkfvk4iv5crz34x6gxjc9cr6f6ibq1bp2mq4y4bnf5")))))
-          (error "No supported system found for ~a@~a" "ruby--nokogiri" "1.15.5")))
+               (uri (list "https://rubygems.org/gems/nokogiri-1.18.4-x86_64-linux-gnu.gem"))
+               (sha256 (base32 "07hr6j6xrky5s0sdl9764i9ifma7rl5ahhm3jx77123b6ixl1imi")))))
+          (error "No supported system found for ~a@~a" "ruby--nokogiri" "1.18.4")))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--parallel
     (gem
@@ -500,6 +629,42 @@
           (method url-fetch)
           (uri (rubygems-uri "parslet" version))
           (sha256 (base32 "01pnw6ymz6nynklqvqxs4bcai25kcvnd5x4id9z3vd1rbmlk0lfl"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--pg
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--pg")
+      (version "1.5.9")
+      (propagated-inputs (list))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "pg" version))
+          (sha256 (base32 "1p2gqqrm895fzr9vi8d118zhql67bm8ydjvgqbq1crdnfggzn7kn"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--pp
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--pp")
+      (version "0.6.2")
+      (propagated-inputs (list ruby--prettyprint))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "pp" version))
+          (sha256 (base32 "1zxnfxjni0r9l2x42fyq0sqpnaf5nakjbap8irgik4kg1h9c6zll"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--prettyprint
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--prettyprint")
+      (version "0.2.0")
+      (propagated-inputs (list))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "prettyprint" version))
+          (sha256 (base32 "14zicq3plqi217w6xahv7b8f7aj5kpxv1j1w98344ix9h5ay3j9b"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--properb
     (gem
@@ -543,6 +708,18 @@
                      (string-append
                        base
                        "/bundler/gems/properb-99b01e5b2ab1/properb-0.0.1.gemspec"))))))))))
+  (define ruby--psych
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--psych")
+      (version "5.2.3")
+      (propagated-inputs (list ruby--date ruby--stringio))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "psych" version))
+          (sha256 (base32 "1vjrx3yd596zzi42dcaq5xw7hil1921r769dlbz08iniaawlp9c4"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--racc
     (gem
       (transformers gem-transformers)
@@ -559,31 +736,55 @@
     (gem
       (transformers gem-transformers)
       (name "ruby--rack")
-      (version "2.2.8")
+      (version "3.1.12")
       (propagated-inputs (list))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "rack" version))
-          (sha256 (base32 "15rdwbyk71c9nxvd527bvb8jxkcys8r3dj3vqra5b3sa63qs30vv"))))
+          (sha256 (base32 "0h65a1f9gsqx2ryisdy4lrd9a9l8gdv65dcscw9ynwwjr1ak1n00"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--rack-session
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--rack-session")
+      (version "2.1.0")
+      (propagated-inputs (list ruby--base64 ruby--rack))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "rack-session" version))
+          (sha256 (base32 "1452c1bhh6fdnv17s1z65ajwh08axqnlmkhnr1qyyn2vacb3jz23"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--rack-test
     (gem
       (transformers gem-transformers)
       (name "ruby--rack-test")
-      (version "2.1.0")
+      (version "2.2.0")
       (propagated-inputs (list ruby--rack))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "rack-test" version))
-          (sha256 (base32 "1ysx29gk9k14a14zsp5a8czys140wacvp91fja8xcja0j1hzqq8c"))))
+          (sha256 (base32 "0qy4ylhcfdn65a5mz2hly7g9vl0g13p5a0rmm6sc0sih5ilkcnh0"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--rackup
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--rackup")
+      (version "2.2.1")
+      (propagated-inputs (list ruby--rack))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "rackup" version))
+          (sha256 (base32 "13brkq5xkj6lcdxj3f0k7v28hgrqhqxjlhd4y2vlicy5slgijdzp"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--rails
     (gem
       (transformers gem-transformers)
       (name "ruby--rails")
-      (version "6.1.7.6")
+      (version "7.1.5.1")
       (propagated-inputs
         (list
           ruby--actioncable
@@ -597,13 +798,12 @@
           ruby--activerecord
           ruby--activestorage
           ruby--activesupport
-          ruby--railties
-          ruby--sprockets-rails))
+          ruby--railties))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "rails" version))
-          (sha256 (base32 "0gf5dqabzd0mf0q39a07kf0smdm2cv2z5swl3zr4cz50yb85zz3l"))))
+          (sha256 (base32 "0148c00v3hks98rymdiilhjm0i8qw5fla4gww0fb94k3ggns5bh5"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--rails-dom-testing
     (gem
@@ -621,26 +821,33 @@
     (gem
       (transformers gem-transformers)
       (name "ruby--rails-html-sanitizer")
-      (version "1.6.0")
+      (version "1.6.2")
       (propagated-inputs (list ruby--loofah ruby--nokogiri))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "rails-html-sanitizer" version))
-          (sha256 (base32 "1pm4z853nyz1bhhqr7fzl44alnx4bjachcr6rh6qjj375sfz3sc6"))))
+          (sha256 (base32 "0q55i6mpad20m2x1lg5pkqfpbmmapk0sjsrvr1sqgnj2hb5f5z1m"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--railties
     (gem
       (transformers gem-transformers)
       (name "ruby--railties")
-      (version "6.1.7.6")
+      (version "7.1.5.1")
       (propagated-inputs
-        (list ruby--actionpack ruby--activesupport ruby--method-source ruby--rake ruby--thor))
+        (list
+          ruby--actionpack
+          ruby--activesupport
+          ruby--irb
+          ruby--rackup
+          ruby--rake
+          ruby--thor
+          ruby--zeitwerk))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "railties" version))
-          (sha256 (base32 "1vq4ahyg9hraixxmmwwypdnpcylpvznvdxhj4xa23xk45wzbl3h7"))))
+          (sha256 (base32 "1yz28fq55drl4c2dwgap96xcjf6qns2ghc3c3gffzm6yw9i5bq8b"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--rainbow
     (gem
@@ -666,6 +873,18 @@
           (uri (rubygems-uri "rake" version))
           (sha256 (base32 "1ilr853hawi09626axx0mps4rkkmxcs54mapz9jnqvpnlwd3wsmy"))))
       (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--rdoc
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--rdoc")
+      (version "6.12.0")
+      (propagated-inputs (list ruby--psych))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "rdoc" version))
+          (sha256 (base32 "1q2nkyk6r3m15a2an7lwm4ilkcxzdh3j93s4ib8sbzqb0xp70vvx"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--regexp-parser
     (gem
       (transformers gem-transformers)
@@ -677,6 +896,18 @@
           (method url-fetch)
           (uri (rubygems-uri "regexp_parser" version))
           (sha256 (base32 "1d9a5s3qrjdy50ll2s32gg3qmf10ryp3v2nr5k718kvfadp50ray"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--reline
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--reline")
+      (version "0.6.0")
+      (propagated-inputs (list ruby--io-console))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "reline" version))
+          (sha256 (base32 "1lirwlw59apc8m1wjk85y2xidiv0fkxjn6f7p84yqmmyvish6qjp"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--rexml
     (gem
@@ -821,29 +1052,53 @@
           (uri (rubygems-uri "ruby-progressbar" version))
           (sha256 (base32 "0cwvyb7j47m7wihpfaq7rc47zwwx9k4v7iqd9s1xch5nm53rrz40"))))
       (arguments (list #:ruby ruby #:tests? #f))))
-  (define ruby--sprockets
+  (define ruby--securerandom
     (gem
       (transformers gem-transformers)
-      (name "ruby--sprockets")
-      (version "4.2.1")
-      (propagated-inputs (list ruby--concurrent-ruby ruby--rack))
+      (name "ruby--securerandom")
+      (version "0.4.1")
+      (propagated-inputs (list))
       (source
         (origin
           (method url-fetch)
-          (uri (rubygems-uri "sprockets" version))
-          (sha256 (base32 "15rzfzd9dca4v0mr0bbhsbwhygl0k9l24iqqlx0fijig5zfi66wm"))))
+          (uri (rubygems-uri "securerandom" version))
+          (sha256 (base32 "1cd0iriqfsf1z91qg271sm88xjnfd92b832z49p1nd542ka96lfc"))))
       (arguments (list #:ruby ruby #:tests? #f))))
-  (define ruby--sprockets-rails
+  (define ruby--simplecov
     (gem
       (transformers gem-transformers)
-      (name "ruby--sprockets-rails")
-      (version "3.4.2")
-      (propagated-inputs (list ruby--actionpack ruby--activesupport ruby--sprockets))
+      (name "ruby--simplecov")
+      (version "0.22.0")
+      (propagated-inputs (list ruby--docile ruby--simplecov-html ruby--simplecov-json-formatter))
       (source
         (origin
           (method url-fetch)
-          (uri (rubygems-uri "sprockets-rails" version))
-          (sha256 (base32 "1b9i14qb27zs56hlcc2hf139l0ghbqnjpmfi0054dxycaxvk5min"))))
+          (uri (rubygems-uri "simplecov" version))
+          (sha256 (base32 "198kcbrjxhhzca19yrdcd6jjj9sb51aaic3b0sc3pwjghg3j49py"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--simplecov-html
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--simplecov-html")
+      (version "0.13.1")
+      (propagated-inputs (list))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "simplecov-html" version))
+          (sha256 (base32 "02zi3rwihp7rlnp9x18c9idnkx7x68w6jmxdhyc0xrhjwrz0pasx"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--simplecov-json-formatter
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--simplecov_json_formatter")
+      (version "0.1.4")
+      (propagated-inputs (list))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "simplecov_json_formatter" version))
+          (sha256 (base32 "0a5l0733hj7sk51j81ykfmlk2vd5vaijlq9d5fn165yyx3xii52j"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--sqlite3
     (gem
@@ -865,29 +1120,41 @@
                (sha256 (base32 "18nihkhiy6sjf5csfgjv88ji7xvjscgffxsipih4m5jy896jsk4j")))))
           (error "No supported system found for ~a@~a" "ruby--sqlite3" "1.6.9")))
       (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--stringio
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--stringio")
+      (version "3.1.5")
+      (propagated-inputs (list))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "stringio" version))
+          (sha256 (base32 "1j1mgvrgkxhadi6nb6pz1kcff7gsb5aivj1vfhsia4ssa5hj9adw"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--thor
     (gem
       (transformers gem-transformers)
       (name "ruby--thor")
-      (version "1.3.0")
+      (version "1.3.2")
       (propagated-inputs (list))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "thor" version))
-          (sha256 (base32 "1hx77jxkrwi66yvs10wfxqa8s25ds25ywgrrf66acm9nbfg7zp0s"))))
+          (sha256 (base32 "1nmymd86a0vb39pzj2cwv57avdrl6pl3lf5bsz58q594kqxjkw7f"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--timeout
     (gem
       (transformers gem-transformers)
       (name "ruby--timeout")
-      (version "0.4.1")
+      (version "0.4.3")
       (propagated-inputs (list))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "timeout" version))
-          (sha256 (base32 "16mvvsmx90023wrhf8dxc1lpqh0m8alk65shb7xcya6a9gflw7vg"))))
+          (sha256 (base32 "03p31w5ghqfsbz5mcjzvwgkw3h9lbvbknqvrdliy8pxmn9wz02cm"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--tzinfo
     (gem
@@ -917,13 +1184,13 @@
     (gem
       (transformers gem-transformers)
       (name "ruby--websocket-driver")
-      (version "0.7.6")
-      (propagated-inputs (list ruby--websocket-extensions))
+      (version "0.7.7")
+      (propagated-inputs (list ruby--base64 ruby--websocket-extensions))
       (source
         (origin
           (method url-fetch)
           (uri (rubygems-uri "websocket-driver" version))
-          (sha256 (base32 "1nyh873w4lvahcl8kzbjfca26656d5c6z3md4sbqg5y1gfz0157n"))))
+          (sha256 (base32 "1d26l4qn55ivzahbc7fwc4k4z3j7wzym05i9n77i4mslrpr9jv85"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--websocket-extensions
     (gem
@@ -960,5 +1227,7 @@
         ruby--rspec
         ruby--rails
         ruby--sqlite3
-        ruby--properb)
+        ruby--pg
+        ruby--properb
+        ruby--simplecov)
       (list))))
