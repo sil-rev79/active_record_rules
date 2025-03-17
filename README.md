@@ -155,7 +155,7 @@ The current state of matches is stored in `RuleMatch` records. As the rules them
 
 ## Development
 
-This project uses Guix as its main dependency management system. A development environment can be created by running:
+This project uses Guix with the [guix-ruby channel](https://sr.ht/~czan/guix-ruby) as its main dependency management system. A development environment can be created by running:
 
 ```sh
 guix shell --development --file=guix.scm
