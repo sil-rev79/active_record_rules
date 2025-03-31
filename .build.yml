@@ -3,6 +3,7 @@ packages:
   - ruby
   - ruby-bundler
   - ruby-dev
+  - libyaml-dev
   - git
   - postgresql
   - libpq-dev
