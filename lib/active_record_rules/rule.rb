@@ -197,16 +197,8 @@ module ActiveRecordRules
             insert into #{RuleMatch.table_name}(rule_id, ids, queued_since, next_arguments)
               select #{ActiveRecord::Base.connection.quote(id)},
                      coalesce(record.ids, match.ids),
-                     case when record.arguments = match.live_arguments then
-                       match.queued_since
-                     else
-                       coalesce(match.queued_since, current_timestamp)
-                     end,
-                     case when record.arguments = match.live_arguments then
-                       match.next_arguments
-                     else
-                       record.arguments
-                     end
+                     coalesce(match.queued_since, current_timestamp),
+                     record.arguments
                 from (
                   #{constraints.to_query_sql.split("\n").join("\n      ")}
                    where #{plain_sql}

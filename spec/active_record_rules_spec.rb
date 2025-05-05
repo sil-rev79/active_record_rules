@@ -80,6 +80,13 @@ RSpec.describe ActiveRecordRules do
         salutation.update!(farewell: "goodbye")
         expect(TestHelper.matches).to include(["hello", "John"])
       end
+
+      it "handles two updates that are the reverse of each other, with only an activation between them" do
+        salutation.update_columns(greeting: "hi")
+        ActiveRecordRules.find_rule("greet").activate
+        salutation.update!(greeting: "hello")
+        expect(TestHelper.matches).to include(["hello", "John"])
+      end
     end
 
     context "with John and Jane as people" do
