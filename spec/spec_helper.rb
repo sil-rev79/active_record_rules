@@ -97,8 +97,7 @@ RSpec.configure do |config|
 
       ActiveRecord::Migration.suppress_messages do
         ActiveRecord::MigrationContext.new(
-          "#{dir}/db/migrate",
-          ActiveRecord::Base.connection.schema_migration
+          "#{dir}/db/migrate"
         ).migrate
       end
     end
@@ -116,11 +115,8 @@ RSpec.configure do |config|
 
   config.include ActiveJob::TestHelper
 
-  config.around do |example|
-    ActiveJob::Base.queue_adapter = queue_adapter_for_test
-
-    perform_enqueued_jobs do
-      example.run
-    end
+  config.before do
+    ActiveJob::Base.queue_adapter = :test
+    ActiveJob::Base.queue_adapter.perform_enqueued_jobs = true
   end
 end
