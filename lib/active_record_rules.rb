@@ -248,7 +248,7 @@ module ActiveRecordRules
     def explain_rules(change, output = $stdout)
       class_name, previous, current = change
       klass = Object.const_get(class_name)
-      @loaded_rules.each do |_, rule|
+      @loaded_rules.each_value do |rule|
         next if rule.relevant_attributes(klass).empty?
 
         pending = rule.calculate_required_activations(klass, previous, current)

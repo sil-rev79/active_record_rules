@@ -224,9 +224,9 @@ module ActiveRecordRules
 
       def unparse = @constraints.map(&:unparse).join("\n  ")
 
-      private
-
       TableField = Struct.new(:table, :field, :field_name)
+
+      private
 
       def populate_query_parts!
         return if @query_sql

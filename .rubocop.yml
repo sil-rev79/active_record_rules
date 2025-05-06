@@ -1,6 +1,9 @@
 require:
   - 'rubocop-rspec'
 
+plugins:
+  - 'rubocop-capybara'
+
 AllCops:
   TargetRubyVersion: 3.0
   NewCops: enable
@@ -50,3 +53,8 @@ Layout/LineLength:
 
 RSpec/NestedGroups:
   Max: 4
+
+# This is a style issue that I don't care about. Sometimes indexes are
+# meaningful enough!
+RSpec/IndexedLet:
+  Enabled: false

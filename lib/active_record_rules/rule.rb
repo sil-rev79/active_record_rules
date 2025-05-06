@@ -98,6 +98,8 @@ module ActiveRecordRules
 
     PendingActivation = Struct.new(:condition_terms, :condition_sql)
 
+    ArgumentPair = Struct.new(:old, :new)
+
     def execute_match(args)
       wrap_execution { @context_builder.call(args).instance_exec(&@on_match) } if @on_match
     end
@@ -243,8 +245,6 @@ module ActiveRecordRules
     def logger
       ActiveRecordRules.logger
     end
-
-    ArgumentPair = Struct.new(:old, :new)
 
     class ExecutionContext < SimpleDelegator
       def initialize(base, values)
