@@ -1,12 +1,15 @@
 image: debian/stable
 packages:
+  - build-essential
+  - git
+  - libpq-dev
+  - libyaml-dev
+  - pkg-config
+  - postgresql
   - ruby
   - ruby-bundler
   - ruby-dev
-  - libyaml-dev
-  - git
-  - postgresql
-  - libpq-dev
+  - libsqlite3-dev
 sources:
   - https://git.sr.ht/~czan/active_record_rules
 tasks:
