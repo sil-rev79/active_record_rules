@@ -4,7 +4,7 @@ A [production system][] within ActiveRecord to execute code when matching rule c
 
 Rules are a great way to simplify business logic, but too often their target audience has been non-developers. Instead, ActiveRecordRules sees itself as a tool for _developers_ to express the complex logic of their system. The matching logic for rules is written in a custom DSL, but the resulting behaviours are regular Ruby code:
 
-```
+```ruby
 define_rule('Unapproved customers must be in "pending" state') do
   later(<<~MATCH)
     # Custom matching DSL. '<id>' denotes a variable called `id`.
@@ -45,7 +45,7 @@ At the moment only Postgres and SQLite are supported. Contributions are welcome 
 
 ### Defining rules
 
-```
+```ruby
 define_rule('Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers') do
   after_save(<<~MATCH)
     Order(id = <order_id>, <customer_id>, status = "pending")
@@ -120,7 +120,7 @@ The current state of matches is stored in `RuleMatch` records. As the rules them
 
  3. **Updates to rule logic/code may leave inconsistencies in `update`/`unmatch` clauses.** Due to the way ActiveRecordRules persists the last-matched values for `update` and `unmatch` clauses, the variables provided to these clauses may not match those expected by the rule. Any names not present in the last-matched values will be provided as `nil`, and any binding names removed from the matching logic will not be accessible.
 
-    ```
+    ```ruby
     # Initial definition
     define_rule("Example") do
       later(<<~MATCH)
