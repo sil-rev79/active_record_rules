@@ -27,13 +27,13 @@ RSpec.describe ActiveRecordRules do
 
       schema.create_table :items do |t|
         t.float :sale_discount, default: 0
+        t.float :value
       end
 
       schema.create_table :order_items do |t|
         t.references :order
         t.references :item
         t.integer :quantity
-        t.float :value
       end
     end
 
@@ -44,8 +44,8 @@ RSpec.describe ActiveRecordRules do
         Order(id = <order_id>, <customer_id>, status = "pending")
         Customer(id = <customer_id>, vip_customer = true)
         <order_value> = sum(<value> * <quantity>) {
-          OrderItem(<order_id>, <item_id>, <quantity>, <value>)
-          Item(id = <item_id>, sale_discount = 0)
+          OrderItem(<order_id>, <item_id>, <quantity>)
+          Item(id = <item_id>, <value>, sale_discount = 0)
         }
         <order_value> > 100
       MATCH
@@ -63,7 +63,8 @@ RSpec.describe ActiveRecordRules do
       after_save(<<~MATCH)
         Order(id = <order_id>, <customer_id>, <discount>)
         <order_value> = sum(<value> * <quantity>) {
-          OrderItem(<order_id>, <quantity>, <value>)
+          OrderItem(<order_id>, <item_id>, <quantity>)
+          Item(id = <item_id>, <value>)
         }
       MATCH
 
@@ -79,40 +80,40 @@ RSpec.describe ActiveRecordRules do
     end
 
     context "with a single item worth over 100" do
-      let(:item) { Item.create! }
+      let(:item) { Item.create!(value: 101) }
 
-      before { OrderItem.create!(order_id: order.id, item_id: item.id, quantity: 1, value: 101) }
+      before { OrderItem.create!(order_id: order.id, item_id: item.id, quantity: 1) }
 
       it { is_expected.to eq(101.0) }
     end
 
     context "with a quantity worth over 100" do
-      let(:item) { Item.create! }
+      let(:item) { Item.create!(value: 51) }
 
-      before { OrderItem.create!(order_id: order.id, item_id: item.id, quantity: 2, value: 51) }
+      before { OrderItem.create!(order_id: order.id, item_id: item.id, quantity: 2) }
 
       it { is_expected.to eq(102.0) }
     end
 
     context "with two items together worth 100" do
-      let(:item1) { Item.create! }
-      let(:item2) { Item.create! }
+      let(:item1) { Item.create!(value: 31) }
+      let(:item2) { Item.create!(value: 71) }
 
       before do
-        OrderItem.create!(order_id: order.id, item_id: item1.id, quantity: 1, value: 31)
-        OrderItem.create!(order_id: order.id, item_id: item2.id, quantity: 1, value: 71)
+        OrderItem.create!(order_id: order.id, item_id: item1.id, quantity: 1)
+        OrderItem.create!(order_id: order.id, item_id: item2.id, quantity: 1)
       end
 
       it { is_expected.to eq(102.0) }
     end
 
     context "with two items together worth 100, but one is on sale" do
-      let(:item1) { Item.create! }
-      let(:item2) { Item.create!(sale_discount: 0.1) }
+      let(:item1) { Item.create!(value: 31) }
+      let(:item2) { Item.create!(value: 71, sale_discount: 0.1) }
 
       before do
-        OrderItem.create!(order_id: order.id, item_id: item1.id, quantity: 1, value: 31)
-        OrderItem.create!(order_id: order.id, item_id: item2.id, quantity: 1, value: 71)
+        OrderItem.create!(order_id: order.id, item_id: item1.id, quantity: 1)
+        OrderItem.create!(order_id: order.id, item_id: item2.id, quantity: 1)
       end
 
       it { is_expected.to eq(102.0) }
@@ -127,19 +128,19 @@ RSpec.describe ActiveRecordRules do
     end
 
     context "with a single item worth over 100" do
-      let(:item) { Item.create! }
+      let(:item) { Item.create!(value: 101) }
 
       before do
-        OrderItem.create!(order_id: order.id, item_id: item.id, quantity: 1, value: 101)
+        OrderItem.create!(order_id: order.id, item_id: item.id, quantity: 1)
       end
 
       it { is_expected.to eq(90.9) }
     end
 
     context "with a quantity worth over 100" do
-      let(:item) { Item.create! }
+      let(:item) { Item.create!(value: 51) }
 
-      before { OrderItem.create!(order_id: order.id, item_id: item.id, quantity: 2, value: 51) }
+      before { OrderItem.create!(order_id: order.id, item_id: item.id, quantity: 2) }
 
       it { is_expected.to eq(91.8) }
 
@@ -151,12 +152,12 @@ RSpec.describe ActiveRecordRules do
     end
 
     context "with two items together worth 100" do
-      let(:item1) { Item.create! }
-      let(:item2) { Item.create! }
+      let(:item1) { Item.create!(value: 31) }
+      let(:item2) { Item.create!(value: 71) }
 
       before do
-        OrderItem.create!(order_id: order.id, item_id: item1.id, quantity: 1, value: 31)
-        OrderItem.create!(order_id: order.id, item_id: item2.id, quantity: 1, value: 71)
+        OrderItem.create!(order_id: order.id, item_id: item1.id, quantity: 1)
+        OrderItem.create!(order_id: order.id, item_id: item2.id, quantity: 1)
       end
 
       it { is_expected.to eq(91.8) }
@@ -169,12 +170,12 @@ RSpec.describe ActiveRecordRules do
     end
 
     context "with two items together worth 100, but one is on sale" do
-      let(:item1) { Item.create! }
-      let(:item2) { Item.create!(sale_discount: 0.1) }
+      let(:item1) { Item.create!(value: 31) }
+      let(:item2) { Item.create!(value: 71, sale_discount: 0.1) }
 
       before do
-        OrderItem.create!(order_id: order.id, item_id: item1.id, quantity: 1, value: 31)
-        OrderItem.create!(order_id: order.id, item_id: item2.id, quantity: 1, value: 71)
+        OrderItem.create!(order_id: order.id, item_id: item1.id, quantity: 1)
+        OrderItem.create!(order_id: order.id, item_id: item2.id, quantity: 1)
       end
 
       it { is_expected.to eq(102.0) }

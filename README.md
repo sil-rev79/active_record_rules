@@ -51,8 +51,8 @@ define_rule('Apply a 10% discount to pending orders above $100 (ignoring sale it
     Order(id = <order_id>, <customer_id>, status = "pending")
     Customer(id = <customer_id>, vip_customer = true)
     <order_value> = sum(<value> * <quantity>) {
-      OrderItem(<order_id>, <item_id>, <quantity>, <value>)
-      Item(id = <item_id>, sale_discount = 0)
+      OrderItem(<order_id>, <item_id>, <quantity>)
+      Item(id = <item_id>, <value>, sale_discount = 0)
     }
     <order_value> > 100
   MATCH
@@ -71,7 +71,8 @@ define_rule('Calculate order price from items and discount') do
   after_save(<<~MATCH)
     Order(id = <order_id>, <customer_id>, <discount>)
     <order_value> = sum(<value> * <quantity>) {
-      OrderItem(<order_id>, <quantity>, <value>)
+      OrderItem(<order_id>, <item_id>, <quantity>)
+      Item(id = <item_id>, <value>)
     }
   MATCH
   on_match
