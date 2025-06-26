@@ -52,7 +52,14 @@ module ActiveRecordRules
       end
 
       rule(:comparison) do
-        (str("=") | str("!=") | str("<=") | str("<") | str(">=") | str(">") | str("in"))
+        (str("=") |
+         str("!=") |
+         str("<=") |
+         str("<") |
+         str(">=") |
+         str(">") |
+         str("in") |
+         (str("not") >> whitespace >> str("in")))
       end
 
       # ===========

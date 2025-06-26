@@ -37,6 +37,17 @@ module ActiveRecordRules
                 false
               )
             end
+          in /^not[ \t\n]+in$/
+            case ActiveRecordRules.dialect
+            in :postgres
+              QueryDefiner::SqlExpr.new("not (jsonb_build_array(#{left_str}) <@ #{right_str})",
+                                        left_str.nullable? || right_str.nullable?)
+            in :sqlite
+              QueryDefiner::SqlExpr.new(
+                "not exists (select 1 from json_each(#{right_str}) where json_each.value = #{left_str})",
+                false
+              )
+            end
           else
             QueryDefiner::SqlExpr.new(
               "(#{left_str.sql} #{@operator} #{right_str.sql})",
