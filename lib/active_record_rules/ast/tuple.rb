@@ -19,7 +19,7 @@ module ActiveRecordRules
             raise "Tuples [like, this] are not available for SQLite"
           elsif ActiveRecordRules.dialect == :postgres
             values = procs.map { _1.call(bindings) }
-            "jsonb_build_array(#{values.join(", ")})"
+            QueryDefiner::SqlExpr.new("jsonb_build_array(#{values.join(", ")})", false)
           else
             raise "Unknown dialect: #{ActiveRecordRules.dialect}"
           end

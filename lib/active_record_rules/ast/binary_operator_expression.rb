@@ -29,7 +29,8 @@ module ActiveRecordRules
           in "in"
             case ActiveRecordRules.dialect
             in :postgres
-              QueryDefiner::SqlExpr.new("array[#{left_str}] <@ #{right_str}", left_str.nullable? || right_str.nullable?)
+              QueryDefiner::SqlExpr.new("jsonb_build_array(#{left_str}) <@ #{right_str}",
+                                        left_str.nullable? || right_str.nullable?)
             in :sqlite
               QueryDefiner::SqlExpr.new(
                 "exists (select 1 from json_each(#{right_str}) where json_each.value = #{left_str})",
