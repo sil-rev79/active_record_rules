@@ -43,6 +43,28 @@ module ActiveRecordRules
 
     def rule_matches = RuleMatch.where(rule_id: id)
 
+    def rule_matches_for(record)
+      queries = calculate_required_activations(record.class, nil, record.attributes).map do |condition|
+        clauses = condition.condition_terms.map do |term|
+          "(match_id.record_id = __ids.#{term} and match_id.name = #{ActiveRecord::Base.connection.quote(term)})"
+        end
+
+        <<~SQL
+          (with __ids as (#{condition.condition_sql})
+           select distinct match.* from #{RuleMatch.table_name} match
+             cross join __ids
+             join #{RuleMatchId.table_name} match_id on match.id = match_id.rule_match_id
+            where #{clauses.join(" or ")})
+        SQL
+      end
+
+      if queries.empty?
+        RuleMatch.none
+      else
+        RuleMatch.from("(#{queries.join(" UNION ")}) as #{RuleMatch.table_name}")
+      end
+    end
+
     def ==(other)
       super || constraints.unparse == other.constraints.unparse
     end
