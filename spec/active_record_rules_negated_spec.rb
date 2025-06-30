@@ -1,17 +1,13 @@
 # frozen_string_literal: true
 
-class Racer < TestRecord; end
-
 RSpec.describe ActiveRecordRules do
-  before do
-    define_tables do |schema|
-      schema.create_table :racers do |t|
-        t.integer :race_time
-        t.integer :race_id
-        t.boolean :winner
-      end
-    end
+  define_record "Racer" do |t|
+    t.integer :race_time
+    t.integer :race_id
+    t.boolean :winner
+  end
 
+  before do
     Racer.define_rule("the fastest is the winner") do
       after_commit(<<~MATCH)
         Racer(<id>, <race_id>, <race_time>)

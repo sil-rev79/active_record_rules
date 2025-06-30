@@ -1,33 +1,25 @@
 # frozen_string_literal: true
 
-class Counter < TestRecord; end
-
-class Countable < TestRecord
-  enum status: {
-    planned: 0,
-    active: 1,
-    completed: 2
-  }
-end
-
 RSpec.describe ActiveRecordRules do
-  before do
-    define_tables do |schema|
-      schema.create_table :counters do |t|
-        case described_class.dialect
-        in :sqlite
-          t.json :definition
-        in :postgres
-          t.jsonb :definition
-        end
-        t.integer :count, default: 0
-      end
-
-      schema.create_table :countables do |t|
-        t.integer :value
-        t.integer :status
-      end
+  define_record "Counter" do |t|
+    case ActiveRecordRules.dialect # rubocop:disable RSpec/DescribedClass
+    in :sqlite
+      t.json :definition
+    in :postgres
+      t.jsonb :definition
     end
+    t.integer :count, default: 0
+  end
+
+  define_record "Countable" do |t|
+    t.integer :value
+    t.integer :status
+
+    enum :status, {
+      planned: 0,
+      active: 1,
+      completed: 2
+    }
   end
 
   describe "a counter using JSON-based conditions" do

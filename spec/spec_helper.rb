@@ -27,6 +27,17 @@ require "properb"
 ActiveJob::Base.logger = nil
 
 module RSpecExtensions
+  def self.included(other)
+    other.define_singleton_method(:define_record) do |name, superclass = TestRecord, &block|
+      before do
+        new_class = stub_const(name, Class.new(superclass))
+        ActiveRecord::Base.connection.create_table(new_class.table_name) do |t|
+          new_class.instance_exec(t, &block)
+        end
+      end
+    end
+  end
+
   def define_tables(&block)
     block.call(ActiveRecord::Base.connection)
   end

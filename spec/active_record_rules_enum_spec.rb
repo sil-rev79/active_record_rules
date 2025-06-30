@@ -1,33 +1,23 @@
 # frozen_string_literal: true
 
-class WorkOrder < TestRecord
-  enum status: {
-    pending_approval: 0,
-    rejected: 1,
-    approved: 2
-  }
-end
-
-class WorkOrderApproval < TestRecord
-  enum status: {
-    pending: 0,
-    rejected: 1,
-    approved: 2
-  }
-end
-
 RSpec.describe ActiveRecordRules do
-  before do
-    define_tables do |schema|
-      schema.create_table :work_orders do |t|
-        t.integer :status
-      end
+  define_record "WorkOrder" do |t|
+    t.integer :status
+    enum :status, {
+      pending_approval: 0,
+      rejected: 1,
+      approved: 2
+    }
+  end
 
-      schema.create_table :work_order_approvals do |t|
-        t.references :work_order
-        t.integer :status
-      end
-    end
+  define_record "WorkOrderApproval" do |t|
+    t.references :work_order
+    t.integer :status
+    enum :status, {
+      pending: 0,
+      rejected: 1,
+      approved: 2
+    }
   end
 
   describe "using enums as strings" do

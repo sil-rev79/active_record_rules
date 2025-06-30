@@ -1,17 +1,13 @@
 # frozen_string_literal: true
 
-class Fraction < TestRecord; end
-
 RSpec.describe ActiveRecordRules do
-  before do
-    define_tables do |schema|
-      schema.create_table :fractions do |t|
-        t.integer :numerator
-        t.integer :denominator
-        t.integer :int_value
-      end
-    end
+  define_record "Fraction" do |t|
+    t.integer :numerator
+    t.integer :denominator
+    t.integer :int_value
+  end
 
+  before do
     described_class.define_rule("calculate fraction value") do
       later(<<~MATCH)
         Fraction(<id>, <numerator>, <denominator>)

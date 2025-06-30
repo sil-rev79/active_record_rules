@@ -1,22 +1,15 @@
 # frozen_string_literal: true
 
-class Salutation < TestRecord; end
-class Person < TestRecord; end
-
 RSpec.describe ActiveRecordRules do
-  before do
-    define_tables do |schema|
-      schema.create_table :salutations do |t|
-        t.string :greeting
-        t.string :farewell
-      end
+  define_record "Salutation" do |t|
+    t.string :greeting
+    t.string :farewell
+  end
 
-      schema.create_table :people do |t|
-        t.string :name
-        t.boolean :greetable
-        t.boolean :farewellable
-      end
-    end
+  define_record "Person" do |t|
+    t.string :name
+    t.boolean :greetable
+    t.boolean :farewellable
   end
 
   describe "loading rules from a file" do

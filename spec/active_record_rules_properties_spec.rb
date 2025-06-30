@@ -1,12 +1,5 @@
 # frozen_string_literal: true
 
-# For the first example group
-class SupportRequest < TestRecord; end
-class ClientRepresentative < TestRecord; end
-
-# For the second example group
-class Card < TestRecord; end
-
 RSpec.describe ActiveRecordRules do
   # the basic idea of this test is taken from the Clara Rules documentation
   describe "SupportRequest example" do # rubocop:disable RSpec/EmptyExampleGroup
@@ -20,19 +13,17 @@ RSpec.describe ActiveRecordRules do
       )
     )
 
+    define_record "SupportRequest" do |t|
+      t.string :client
+      t.string :level
+    end
+
+    define_record "ClientRepresentative" do |t|
+      t.string :name
+      t.string :client
+    end
+
     before do
-      define_tables do |schema|
-        schema.create_table :support_requests do |t|
-          t.string :client
-          t.string :level
-        end
-
-        schema.create_table :client_representatives do |t|
-          t.string :name
-          t.string :client
-        end
-      end
-
       described_class.define_rule("notify client representative for high importance requests") do
         later(<<~MATCH)
           SupportRequest(<client>, level = "high")
@@ -81,14 +72,12 @@ RSpec.describe ActiveRecordRules do
 
     let!(:counts) { Hash.new { _1[_2] = 0 } }
 
-    before do
-      define_tables do |schema|
-        schema.create_table :cards do |t|
-          t.string :suit
-          t.string :rank
-        end
-      end
+    define_record "Card" do |t|
+      t.string :suit
+      t.string :rank
+    end
 
+    before do
       counts.extend(ActiveRecordRules::Definer)
 
       steps.each do |step|
@@ -129,14 +118,12 @@ RSpec.describe ActiveRecordRules do
   end
 
   describe "Card example" do
-    before do
-      define_tables do |schema|
-        schema.create_table :cards do |t|
-          t.string :suit
-          t.string :rank
-        end
-      end
+    define_record "Card" do |t|
+      t.string :suit
+      t.string :rank
+    end
 
+    before do
       described_class.define_rule("three of the same suit") do
         later(<<~MATCH)
           Card(<suit>, rank = <rank1>)

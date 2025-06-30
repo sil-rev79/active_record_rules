@@ -1,24 +1,19 @@
 # frozen_string_literal: true
 
-class Vehicle < TestRecord; end
-class Car < Vehicle; end
-class Bus < Vehicle; end
-
-class Passenger < TestRecord; end
-
 RSpec.describe ActiveRecordRules do
-  before do
-    define_tables do |schema|
-      schema.create_table :vehicles do |t|
-        t.string :type
-        t.string :name
-      end
+  define_record "Vehicle" do |t|
+    t.string :type
+    t.string :name
+  end
 
-      schema.create_table :passengers do |t|
-        t.references :vehicle
-        t.string :name
-      end
-    end
+  define_record "Passenger" do |t|
+    t.references :vehicle
+    t.string :name
+  end
+
+  before do
+    stub_const("Car", Class.new(Vehicle))
+    stub_const("Bus", Class.new(Vehicle))
   end
 
   describe "a rule on vehicles" do

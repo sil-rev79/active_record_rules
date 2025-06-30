@@ -1,27 +1,20 @@
 # frozen_string_literal: true
 
-class Salutation < TestRecord; end
-class Person < TestRecord; end
-
 module TestRecordModule
   class Salutation < TestRecord; end
   class Person < TestRecord; end
 end
 
 RSpec.describe ActiveRecordRules do
-  before do
-    define_tables do |schema|
-      schema.create_table :salutations do |t|
-        t.string :greeting
-        t.string :farewell
-      end
+  define_record "Salutation" do |t|
+    t.string :greeting
+    t.string :farewell
+  end
 
-      schema.create_table :people do |t|
-        t.string :name
-        t.boolean :greetable
-        t.boolean :farewellable
-      end
-    end
+  define_record "Person" do |t|
+    t.string :name
+    t.boolean :greetable
+    t.boolean :farewellable
   end
 
   it "prints a rule with its name, id, and block source location" do # rubocop:disable RSpec/ExampleLength
@@ -112,6 +105,9 @@ RSpec.describe ActiveRecordRules do
 
   describe "rules with a class in a module" do
     before do
+      stub_const("TestRecordModule::Salutation", Class.new(TestRecord))
+      stub_const("TestRecordModule::Person", Class.new(TestRecord))
+
       described_class.define_rule("greet") do
         later(<<~MATCH)
           TestRecordModule::Salutation(<greeting>)

@@ -1,22 +1,16 @@
 # frozen_string_literal: true
 
-class Classroom < TestRecord
-  has_many :teachers
-end
-
-class Teacher < TestRecord; end
-
 RSpec.describe ActiveRecordRules do
+  define_record "Classroom" do |_t|
+    has_many :teachers
+  end
+
+  define_record "Teacher" do |t|
+    t.string :name
+    t.references :classroom
+  end
+
   before do
-    define_tables do |schema|
-      schema.create_table :classrooms
-
-      schema.create_table :teachers do |t|
-        t.string :name
-        t.references :classroom
-      end
-    end
-
     described_class.define_rule("a classroom with no teachers gets John") do
       after_request(<<~MATCH)
         Classroom(<id>)

@@ -1,31 +1,24 @@
 # frozen_string_literal: true
 
-class CourseStudent < TestRecord
-  belongs_to :course
-  belongs_to :student
-end
-
-class Course < TestRecord; end
-class Student < TestRecord; end
-
 RSpec.describe ActiveRecordRules do
-  before do
-    define_tables do |schema|
-      schema.create_table :courses do |t|
-        t.string :student_names
-        t.integer :early_rego_count
-        t.integer :early_cutoff
-      end
-      schema.create_table :students do |t|
-        t.string :name
-        t.string :status
-      end
-      schema.create_table :course_students do |t|
-        t.references :course, null: false
-        t.references :student, null: false
-        t.integer :rego_time
-      end
-    end
+  define_record "Course" do |t|
+    t.string :student_names
+    t.integer :early_rego_count
+    t.integer :early_cutoff
+  end
+
+  define_record "Student" do |t|
+    t.string :name
+    t.string :status
+  end
+
+  define_record "CourseStudent" do |t|
+    t.references :course, null: false
+    t.references :student, null: false
+    t.integer :rego_time
+
+    belongs_to :course
+    belongs_to :student
   end
 
   describe "count" do

@@ -1,10 +1,5 @@
 # frozen_string_literal: true
 
-class Customer < TestRecord; end
-class Order < TestRecord; end
-class Item < TestRecord; end
-class OrderItem < TestRecord; end
-
 RSpec.describe ActiveRecordRules do
   subject { order.reload.total_price }
 
@@ -12,31 +7,29 @@ RSpec.describe ActiveRecordRules do
   let(:customer) { Customer.create! }
   let(:order) { Order.create!(customer_id: customer.id) }
 
+  define_record "Customer" do |t|
+    t.boolean :vip_customer
+  end
+
+  define_record "Order" do |t|
+    t.references :customer
+    t.string :status, default: "pending"
+    t.float :discount, default: 0
+    t.float :total_price
+  end
+
+  define_record "Item" do |t|
+    t.float :sale_discount, default: 0
+    t.float :value
+  end
+
+  define_record "OrderItem" do |t|
+    t.references :order
+    t.references :item
+    t.integer :quantity
+  end
+
   before do
-    define_tables do |schema|
-      schema.create_table :customers do |t|
-        t.boolean :vip_customer
-      end
-
-      schema.create_table :orders do |t|
-        t.references :customer
-        t.string :status, default: "pending"
-        t.float :discount, default: 0
-        t.float :total_price
-      end
-
-      schema.create_table :items do |t|
-        t.float :sale_discount, default: 0
-        t.float :value
-      end
-
-      schema.create_table :order_items do |t|
-        t.references :order
-        t.references :item
-        t.integer :quantity
-      end
-    end
-
     described_class.define_rule(
       "Apply a 10% discount to pending orders above $100 (ignoring sale items), for VIP customers"
     ) do

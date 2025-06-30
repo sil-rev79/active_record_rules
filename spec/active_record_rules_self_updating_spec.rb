@@ -1,19 +1,13 @@
 # frozen_string_literal: true
 
-class Number < TestRecord; end
-
 RSpec.describe ActiveRecordRules do
   subject { number.reload.value }
 
-  let(:number) { Number.create!(value: 0) }
+  define_record "Number" do |t|
+    t.integer :value
+  end
 
   before do
-    define_tables do |schema|
-      schema.create_table :numbers do |t|
-        t.integer :value
-      end
-    end
-
     described_class.define_rule("increments number to 10") do
       after_commit(<<~MATCH)
         Number(<id>, <value>, value < 10)
@@ -23,6 +17,8 @@ RSpec.describe ActiveRecordRules do
       end
     end
   end
+
+  let(:number) { Number.create!(value: 0) }
 
   it { is_expected.to eq(10) }
 end
