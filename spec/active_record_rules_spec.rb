@@ -1,10 +1,5 @@
 # frozen_string_literal: true
 
-module TestRecordModule
-  class Salutation < TestRecord; end
-  class Person < TestRecord; end
-end
-
 RSpec.describe ActiveRecordRules do
   define_record "Salutation" do |t|
     t.string :greeting
