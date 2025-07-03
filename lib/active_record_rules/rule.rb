@@ -238,8 +238,16 @@ module ActiveRecordRules
                 ) as match on match.ids = record.ids
                where true
             on conflict(rule_id, ids) do update
-              set queued_since = excluded.queued_since,
-                  next_arguments = excluded.next_arguments
+              set queued_since = case
+                                   when #{RuleMatch.table_name}.live_arguments = excluded.next_arguments
+                                   then null
+                                   else excluded.queued_since
+                                 end,
+                  next_arguments = case
+                                     when #{RuleMatch.table_name}.live_arguments = excluded.next_arguments
+                                     then null
+                                     else excluded.next_arguments
+                                   end
             returning id
         SQL
       end
