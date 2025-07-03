@@ -54,9 +54,8 @@ module ActiveRecordRules
           end
           sql = query_definer.to_sql(bindings, [value_name]) # Then we only emit __value here
 
-          # We order by __value here to make the array aggregate
-          # deterministic. It shouldn't really affect anything else.
-          final_result("(#{sql}\n order by #{value_name})")
+          # Wrap the result in parens, because it's a subquery
+          final_result("(#{sql})")
         end
       end
 

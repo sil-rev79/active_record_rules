@@ -18,7 +18,8 @@ module ActiveRecordRules
           if ActiveRecordRules.dialect == :sqlite
             raise "The `array' aggregate is not available for SQLite"
           elsif ActiveRecordRules.dialect == :postgres
-            "array_agg(#{expr.call(bindings)})"
+            expr_str = expr.call(bindings)
+            "array_agg(#{expr_str} order by 1)"
           else
             raise "Unknown dialect: #{ActiveRecordRules.dialect}"
           end
