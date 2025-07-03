@@ -15,14 +15,17 @@ module ActiveRecordRules
       def to_query(definer)
         procs = @elements.map { _1.to_query(definer) }
         lambda do |bindings|
-          if ActiveRecordRules.dialect == :sqlite
-            raise "Tuples [like, this] are not available for SQLite"
-          elsif ActiveRecordRules.dialect == :postgres
-            values = procs.map { _1.call(bindings) }
-            QueryDefiner::SqlExpr.new("jsonb_build_array(#{values.join(", ")})", false)
-          else
-            raise "Unknown dialect: #{ActiveRecordRules.dialect}"
-          end
+          values = procs.map { _1.call(bindings) }
+          QueryDefiner::SqlExpr.new(
+            if ActiveRecordRules.dialect == :sqlite
+              "jsonb_array(#{values.join(", ")})"
+            elsif ActiveRecordRules.dialect == :postgres
+              "jsonb_build_array(#{values.join(", ")})"
+            else
+              raise "Unknown dialect: #{ActiveRecordRules.dialect}"
+            end,
+            false
+          )
         end
       end
 

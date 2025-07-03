@@ -82,7 +82,7 @@ RSpec.describe ActiveRecordRules do
     end
   end
 
-  describe "array aggregation", restrict_database: :postgres do
+  describe "array aggregation" do
     let(:course) { Course.create! }
     let(:student) { Student.create!(name: "John Doe", status: "active") }
 
@@ -119,7 +119,7 @@ RSpec.describe ActiveRecordRules do
     end
   end
 
-  describe "array aggregation with tuples", restrict_database: :postgres do
+  describe "array aggregation with tuples" do
     let(:course) { Course.create! }
     let(:student) { Student.create!(name: "John Doe", status: "active") }
 

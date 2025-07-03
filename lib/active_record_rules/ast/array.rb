@@ -16,10 +16,9 @@ module ActiveRecordRules
         expr = @expression.to_query(query_definer)
         lambda do |bindings|
           if ActiveRecordRules.dialect == :sqlite
-            raise "The `array' aggregate is not available for SQLite"
+            "json_group_array(#{expr.call(bindings)} order by 1)"
           elsif ActiveRecordRules.dialect == :postgres
-            expr_str = expr.call(bindings)
-            "array_agg(#{expr_str} order by 1)"
+            "json_agg(#{expr.call(bindings)} order by 1)"
           else
             raise "Unknown dialect: #{ActiveRecordRules.dialect}"
           end
@@ -27,7 +26,16 @@ module ActiveRecordRules
       end
 
       def final_result(self_expression)
-        QueryDefiner::SqlExpr.new("coalesce(#{self_expression}, '{}')", false)
+        QueryDefiner::SqlExpr.new(
+          if ActiveRecordRules.dialect == :sqlite
+            "jsonb(coalesce(#{self_expression}, json_array()))"
+          elsif ActiveRecordRules.dialect == :postgres
+            "coalesce(#{self_expression}, json_build_array())"
+          else
+            raise "Unknown dialect: #{ActiveRecordRules.dialect}"
+          end,
+          false
+        )
       end
 
       def unparse
