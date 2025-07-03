@@ -89,7 +89,7 @@ module ActiveRecordRules
             number |
             integer |
             nil_expr |
-            # Database fields, with JSON extractors
+            # Database fields
             record_expression
           ),
           [whitespace.maybe >> match("[+-]").as(:op) >> whitespace.maybe, 1, :left],
@@ -98,20 +98,7 @@ module ActiveRecordRules
       end
 
       rule(:record_expression) do
-        record_name.as(:record_name) >>
-          json_path.as(:json_extraction).maybe
-      end
-
-      rule(:json_path) do
-        (
-          (whitespace.maybe >> str(".") >>
-           whitespace.maybe >> name.as(:json_field_name)) |
-          (whitespace.maybe >> str("[") >>
-           whitespace.maybe >> (str("*").as(:json_field_name) | expression) >>
-           whitespace.maybe >> str("]"))
-        ).repeat.as(:json_path) >>
-          whitespace >> str("as") >> whitespace >>
-          sql_type.as(:type)
+        record_name.as(:record_name)
       end
 
       rule(:string) do
