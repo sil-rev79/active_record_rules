@@ -40,6 +40,12 @@ module ActiveRecordRules
       ensure
         @arr__transaction_changes = nil
       end
+
+      klass.after_rollback do
+        # If the transaction rolls back, then remove all the changes
+        # we made. We don't want them any more!
+        @arr__transaction_changes = nil
+      end
     end
   end
 end
