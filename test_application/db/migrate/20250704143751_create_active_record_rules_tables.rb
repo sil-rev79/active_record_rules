@@ -1,0 +1,28 @@
+# -*- ruby -*-
+class CreateActiveRecordRulesTables < ActiveRecord::Migration[7.2]
+  def change
+    create_table :arr__rule_matches, id: :bigint do |t|
+      t.integer :rule_id, null: false, limit: 4
+      t.timestamp :queued_since
+      t.timestamp :running_since
+      t.timestamp :failed_since
+      t.json :ids, null: false
+      t.json :live_arguments
+      t.json :next_arguments
+      t.boolean :missing_ids, null: false, default: true
+      t.index [:rule_id, :ids], unique: true, name: 'rule_match_uniqueness'
+      t.index [:missing_ids], name: 'rule_match_missing_ids'
+      t.index [:rule_id, :queued_since], name: 'rule_match_queued_since'
+      t.index [:rule_id, :running_since], name: 'rule_match_running_since'
+      t.index [:rule_id, :failed_since], name: 'rule_match_failed_since'
+    end
+
+    create_table :arr__rule_match_ids, id: :bigint do |t|
+      t.integer :rule_id, null: false, limit: 4
+      t.references :rule_match, null: false, foreign_key: { to_table: :arr__rule_matches, on_delete: :cascade }
+      t.string :name, null: false
+      t.integer :record_id, null: false
+      t.index [:rule_id, :name, :record_id, :rule_match_id], unique: true, name: 'rule_match_ids_uniqueness'
+    end
+  end
+end

@@ -52,7 +52,7 @@ module ActiveRecordRules
               )
             end
           end
-          sql = query_definer.to_sql(bindings, [value_name]) # Then we only emit __value here
+          sql = query_definer.to_sql(bindings, [ value_name ]) # Then we only emit __value here
 
           # Wrap the result in parens, because it's a subquery
           final_result("(#{sql})")
@@ -67,7 +67,7 @@ module ActiveRecordRules
         @constraints.each { _1.record_relevant_attributes(tracker) }
       end
 
-      def deconstruct = [constraints]
+      def deconstruct = [ constraints ]
     end
   end
 end

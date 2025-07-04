@@ -12,6 +12,14 @@ module ActiveRecordRules
         @expression = expression
       end
 
+      def id_paths(vars)
+        @expression.id_paths(
+          vars.merge(
+            ConstraintSet.new(@constraints).extract_id_variables
+          )
+        ).transform_keys { [ :all ] + _1 }
+      end
+
       def define_expression(query_definer)
         expr = @expression.to_query(query_definer)
         lambda do |bindings|
@@ -40,7 +48,7 @@ module ActiveRecordRules
       end
 
       def unparse
-        "array(#{expression.unparse}) { #{@constraints.map(&:unparse).join("; ")} }"
+        "array(#{expression.unparse}) {#{@constraints.map { "\n" + _1.unparse }.join.indent(2)}\n}"
       end
     end
   end

@@ -17,6 +17,35 @@ module ActiveRecordRules
         raise "Record matches must be on subclasses of ActiveRecord::Base, not #{@class_name}"
       end
 
+      def klass = @class
+
+      def extract_id_variables
+        @clauses.map do |clause|
+          case clause
+          in BinaryOperatorExpression(Variable(name), "=", RecordField("id"))
+            { [ name ] => @class }
+          in BinaryOperatorExpression(RecordField("id"), "=", Variable(name))
+            { [ name ] => @class }
+          in BinaryOperatorExpression(Variable(name), "=", RecordField(field_name))
+            reflection = @class.reflect_on_all_associations(:belongs_to).find { _1.foreign_key == field_name }
+            if reflection
+              { [ name ] => reflection.klass }
+            else
+              {}
+            end
+          in BinaryOperatorExpression(RecordField(field_name), "=", Variable(name))
+            reflection = @class.reflect_on_all_associations(:belongs_to).find { _1.foreign_key == field_name }
+            if reflection
+              { [ name ] => reflection.klass }
+            else
+              {}
+            end
+          else
+            {}
+          end
+        end.reduce({}, &:merge)
+      end
+
       def to_query(definer)
         table_definer = definer.define_table(@class)
 
@@ -55,7 +84,7 @@ module ActiveRecordRules
         @clauses.each { _1.record_relevant_attributes(subtracker) }
       end
 
-      def deconstruct = [@class, @clauses]
+      def deconstruct = [ @class, @clauses ]
       def unparse = "#{@class_name}(#{@clauses.map(&:unparse).join(", ")})"
     end
   end

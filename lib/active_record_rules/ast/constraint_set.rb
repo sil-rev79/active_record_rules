@@ -14,6 +14,22 @@ module ActiveRecordRules
         @constraints = constraints
       end
 
+      def extract_id_variables
+        vars = @constraints.select { _1.is_a?(RecordMatcher) }.map(&:extract_id_variables).reduce({}, &:merge)
+        # Once we've extracted the simple stuff, run through the
+        # expressions.
+        @constraints.reduce(vars) do |vars, constraint|
+          case constraint
+          in BinaryOperatorExpression(Variable(name), "=", expr)
+            vars.merge(expr.id_paths(vars).transform_keys { [ name ] + _1 })
+          in BinaryOperatorExpression(expr, "=", Variable(name))
+            vars.merge(expr.id_paths(vars).transform_keys { [ name ] + _1 })
+          else
+            vars
+          end
+        end
+      end
+
       def to_query_sql
         populate_query_parts!
         @query_sql
@@ -25,6 +41,12 @@ module ActiveRecordRules
           @constraints.each { _1.record_relevant_attributes(tracker) }
           tracker.attributes_by_class
         end
+      end
+
+      def id_names_and_types
+        populate_query_parts!
+
+        @id_names.map { _1.delete_prefix("__id_") }.zip(@constraints.to_a.select { _1.is_a?(Ast::RecordMatcher) }.map(&:klass))
       end
 
       def affected_ids_sql(klass, previous, current)
@@ -44,11 +66,11 @@ module ActiveRecordRules
           if @target_tables.include?(table)
             # No need to find a path if the record we're changing is
             # one of our ground ids. Nice and easy.
-            [previous, current].each do |attributes|
+            [ previous, current ].each do |attributes|
               next unless attributes
 
               value = ActiveRecord::Base.connection.quote(attributes["id"])
-              pending_activations << Rule::PendingActivation.new([table], "select #{id_cast(value, klass)} as #{table}")
+              pending_activations << Rule::PendingActivation.new([ table ], "select #{id_cast(value, klass)} as #{table}")
             end
           else
             # If we're not immediately in the right place, then we
@@ -62,10 +84,10 @@ module ActiveRecordRules
             # invalidate *all* matches.
             target_tables = Set.new(@target_tables)
             candidates = []
-            done = Set.new([table])
+            done = Set.new([ table ])
             @edges[table].each do |table_field, local_edges|
               local_edges.each do |edge|
-                candidates << [edge, [[edge, table_field]]]
+                candidates << [ edge, [ [ edge, table_field ] ] ]
               end
             end
 
@@ -78,7 +100,7 @@ module ActiveRecordRules
               else
                 @edges[item.table].each do |table_field, local_edges|
                   local_edges.each do |edge|
-                    candidates << [edge, [[edge, table_field]] + path]
+                    candidates << [ edge, [ [ edge, table_field ] ] + path ]
                   end
                 end
               end
@@ -90,7 +112,7 @@ module ActiveRecordRules
             #
             # This is relatively expensive, so hopefully it doesn't
             # happen often!
-            return Set.new([:all]) if paths.empty?
+            return Set.new([ :all ]) if paths.empty?
 
             selections = {}
             tables = Hash.new { _1[_2] = [] }
@@ -130,7 +152,7 @@ module ActiveRecordRules
               end
             end
 
-            [previous, current].each do |attributes|
+            [ previous, current ].each do |attributes|
               next if attributes.nil?
 
               selections_sql = selections.map do |name, maker|
@@ -201,28 +223,28 @@ module ActiveRecordRules
             clauses.map do |clause|
               case clause
               in BinaryOperatorExpression(Variable(left), "=", Variable(right))
-                Set.new([left, right])
+                Set.new([ left, right ])
               in BinaryOperatorExpression(Variable(left), "=", _)
-                Set.new([left])
+                Set.new([ left ])
               in BinaryOperatorExpression(_, "=", Variable(right))
-                Set.new([right])
+                Set.new([ right ])
               else
                 Set.new
               end
             end.reduce(&:+)
           in BinaryOperatorExpression(Variable(left), "=", Variable(right))
-            Set.new([left, right])
+            Set.new([ left, right ])
           in BinaryOperatorExpression(Variable(left), "=", _)
-            Set.new([left])
+            Set.new([ left ])
           in BinaryOperatorExpression(_, "=", Variable(right))
-            Set.new([right])
+            Set.new([ right ])
           else
             Set.new
           end
         end.reduce(&:+)
       end
 
-      def unparse = @constraints.map(&:unparse).join("\n  ")
+      def unparse = @constraints.map(&:unparse).join("\n")
 
       TableField = Struct.new(:table, :field, :field_name)
 
@@ -296,7 +318,7 @@ module ActiveRecordRules
 
         table_bindings = BindingMap.new(nil)
         binding_maps << table_bindings
-        to_do = constraints.dup.map { [_1, true, table_bindings] }
+        to_do = constraints.dup.map { [ _1, true, table_bindings ] }
         table_index = 0
         @target_tables = []
         @start_tables = Hash.new { _1[_2] = [] }
@@ -308,15 +330,15 @@ module ActiveRecordRules
           in Aggregate(aggregated_constraints)
             subbindings = BindingMap.new(bindings)
             binding_maps << subbindings
-            to_do += aggregated_constraints.map { [_1, false, subbindings] }
+            to_do += aggregated_constraints.map { [ _1, false, subbindings ] }
           in Any(existential_constraints)
             subbindings = BindingMap.new(bindings)
             binding_maps << subbindings
-            to_do += existential_constraints.map { [_1, false, subbindings] }
+            to_do += existential_constraints.map { [ _1, false, subbindings ] }
           in Negation(negated_constraints)
             subbindings = BindingMap.new(bindings)
             binding_maps << subbindings
-            to_do += negated_constraints.map { [_1, false, subbindings] }
+            to_do += negated_constraints.map { [ _1, false, subbindings ] }
           in RecordMatcher(match_klass, clauses)
             table_name = "#{match_klass.table_name}_#{table_index += 1}"
             @internal_table_names[table_name] = match_klass.table_name
@@ -342,14 +364,14 @@ module ActiveRecordRules
                 bindings.add(rhs, TableField.new(table_name, expr, lhs))
               else
                 # Recurse into the LHS and RHS to find other relevant tables.
-                to_do << [lhs, false, bindings]
-                to_do << [rhs, false, bindings]
+                to_do << [ lhs, false, bindings ]
+                to_do << [ rhs, false, bindings ]
               end
             end
           in BinaryOperatorExpression(lhs, _, rhs)
             # Recurse into the LHS and RHS to find other relevant tables.
-            to_do << [lhs, false, bindings]
-            to_do << [rhs, false, bindings]
+            to_do << [ lhs, false, bindings ]
+            to_do << [ rhs, false, bindings ]
           else
             # we're not handling anything else
             nil

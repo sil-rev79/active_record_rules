@@ -12,8 +12,12 @@ module ActiveRecordRules
         @name = name
       end
 
+      def id_paths(vars)
+        vars.select { _1[0] == @name }.transform_keys { _1[1..] }
+      end
+
       def relevant_change?(_, _, _) = false
-      def deconstruct = [@name]
+      def deconstruct = [ @name ]
       def to_query(_) = ->(bindings) { bindings[@name] }
       def unparse = "<#{@name}>"
     end

@@ -12,6 +12,15 @@ module ActiveRecordRules
         @elements = elements
       end
 
+      def id_paths(vars)
+        @elements.each_with_index.map do |element, i|
+          id_paths = element.id_paths(vars)
+          next if id_paths.empty?
+
+          id_paths.transform_keys { [ i ] + _1 }
+        end.compact.reduce({}, &:merge)
+      end
+
       def to_query(definer)
         procs = @elements.map { _1.to_query(definer) }
         lambda do |bindings|
@@ -33,7 +42,7 @@ module ActiveRecordRules
         @elements.any? { _1.relevant_change?(klass, previous, current) }
       end
 
-      def deconstruct = [@elements]
+      def deconstruct = [ @elements ]
 
       def unparse = "[#{@elements.map(&:unparse).join(", ")}]"
     end

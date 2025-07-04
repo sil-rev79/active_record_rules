@@ -102,7 +102,7 @@ RSpec.configure do |config|
     Dir.mktmpdir do |dir|
       Rails::Generators.invoke(
         "active_record_rules:install",
-        ["--quiet"],
+        [ "--quiet" ],
         destination_root: dir
       )
 

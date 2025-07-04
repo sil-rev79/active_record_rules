@@ -12,6 +12,8 @@ module ActiveRecordRules
         @expression = expression
       end
 
+      def id_paths(_) = {}
+
       def define_expression(query_definer)
         expr = @expression.to_query(query_definer)
         ->(bindings) { "sum(#{expr.call(bindings)})" }

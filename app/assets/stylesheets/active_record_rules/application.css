@@ -1,0 +1,76 @@
+/*
+ * This is a manifest file that'll be compiled into application.css, which will include all the files
+ * listed below.
+ *
+ * Any CSS and SCSS file within this directory, lib/assets/stylesheets, vendor/assets/stylesheets,
+ * or any plugin's vendor/assets/stylesheets directory can be referenced here using a relative path.
+ *
+ * You're free to add application-wide styles to this file and they'll appear at the bottom of the
+ * compiled file so the styles you add here take precedence over styles defined in any other CSS/SCSS
+ * files in this directory. Styles in this file should be added after the last require_* statement.
+ * It is generally better to create a new file per style scope.
+ *
+ */
+.rule-link {
+    text-decoration: none;
+}
+.rule header h2, .rule-match header h2 {
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    margin: 0;
+}
+.rule pre {
+    padding: 1em;
+    border-radius: 1em;
+}
+.rule header a {
+    height: 100%;
+    width: 100%;
+    margin-bottom: 0;
+}
+.rule header div.timing {
+    padding: 0.25em 1em;
+    flex-grow: 0;
+    flex-basis: fit-content;
+    border-radius: 0.5em;
+}
+.rule header div.timing_later {
+    color: var(--pico-primary-inverse);
+    background: var(--pico-primary-background);
+}
+.rule header div.timing_after_request {
+    color: var(--pico-primary-inverse);
+    background: var(--pico-primary-background);
+}
+.rule header div.timing_after_commit {
+    color: var(--pico-primary-inverse);
+    background: var(--pico-primary-background);
+}
+.rule header div.timing_after_save {
+    color: var(--pico-secondary-inverse);
+    background: var(--pico-secondary-background);
+}
+.rule footer {
+    text-align: center;
+}
+.rule footer a {
+    margin: 0;
+    display: block;
+    height: 100%;
+    width: 100%;
+}
+
+.rule-match pre {
+    margin-bottom: 0;
+}
+
+dl {
+    margin-bottom: 0;
+}
+dt {
+    font-weight: bold;
+}
+dd pre {
+    padding: 1em;
+}

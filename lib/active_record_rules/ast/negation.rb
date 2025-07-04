@@ -41,7 +41,7 @@ module ActiveRecordRules
         query_definer.add_binding(value_name) { "1" }
 
         lambda do |bindings|
-          sql = query_definer.to_sql(bindings, [value_name])
+          sql = query_definer.to_sql(bindings, [ value_name ])
           QueryDefiner::SqlExpr.new("not exists (#{sql.split("\n").join("\n            ")})", false)
         end
       end
@@ -55,7 +55,7 @@ module ActiveRecordRules
       end
 
       def unparse = "not { #{@constraints.map(&:unparse).join("; ")} }"
-      def deconstruct = [constraints]
+      def deconstruct = [ constraints ]
     end
   end
 end

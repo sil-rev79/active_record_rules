@@ -156,7 +156,7 @@ module ActiveRecordRules
     end
 
     def gen_eq(left, right)
-      case [left.to_s, right.to_s]
+      case [ left.to_s, right.to_s ]
       in "NULL", "NULL"
         "TRUE"
       in "NULL", _

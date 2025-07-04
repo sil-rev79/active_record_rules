@@ -1,0 +1,33 @@
+<nav>
+    <h1><%= link_to '⇐ Back to rule matches', rule_path(@rule, page: @page, model_name: @model_name, record_id: @record_id) %></h1>
+</nav>
+
+<article class="rule">
+    <header role="group">
+        <h2><%= @rule.name %></h2>
+        <div class="timing timing_<%= @rule.timing %>"><%= @rule.timing.to_s.gsub('_', ' ') %></div>
+    </header>
+    <details>
+        <summary role="button" class="secondary">Show definition (<%= @rule.source_location.delete_prefix("#{Rails.root}/") %>)</summary>
+        <pre><%= @rule.constraints_string %></pre>
+    </details>
+</article>
+
+
+<article class="rule-match">
+    <header>
+        <h2>Rule matches</h2>
+    </header>
+    <dl>
+        <% @argument_keys.each do |key| %>
+            <dt><%= key %></dt>
+            <dd>
+                <pre><%= @live_objects[key] %></pre>
+                <% if @next_objects && @next_objects[key] != @live_objects[key] %>
+                    awaiting execution with next value:
+                    <pre><%= @next_objects[key] %></pre>
+                <% end %>
+            </dd>
+        <% end %>
+    </dl>
+</article>

@@ -4,23 +4,26 @@ require "digest/md5"
 
 module ActiveRecordRules
   class Rule
-    attr_reader :id, :name, :timing, :constraints, :on_match, :on_update, :on_unmatch, :context, :source_location
+    include ActiveModel::Model
+
+    attr_reader :id, :name, :timing, :constraints, :constraints_string, :on_match, :on_update, :on_unmatch, :context, :source_location
 
     def initialize(name:, timing:, constraints:, on_match:, on_update:, on_unmatch:, context:, source_location:)
       @name = name
       @timing = timing
-      @constraints = constraints
+      @constraints_string = constraints.strip
+      @constraints = Parse.constraints(constraints)
       @on_match = on_match
       @on_update = on_update
       @on_unmatch = on_unmatch
       @context = context
-      context_class = ExecutionContext.for_variables(constraints.bound_names)
+      context_class = ExecutionContext.for_variables(@constraints.bound_names)
       @context_builder = case @context
-                         when Proc
+      when Proc
                            ->(args) { context_class.new(@context.call, args) }
-                         else
+      else
                            ->(args) { context_class.new(@context, args) }
-                         end
+      end
       @source_location = source_location
 
       @id = Rule.name_to_id(@name)
@@ -31,6 +34,8 @@ module ActiveRecordRules
 
       freeze # We want these to be immutable, so we'll at least freeze the top-level
     end
+
+    def persisted? = true
 
     # The id is the MD5 hash of the definition's name, truncated to a
     # 32 bit integer, in network (big) endian byte order. These
@@ -50,27 +55,32 @@ module ActiveRecordRules
         end
 
         <<~SQL
-          (with __ids as (#{condition.condition_sql})
-           select distinct match.* from #{RuleMatch.table_name} match
+          select match.* from (
+            with __ids as (#{condition.condition_sql})
+            select distinct match.* from #{RuleMatch.table_name} match
              cross join __ids
-             join #{RuleMatchId.table_name} match_id on match.id = match_id.rule_match_id
-            where #{clauses.join(" or ")})
+              join #{RuleMatchId.table_name} match_id on match.id = match_id.rule_match_id
+             where #{clauses.join(" or ")}
+          ) as match
         SQL
       end
 
       if queries.empty?
         RuleMatch.none
       else
-        RuleMatch.from("(#{queries.join(" UNION ")}) as #{RuleMatch.table_name}")
+        RuleMatch.from("(#{queries.join(" UNION ")}) as #{RuleMatch.table_name}").where(rule_id: id)
       end
     end
+
+    def extract_id_variables = constraints.extract_id_variables
+    def id_names_and_types = constraints.id_names_and_types
 
     def ==(other)
       super || constraints.unparse == other.constraints.unparse
     end
 
     def inspect
-      "#<#{self.class.name} id=#{id} name=#{name} (#{@source_location.join(":")})>"
+      "#<#{self.class.name} id=#{id} name=#{name} (#{@source_location})>"
     end
 
     def to_s = inspect
@@ -92,6 +102,10 @@ module ActiveRecordRules
 
     def calculate_required_activations(klass, previous, current)
       constraints.affected_ids_sql(klass, previous, current)
+    end
+
+    def referenced_classes
+      constraints.relevant_attributes_by_class.keys.to_set
     end
 
     def relevant_attributes(klass)
@@ -129,7 +143,7 @@ module ActiveRecordRules
     def execute_update(old_args, new_args)
       if @on_update
         arg_pairs = (old_args.keys.to_set + new_args.keys.to_set).to_h do |key|
-          [key, ArgumentPair.new(old_args[key], new_args[key])]
+          [ key, ArgumentPair.new(old_args[key], new_args[key]) ]
         end
         wrap_execution do
           @context_builder.call(arg_pairs).instance_exec(&@on_update)
@@ -155,7 +169,7 @@ module ActiveRecordRules
       ActiveRecordRules.around_execution.call(self, execution)
       return if count == 1
 
-      location = ActiveRecordRules.around_execution.source_location.join(":")
+      location = ActiveRecordRules.around_execution.source_location
       raise "Execution context did not execute rule body for rule #{id} (context at #{location})" if count.zero?
 
       raise "Execution context executed rule body #{count} times for rule #{id} (context at #{location})"
@@ -173,13 +187,13 @@ module ActiveRecordRules
       return if missing_ids.empty?
 
       json_each, id_cast = case ActiveRecordRules.dialect
-                           in :sqlite
-                             ["json_each",
-                              ""]
-                           in :postgres
-                             ["jsonb_each_text",
-                              ":: #{RuleMatchId.attribute_types["record_id"]&.type}"]
-                           end
+      in :sqlite
+                             [ "json_each",
+                              "" ]
+      in :postgres
+                             [ "jsonb_each_text",
+                              ":: #{RuleMatchId.attribute_types["record_id"]&.type}" ]
+      end
 
       quoted_ids = missing_ids.map { ActiveRecord::Base.connection.quote(_1) }
 
@@ -205,12 +219,12 @@ module ActiveRecordRules
         # trivial as I can think of. The conditions being "true" means
         # that we won't actually use the result of the query, so it
         # should be fine.
-        conditions = [["select 1", "true", "true"]]
+        conditions = [ [ "select 1", "true", "true" ] ]
       else
         logger&.info { "Rule(#{id}): activating rule" }
         logger&.debug do
           "Rule(#{id}): activating for: \n  " + pending_activations.flat_map do |pending_activation|
-            format_sql_conditions([pending_activation]).map(&:first)
+            format_sql_conditions([ pending_activation ]).map(&:first)
           end.join("\n  ")
         end
       end
@@ -268,7 +282,7 @@ module ActiveRecordRules
                       and name = #{ActiveRecord::Base.connection.quote(term)}
                       and record_id = __ids.#{term})"
         end.join(" and ")
-        [pending_activation.condition_sql, sql_condition, json_condition]
+        [ pending_activation.condition_sql, sql_condition, json_condition ]
       end
     end
 

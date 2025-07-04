@@ -17,7 +17,7 @@ RSpec.describe ActiveRecordRules do
 
     before do
       TestHelper.matches = []
-      described_class.load_files(["#{__dir__}/rules_initial.rules.rb"])
+      described_class.load_files([ "#{__dir__}/rules_initial.rules.rb" ])
 
       Salutation.create!(greeting: "Hi", farewell: "Bye")
       Person.create!(name: "John", greetable: true, farewellable: true)

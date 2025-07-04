@@ -30,7 +30,7 @@ RSpec.describe ActiveRecordRules do
           ClientRepresentative(<client>, <name>)
         MATCH
         on_match do
-          TestHelper.matches << [:notify, name]
+          TestHelper.matches << [ :notify, name ]
         end
       end
 
@@ -48,7 +48,7 @@ RSpec.describe ActiveRecordRules do
       clients.each_value do |data|
         data[:support_requests].select { _1 == "high" }.each do
           data[:representatives].each do |rep|
-            expected_matches << [:notify, rep]
+            expected_matches << [ :notify, rep ]
           end
         end
       end
@@ -111,7 +111,7 @@ RSpec.describe ActiveRecordRules do
                .size
             next if count.zero?
 
-            [step, count]
+            [ step, count ]
           end.compact.to_h
         )
     end
@@ -131,12 +131,12 @@ RSpec.describe ActiveRecordRules do
           Card(<suit>, rank = <rank3>, rank > <rank2>)
         MATCH
         on_match do
-          TestHelper.matches << [suit, [rank1, rank2, rank3]]
+          TestHelper.matches << [ suit, [ rank1, rank2, rank3 ] ]
         end
         on_unmatch do
           # What an annoying construction to delete a single element
           # of an array that possibly contains duplicates!
-          TestHelper.matches.delete_at(TestHelper.matches.index([suit, [rank1, rank2, rank3]]))
+          TestHelper.matches.delete_at(TestHelper.matches.index([ suit, [ rank1, rank2, rank3 ] ]))
         end
       end
 
@@ -213,7 +213,7 @@ RSpec.describe ActiveRecordRules do
           ranks.product(ranks, ranks).map do |rank1, rank2, rank3|
             next unless rank1 < rank2 && rank2 < rank3
 
-            [suit, [rank1, rank2, rank3]]
+            [ suit, [ rank1, rank2, rank3 ] ]
           end
         end.compact
         expect(TestHelper.matches.sort).to eq(expected_matches.sort)
@@ -231,7 +231,7 @@ RSpec.describe ActiveRecordRules do
         end
 
         it "picks up on multiple card updates" do
-          expect(TestHelper.matches.sort).to eq([["diamond", ["2", "3", "4"]]])
+          expect(TestHelper.matches.sort).to eq([ [ "diamond", [ "2", "3", "4" ] ] ])
         end
       end
 
@@ -245,7 +245,7 @@ RSpec.describe ActiveRecordRules do
         end
 
         it "picks up on multiple card updates" do
-          expect(TestHelper.matches.sort).to eq([["diamond", ["2", "3", "4"]]])
+          expect(TestHelper.matches.sort).to eq([ [ "diamond", [ "2", "3", "4" ] ] ])
         end
       end
 
@@ -260,7 +260,7 @@ RSpec.describe ActiveRecordRules do
         end
 
         it "picks up on multiple card updates" do
-          expect(TestHelper.matches.sort).to eq([["diamond", ["2", "3", "4"]]])
+          expect(TestHelper.matches.sort).to eq([ [ "diamond", [ "2", "3", "4" ] ] ])
         end
       end
 
@@ -274,7 +274,7 @@ RSpec.describe ActiveRecordRules do
         end
 
         it "picks up on multiple card updates" do
-          expect(TestHelper.matches.sort).to eq([["heart", ["2", "3", "4"]], ["heart", ["2", "3", "4"]]])
+          expect(TestHelper.matches.sort).to eq([ [ "heart", [ "2", "3", "4" ] ], [ "heart", [ "2", "3", "4" ] ] ])
         end
       end
 
@@ -290,7 +290,7 @@ RSpec.describe ActiveRecordRules do
         end
 
         it "picks up on multiple card updates" do
-          expect(TestHelper.matches.sort).to eq([["heart", ["2", "3", "4"]]])
+          expect(TestHelper.matches.sort).to eq([ [ "heart", [ "2", "3", "4" ] ] ])
         end
       end
 
@@ -303,7 +303,7 @@ RSpec.describe ActiveRecordRules do
         end
 
         it "matches the resulting match" do
-          expect(TestHelper.matches.sort).to eq([["heart", ["2", "3", "4"]], ["heart", ["2", "3", "4"]]])
+          expect(TestHelper.matches.sort).to eq([ [ "heart", [ "2", "3", "4" ] ], [ "heart", [ "2", "3", "4" ] ] ])
         end
       end
     end

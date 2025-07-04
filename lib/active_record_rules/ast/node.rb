@@ -14,7 +14,7 @@ module ActiveRecordRules
       # we could use the IS NOT DISTINCT FROM operator in SQL, but in
       # practice it doesn't use indexes in Postgres, so it's no good.
       def gen_eq(left, right)
-        case [left.to_s, right.to_s]
+        case [ left.to_s, right.to_s ]
         in "NULL", "NULL"
           "TRUE"
         in "NULL", _

@@ -16,7 +16,7 @@ module ActiveRecordRules
       values.instance_eval(&block)
       rule = Rule.new(
         name: name,
-        source_location: block.source_location,
+        source_location: block.source_location.join(":"),
         **values.to_h,
         context: context || self
       )
@@ -64,7 +64,7 @@ module ActiveRecordRules
         raise "Multiple timing/constraint declarations (previously: #{@timing})" if @timing
 
         @timing = timing
-        @constraints = Parse.constraints(constraints)
+        @constraints = constraints
       end
     end
   end

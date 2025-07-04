@@ -2,6 +2,7 @@
 
 require "active_record"
 require "active_record_rules/definer"
+require "active_record_rules/engine"
 require "active_record_rules/hooks"
 require "active_record_rules/jobs"
 require "active_record_rules/parse"
@@ -144,13 +145,13 @@ module ActiveRecordRules
     # @return [nil]
     def deregister_rule!(rule)
       rule = case rule
-             when String, Integer
+      when String, Integer
                find_rule(rule)
-             when Rule
+      when Rule
                rule
-             else
+      else
                raise "Rules can only be deregistered by name (a string), an id (an Integer), or a Rule object"
-             end
+      end
       id = rule.id
       raise "Cannot find rule to undefine: #{name}" unless @loaded_rules&.delete(id)
 
@@ -170,9 +171,9 @@ module ActiveRecordRules
       attrs = relevant_attributes(record.class)
       return nil if attrs.empty?
 
-      [record.class.name,
+      [ record.class.name,
        nil,
-       record.attributes.slice("id", *attrs)]
+       record.attributes.slice("id", *attrs) ]
     end
 
     # Capture the details of attributes in an after_update callback.
@@ -181,14 +182,14 @@ module ActiveRecordRules
     #
     # @return A change record suitable to activate rules, or nil if no activation is necessary
     def capture_update_change(record)
-      attrs = ["id", *relevant_attributes(record.class)]
+      attrs = [ "id", *relevant_attributes(record.class) ]
       return nil unless attrs.any? { record.previous_changes.key?(_1) }
 
       # Get before+after for relevant attributes
       after = record.attributes.slice(*attrs)
       before = after.merge(record.previous_changes.slice(*attrs).transform_values(&:first))
 
-      [record.class.name, before, after]
+      [ record.class.name, before, after ]
     end
 
     # Capture the details of attributes in an after_destroy callback.
@@ -200,9 +201,9 @@ module ActiveRecordRules
       attrs = relevant_attributes(record.class)
       return nil if attrs.empty?
 
-      [record.class.name,
+      [ record.class.name,
        record.attributes.slice("id", *attrs),
-       nil]
+       nil ]
     end
 
     # Activate all rules relevant to the provided change.
@@ -215,17 +216,17 @@ module ActiveRecordRules
       return [] if change.nil?
 
       rules = case timing
-              in :after_save
+      in :after_save
                 @after_save_rules
-              in :after_commit
+      in :after_commit
                 @after_commit_rules
-              in :after_request
+      in :after_request
                 @after_request_rules
-              in :later
+      in :later
                 @later_rules
-              in :all
+      in :all
                 @loaded_rules
-              end
+      end
       return [] if rules.nil?
 
       class_name, previous, current = change
@@ -290,8 +291,8 @@ module ActiveRecordRules
             ids_to_execute << match.id if needs_execution
           rescue StandardError => e
             logger.error(
-              ["Rule execution failed for match (rule id: #{match.rule_id}, match id: #{match.id}): #{e.message}",
-               *e.backtrace].join("\n")
+              [ "Rule execution failed for match (rule id: #{match.rule_id}, match id: #{match.id}): #{e.message}",
+               *e.backtrace ].join("\n")
             )
             failures << e
           end
@@ -304,7 +305,7 @@ module ActiveRecordRules
     end
 
     def run_pending_execution(id)
-      run_pending_executions([id])
+      run_pending_executions([ id ])
     end
 
     def activate_and_execute(change, timing)
@@ -327,12 +328,12 @@ module ActiveRecordRules
                  # if the record is marked as destroyed then we want
                  # to process it as a destroy
                  capture_destroy_change(record)
-               else
+      else
                  # a "create" change is the same as changing every
                  # attribute to its current value, so will trigger
                  # anything it needs to.
                  capture_create_change(record)
-               end
+      end
       ActiveRecordRules.activate_and_execute(change, :after_save)
       ActiveRecordRules.activate_and_execute(change, :after_commit)
       ActiveRecordRules.activate_and_execute(change, :after_request)

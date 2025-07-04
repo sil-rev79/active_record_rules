@@ -46,8 +46,8 @@ module ActiveRecordRules
             comparison.as(:op) >> whitespace.maybe >>
             expression.as(:rhs)
           ),
-          [whitespace.maybe >> str("or").as(:op) >> whitespace.maybe, 1, :left],
-          [whitespace.maybe >> str("and").as(:op) >> whitespace.maybe, 2, :left]
+          [ whitespace.maybe >> str("or").as(:op) >> whitespace.maybe, 1, :left ],
+          [ whitespace.maybe >> str("and").as(:op) >> whitespace.maybe, 2, :left ]
         ) { |l, o, r| { lhs: l, op: o[:op], rhs: r } }
       end
 
@@ -92,8 +92,8 @@ module ActiveRecordRules
             # Database fields
             record_expression
           ),
-          [whitespace.maybe >> match("[+-]").as(:op) >> whitespace.maybe, 1, :left],
-          [whitespace.maybe >> match("[*/]").as(:op) >> whitespace.maybe, 2, :left]
+          [ whitespace.maybe >> match("[+-]").as(:op) >> whitespace.maybe, 1, :left ],
+          [ whitespace.maybe >> match("[*/]").as(:op) >> whitespace.maybe, 2, :left ]
         ) { |l, o, r| { lhs: l, op: o[:op], rhs: r } }
       end
 

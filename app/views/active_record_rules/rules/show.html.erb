@@ -1,0 +1,51 @@
+<nav>
+    <h1><%= link_to '⇐ Back to rules', index_path(model_name: @model_name, record_id: @record_id) %></h1>
+</nav>
+
+<%= form_with method: :get, html: { role: 'group' } do |form| %>
+    <%= form.select :model_name, @models, include_blank: "Select a model", selected: @model_name %>
+    <%= form.text_field :record_id, value: @record_id, placeholder: "Enter an id" %>
+    <%= form.submit "Find matches" %>
+<% end %>
+
+<article class="rule">
+    <header role="group">
+        <h2><%= @rule.name %></h2>
+        <div class="timing timing_<%= @rule.timing %>"><%= @rule.timing.to_s.gsub('_', ' ') %></div>
+    </header>
+    <details>
+        <summary role="button" class="secondary">Show definition (<%= @rule.source_location.delete_prefix("#{Rails.root}/") %>)</summary>
+        <pre><%= @rule.constraints_string %></pre>
+    </details>
+    <footer>
+        <%= form_with do |form| %>
+            <%= form.hidden_field :model_name, value: @model_name  %>
+            <%= form.hidden_field :record_id, value: @record_id  %>
+            <%= form.hidden_field :page, value: @page  %>
+            <button>
+                Trigger rule for <%= @record ? "#{@model_name} #{format_record(@record)}" : "all records" %>
+            </button>
+        <% end %>
+    </footer>
+</article>
+
+<h2>Matches</h2>
+<% @id_objects.each do |match, row| %>
+    <a class="rule-link" href="<%= rule_rule_match_path(@rule.id, match.id, page: @page, model_name: @model_name, record_id: @record_id)  %>">
+        <article>
+            <dl>
+                <% row.each do |name, record| %>
+                    <dt><%= name %></dt>
+                    <dd><%= format_record(record) %></dd>
+                <% end %>
+            </dl>
+        </article>
+    </a>
+<% end %>
+
+<% if @page > 0 %>
+    <%= link_to '⇐ Prev', rule_path(page: @page - 1, model_name: @model_name, record_id: @record_id) %>
+<% end %>
+<% if @page < @max_page %>
+    <%= link_to 'Next ⇒', rule_path(page: @page + 1, model_name: @model_name, record_id: @record_id) %>
+<% end %>

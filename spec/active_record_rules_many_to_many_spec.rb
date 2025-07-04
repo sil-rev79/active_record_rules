@@ -28,7 +28,7 @@ RSpec.describe ActiveRecordRules do
     end
 
     before do
-      ["spades", "clubs", "hearts", "diamonds"].each do |suit|
+      [ "spades", "clubs", "hearts", "diamonds" ].each do |suit|
         (1..13).each do |rank|
           Card.create!(suit: suit, rank: rank)
         end
@@ -66,28 +66,28 @@ RSpec.describe ActiveRecordRules do
       subject(:hand) { Hand.create! }
 
       it "is matched as a straight flush" do
-        hand.update!(cards: Card.where(suit: "hearts", rank: [4, 5, 6, 7, 8]))
+        hand.update!(cards: Card.where(suit: "hearts", rank: [ 4, 5, 6, 7, 8 ]))
         expect(hand.reload.description).to eq("straight hearts flush from 4 to 8")
       end
 
       it "updates when adding a card" do
-        hand.update!(cards: Card.where(suit: "hearts", rank: [4, 5, 6, 7]))
+        hand.update!(cards: Card.where(suit: "hearts", rank: [ 4, 5, 6, 7 ]))
         # Now add 8
-        hand.update!(cards: Card.where(suit: "hearts", rank: [4, 5, 6, 7, 8]))
+        hand.update!(cards: Card.where(suit: "hearts", rank: [ 4, 5, 6, 7, 8 ]))
         expect(hand.reload.description).to eq("straight hearts flush from 4 to 8")
       end
 
       it "does not update when removing a card" do
-        hand.update!(cards: Card.where(suit: "hearts", rank: [4, 5, 6, 7, 8]))
+        hand.update!(cards: Card.where(suit: "hearts", rank: [ 4, 5, 6, 7, 8 ]))
         # Now remove 8
-        hand.update!(cards: Card.where(suit: "hearts", rank: [4, 5, 6, 7]))
+        hand.update!(cards: Card.where(suit: "hearts", rank: [ 4, 5, 6, 7 ]))
         expect(hand.reload.description).to eq("straight hearts flush from 4 to 8")
       end
 
       it "does not update when replacing a card" do
-        hand.update!(cards: Card.where(suit: "hearts", rank: [4, 5, 6, 7, 8]))
+        hand.update!(cards: Card.where(suit: "hearts", rank: [ 4, 5, 6, 7, 8 ]))
         # Now replace 8 with 9
-        hand.update!(cards: Card.where(suit: "hearts", rank: [4, 5, 6, 7, 9]))
+        hand.update!(cards: Card.where(suit: "hearts", rank: [ 4, 5, 6, 7, 9 ]))
         expect(hand.reload.description).to eq("straight hearts flush from 4 to 8")
       end
 
@@ -101,16 +101,16 @@ RSpec.describe ActiveRecordRules do
         end
 
         it "updates when removing a card, with a monkey-patch" do
-          hand.update!(cards: Card.where(suit: "hearts", rank: [4, 5, 6, 7, 8]))
+          hand.update!(cards: Card.where(suit: "hearts", rank: [ 4, 5, 6, 7, 8 ]))
           # Now remove 8
-          hand.update!(cards: Card.where(suit: "hearts", rank: [4, 5, 6, 7]))
+          hand.update!(cards: Card.where(suit: "hearts", rank: [ 4, 5, 6, 7 ]))
           expect(hand.reload.description).to be_nil
         end
 
         it "updates when replacing a card, with a monkey-patch" do
-          hand.update!(cards: Card.where(suit: "hearts", rank: [4, 5, 6, 7, 8]))
+          hand.update!(cards: Card.where(suit: "hearts", rank: [ 4, 5, 6, 7, 8 ]))
           # Now replace 8 with 9
-          hand.update!(cards: Card.where(suit: "hearts", rank: [4, 5, 6, 7, 9]))
+          hand.update!(cards: Card.where(suit: "hearts", rank: [ 4, 5, 6, 7, 9 ]))
           expect(hand.reload.description).to be_nil
         end
       end

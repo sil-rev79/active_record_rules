@@ -34,7 +34,7 @@ module ActiveRecordRules
         query_definer.add_binding(value_name) { "1" }
 
         lambda do |bindings|
-          sql = query_definer.to_sql(bindings, [value_name])
+          sql = query_definer.to_sql(bindings, [ value_name ])
           QueryDefiner::SqlExpr.new("exists (#{sql.split("\n").join("\n        ")})", false)
         end
       end
@@ -47,8 +47,8 @@ module ActiveRecordRules
         @constraints.any? { _1.relevant_change?(klass, previous, current) }
       end
 
-      def unparse = "any { #{@constraints.map(&:unparse).join("; ")} }"
-      def deconstruct = [constraints]
+      def unparse = "any {#{@constraints.map { "\n" + _1.unparse }.join.indent(2)}\n}"
+      def deconstruct = [ constraints ]
     end
   end
 end

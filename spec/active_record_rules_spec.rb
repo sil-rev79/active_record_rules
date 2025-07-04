@@ -30,10 +30,10 @@ RSpec.describe ActiveRecordRules do
           Person(<name>)
         MATCH
         on_match do
-          TestHelper.matches += [[greeting, name]]
+          TestHelper.matches += [ [ greeting, name ] ]
         end
         on_unmatch do
-          TestHelper.matches -= [[greeting, name]]
+          TestHelper.matches -= [ [ greeting, name ] ]
         end
       end
 
@@ -46,34 +46,34 @@ RSpec.describe ActiveRecordRules do
       let!(:john) { Person.create!(name: "John") }
 
       it "matches for hello/John" do
-        expect(TestHelper.matches).to include(["hello", "John"])
+        expect(TestHelper.matches).to include([ "hello", "John" ])
       end
 
       it "unmatches when John is deleted" do
         john.destroy!
-        expect(TestHelper.matches).not_to include(["hello", "John"])
+        expect(TestHelper.matches).not_to include([ "hello", "John" ])
       end
 
       it "unmatches when John changes name" do
         john.update!(name: "Johns")
-        expect(TestHelper.matches).not_to include(["hello", "John"])
+        expect(TestHelper.matches).not_to include([ "hello", "John" ])
       end
 
       it "matches for the new value when John changes name" do
         john.update!(name: "Johns")
-        expect(TestHelper.matches).to include(["hello", "Johns"])
+        expect(TestHelper.matches).to include([ "hello", "Johns" ])
       end
 
       it "does nothing when an unrelated attributes changes" do
         salutation.update!(farewell: "goodbye")
-        expect(TestHelper.matches).to include(["hello", "John"])
+        expect(TestHelper.matches).to include([ "hello", "John" ])
       end
 
       it "handles two updates that are the reverse of each other, with only an activation between them" do
         salutation.update_columns(greeting: "hi")
         described_class.find_rule("greet").activate
         salutation.update!(greeting: "hello")
-        expect(TestHelper.matches).to include(["hello", "John"])
+        expect(TestHelper.matches).to include([ "hello", "John" ])
       end
     end
 
@@ -83,17 +83,17 @@ RSpec.describe ActiveRecordRules do
       let!(:jane) { Person.create!(name: "Jane") }
 
       it "matches for hello/Jane" do
-        expect(TestHelper.matches).to include(["hello", "Jane"])
+        expect(TestHelper.matches).to include([ "hello", "Jane" ])
       end
 
       it "unmatches Jane when Jane is deleted" do
         jane.destroy!
-        expect(TestHelper.matches).not_to include(["hello", "Jane"])
+        expect(TestHelper.matches).not_to include([ "hello", "Jane" ])
       end
 
       it "leave John matched when Jane is deleted" do
         jane.destroy!
-        expect(TestHelper.matches).to include(["hello", "John"])
+        expect(TestHelper.matches).to include([ "hello", "John" ])
       end
     end
   end
@@ -109,10 +109,10 @@ RSpec.describe ActiveRecordRules do
           TestRecordModule::Person(<name>)
         MATCH
         on_match do
-          TestHelper.matches += [[greeting, name]]
+          TestHelper.matches += [ [ greeting, name ] ]
         end
         on_unmatch do
-          TestHelper.matches -= [[greeting, name]]
+          TestHelper.matches -= [ [ greeting, name ] ]
         end
       end
 
@@ -125,27 +125,27 @@ RSpec.describe ActiveRecordRules do
       let!(:john) { TestRecordModule::Person.create!(name: "John") }
 
       it "matches for hello/John" do
-        expect(TestHelper.matches).to include(["hello", "John"])
+        expect(TestHelper.matches).to include([ "hello", "John" ])
       end
 
       it "unmatches when John is deleted" do
         john.destroy!
-        expect(TestHelper.matches).not_to include(["hello", "John"])
+        expect(TestHelper.matches).not_to include([ "hello", "John" ])
       end
 
       it "unmatches when John changes name" do
         john.update!(name: "Johns")
-        expect(TestHelper.matches).not_to include(["hello", "John"])
+        expect(TestHelper.matches).not_to include([ "hello", "John" ])
       end
 
       it "matches for the new value when John changes name" do
         john.update!(name: "Johns")
-        expect(TestHelper.matches).to include(["hello", "Johns"])
+        expect(TestHelper.matches).to include([ "hello", "Johns" ])
       end
 
       it "does nothing when an unrelated attributes changes" do
         salutation.update!(farewell: "goodbye")
-        expect(TestHelper.matches).to include(["hello", "John"])
+        expect(TestHelper.matches).to include([ "hello", "John" ])
       end
     end
 
@@ -155,17 +155,17 @@ RSpec.describe ActiveRecordRules do
       let!(:jane) { TestRecordModule::Person.create!(name: "Jane") }
 
       it "matches for hello/Jane" do
-        expect(TestHelper.matches).to include(["hello", "Jane"])
+        expect(TestHelper.matches).to include([ "hello", "Jane" ])
       end
 
       it "unmatches Jane when Jane is deleted" do
         jane.destroy!
-        expect(TestHelper.matches).not_to include(["hello", "Jane"])
+        expect(TestHelper.matches).not_to include([ "hello", "Jane" ])
       end
 
       it "leave John matched when Jane is deleted" do
         jane.destroy!
-        expect(TestHelper.matches).to include(["hello", "John"])
+        expect(TestHelper.matches).to include([ "hello", "John" ])
       end
     end
   end
@@ -178,10 +178,10 @@ RSpec.describe ActiveRecordRules do
           Person(<name>, greetable = true)
         MATCH
         on_match do
-          TestHelper.matches += [[greeting, name]]
+          TestHelper.matches += [ [ greeting, name ] ]
         end
         on_unmatch do
-          TestHelper.matches -= [[greeting, name]]
+          TestHelper.matches -= [ [ greeting, name ] ]
         end
       end
 
@@ -192,12 +192,12 @@ RSpec.describe ActiveRecordRules do
           Person(<name>, farewellable = true)
         MATCH
         on_match do
-          TestHelper.matches += [[greeting, name]]
-          TestHelper.matches += [[farewell, name]]
+          TestHelper.matches += [ [ greeting, name ] ]
+          TestHelper.matches += [ [ farewell, name ] ]
         end
         on_unmatch do
-          TestHelper.matches -= [[greeting, name]]
-          TestHelper.matches -= [[farewell, name]]
+          TestHelper.matches -= [ [ greeting, name ] ]
+          TestHelper.matches -= [ [ farewell, name ] ]
         end
       end
 
@@ -216,7 +216,7 @@ RSpec.describe ActiveRecordRules do
       it "only reprocesses a single Person when one is added" do
         capturing_logs do |output|
           Person.create!(name: "Jane", greetable: true)
-          expect(output.string.scan(/"people_[0-9]+":([0-9]+)/).uniq).to contain_exactly(["12"])
+          expect(output.string.scan(/"people_[0-9]+":([0-9]+)/).uniq).to contain_exactly([ "12" ])
         end
       end
 
@@ -238,10 +238,10 @@ RSpec.describe ActiveRecordRules do
           Person(name = <name2>, name > <name1>)
         MATCH
         on_match do
-          TestHelper.matches += [[greeting, name1, name2]]
+          TestHelper.matches += [ [ greeting, name1, name2 ] ]
         end
         on_unmatch do
-          TestHelper.matches -= [[greeting, name1, name2]]
+          TestHelper.matches -= [ [ greeting, name1, name2 ] ]
         end
       end
 
@@ -257,7 +257,7 @@ RSpec.describe ActiveRecordRules do
       end
 
       it "does not match twice" do
-        expect(TestHelper.matches).to contain_exactly(["hello", "Jane", "John"])
+        expect(TestHelper.matches).to contain_exactly([ "hello", "Jane", "John" ])
       end
 
       it "unmatches properly" do
@@ -276,10 +276,10 @@ RSpec.describe ActiveRecordRules do
           Person(name = <name2>, name > <name1>)
         MATCH
         on_match do
-          TestHelper.matches += [[greeting, name1, name2]]
+          TestHelper.matches += [ [ greeting, name1, name2 ] ]
         end
         on_unmatch do
-          TestHelper.matches -= [[greeting, name1, name2]]
+          TestHelper.matches -= [ [ greeting, name1, name2 ] ]
         end
       end
 
@@ -322,10 +322,10 @@ RSpec.describe ActiveRecordRules do
           Person(<name>)
         MATCH
         on_match do
-          TestHelper.matches += [[greeting, name]]
+          TestHelper.matches += [ [ greeting, name ] ]
         end
         on_unmatch do
-          TestHelper.matches -= [[greeting, name]]
+          TestHelper.matches -= [ [ greeting, name ] ]
         end
       end
 
@@ -335,10 +335,10 @@ RSpec.describe ActiveRecordRules do
           Person(<name>)
         MATCH
         on_match do
-          TestHelper.matches += [[farewell, name]]
+          TestHelper.matches += [ [ farewell, name ] ]
         end
         on_unmatch do
-          TestHelper.matches -= [[farewell, name]]
+          TestHelper.matches -= [ [ farewell, name ] ]
         end
       end
 
@@ -351,12 +351,12 @@ RSpec.describe ActiveRecordRules do
       let!(:person) { Person.create!(name: "John") }
 
       it "matches" do
-        expect(TestHelper.matches).to eq([["hi", "John"]])
+        expect(TestHelper.matches).to eq([ [ "hi", "John" ] ])
       end
 
       it "updates when John is renamed" do
         person.update!(name: "Jane")
-        expect(TestHelper.matches).to eq([["hi", "Jane"]])
+        expect(TestHelper.matches).to eq([ [ "hi", "Jane" ] ])
       end
 
       it "unmatches when John goes away" do
@@ -371,12 +371,12 @@ RSpec.describe ActiveRecordRules do
       let!(:person) { Person.create!(name: "John") }
 
       it "matches" do
-        expect(TestHelper.matches).to eq([["bye", "John"]])
+        expect(TestHelper.matches).to eq([ [ "bye", "John" ] ])
       end
 
       it "updates when John is renamed" do
         person.update!(name: "Jane")
-        expect(TestHelper.matches).to eq([["bye", "Jane"]])
+        expect(TestHelper.matches).to eq([ [ "bye", "Jane" ] ])
       end
 
       it "unmatches when John goes away" do
@@ -390,22 +390,22 @@ RSpec.describe ActiveRecordRules do
       let!(:person) { Person.create!(name: "John") }
 
       it "matches" do
-        expect(TestHelper.matches.sort).to eq([["bye", "John"], ["hi", "John"]])
+        expect(TestHelper.matches.sort).to eq([ [ "bye", "John" ], [ "hi", "John" ] ])
       end
 
       it "updates when John is renamed" do
         person.update!(name: "Jane")
-        expect(TestHelper.matches.sort).to eq([["bye", "Jane"], ["hi", "Jane"]])
+        expect(TestHelper.matches.sort).to eq([ [ "bye", "Jane" ], [ "hi", "Jane" ] ])
       end
 
       it "updates when greeting changes" do
         salutation.update!(greeting: "hello")
-        expect(TestHelper.matches.sort).to eq([["bye", "John"], ["hello", "John"]])
+        expect(TestHelper.matches.sort).to eq([ [ "bye", "John" ], [ "hello", "John" ] ])
       end
 
       it "updates when farwell changes" do
         salutation.update!(farewell: "so long")
-        expect(TestHelper.matches.sort).to eq([["hi", "John"], ["so long", "John"]])
+        expect(TestHelper.matches.sort).to eq([ [ "hi", "John" ], [ "so long", "John" ] ])
       end
 
       it "unmatches when John goes away" do
@@ -415,12 +415,12 @@ RSpec.describe ActiveRecordRules do
 
       it "unmatches when greeting goes away" do
         salutation.update!(greeting: nil)
-        expect(TestHelper.matches).to eq([["bye", "John"]])
+        expect(TestHelper.matches).to eq([ [ "bye", "John" ] ])
       end
 
       it "unmatches when farwell goes away" do
         salutation.update!(farewell: nil)
-        expect(TestHelper.matches).to eq([["hi", "John"]])
+        expect(TestHelper.matches).to eq([ [ "hi", "John" ] ])
       end
     end
   end
@@ -433,7 +433,7 @@ RSpec.describe ActiveRecordRules do
           Person(<name>)
         MATCH
         on_match do
-          TestHelper.matches += [[greeting, name, 0]]
+          TestHelper.matches += [ [ greeting, name, 0 ] ]
         end
         on_update do
           record = TestHelper.matches.find { _1 == greeting.old && _2 == name.old }
@@ -456,7 +456,7 @@ RSpec.describe ActiveRecordRules do
 
       it "changes value when John changes name" do
         john.update!(name: "Jane")
-        expect(TestHelper.matches).to include(["hello", "Jane", 1])
+        expect(TestHelper.matches).to include([ "hello", "Jane", 1 ])
       end
     end
   end
@@ -560,10 +560,10 @@ RSpec.describe ActiveRecordRules do
           Person(<name>)
         MATCH
         on_match do
-          TestHelper.matches.add([greeting, name])
+          TestHelper.matches.add([ greeting, name ])
         end
         on_unmatch do
-          TestHelper.matches.delete([greeting, name])
+          TestHelper.matches.delete([ greeting, name ])
         end
       end
       TestHelper.matches = Set.new
@@ -696,9 +696,9 @@ RSpec.describe ActiveRecordRules do
         later(<<~MATCH)
           Person(<name>)
         MATCH
-        on_match { TestHelper.matches << [:match, Thread.current[:rule_name]] }
-        on_update { TestHelper.matches << [:update, Thread.current[:rule_name]] }
-        on_unmatch { TestHelper.matches << [:unmatch, Thread.current[:rule_name]] }
+        on_match { TestHelper.matches << [ :match, Thread.current[:rule_name] ] }
+        on_update { TestHelper.matches << [ :update, Thread.current[:rule_name] ] }
+        on_unmatch { TestHelper.matches << [ :unmatch, Thread.current[:rule_name] ] }
       end
       TestHelper.matches = Set.new
     end
@@ -719,17 +719,17 @@ RSpec.describe ActiveRecordRules do
 
       it "exposes the threadlocal on match" do
         Person.create!(name: "John")
-        expect(TestHelper.matches).to include([:match, "match a person once"])
+        expect(TestHelper.matches).to include([ :match, "match a person once" ])
       end
 
       it "exposes the threadlocal on update" do
         Person.create!(name: "John").update!(name: "abc")
-        expect(TestHelper.matches).to include([:update, "match a person once"])
+        expect(TestHelper.matches).to include([ :update, "match a person once" ])
       end
 
       it "exposes the threadlocal on unmatch" do
         Person.create!(name: "John").destroy!
-        expect(TestHelper.matches).to include([:unmatch, "match a person once"])
+        expect(TestHelper.matches).to include([ :unmatch, "match a person once" ])
       end
     end
 

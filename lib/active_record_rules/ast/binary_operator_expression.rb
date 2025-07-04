@@ -14,6 +14,8 @@ module ActiveRecordRules
         @rhs = rhs
       end
 
+      def id_paths(existing) = @rhs.id_paths(@lhs.id_paths(existing))
+
       def to_query(definer)
         left = @lhs.to_query(definer)
         right = @rhs.to_query(definer)
@@ -69,7 +71,7 @@ module ActiveRecordRules
 
       def unparse = "#{@lhs.unparse} #{@operator} #{@rhs.unparse}"
 
-      def deconstruct = [@lhs, @operator, @rhs]
+      def deconstruct = [ @lhs, @operator, @rhs ]
     end
   end
 end

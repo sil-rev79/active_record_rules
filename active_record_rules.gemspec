@@ -26,11 +26,14 @@ Gem::Specification.new do |spec|
     [
       "README.md",
       "COPYING",
-      *Dir["lib/**/*.rb"]
+      *Dir["app/**/*"],
+      *Dir["config/**/*"],
+      *Dir["lib/**/*"],
     ]
   end
   spec.require_paths = ["lib"]
 
   spec.add_dependency "activerecord", ">= 7"
   spec.add_dependency "parslet", ">= 2"
+  spec.add_dependency "rails", ">= 7"
 end

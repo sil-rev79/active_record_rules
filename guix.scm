@@ -9,7 +9,7 @@
              ((guix licenses)
               #:prefix license:))
 
-(define ruby (specification->package "ruby@3.1"))
+(define ruby (specification->package "ruby@3.3"))
 
 (define inputs
   ((load "Gemfile.lock.scm")
@@ -31,7 +31,8 @@
               #:select? (git-predicate (current-source-directory))))
  (build-system ruby-build-system)
  (arguments
-  `(#:test-target "spec"))
+  `(#:test-target "spec"
+    #:ruby ,ruby))
  (inputs (cons ruby inputs))
  (native-inputs native-inputs)
  (synopsis "Database-driven production rules in Ruby")

@@ -737,6 +737,18 @@
           (uri (rubygems-uri "psych" version))
           (sha256 (base32 "1vjrx3yd596zzi42dcaq5xw7hil1921r769dlbz08iniaawlp9c4"))))
       (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--puma
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--puma")
+      (version "6.6.0")
+      (propagated-inputs (append (list ruby--nio4r)))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "puma" version))
+          (sha256 (base32 "11xd3207k5rl6bz0qxhcb3zcr941rhx7ig2f19gxxmdk7s3hcp7j"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--racc
     (gem
       (transformers gem-transformers)
@@ -1047,6 +1059,50 @@
           (uri (rubygems-uri "rubocop-factory_bot" version))
           (sha256 (base32 "1zkkhldrdacv4gn58dc591jxjnw5d767frzywm41i33p2rclnx4x"))))
       (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--rubocop-performance
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--rubocop-performance")
+      (version "1.25.0")
+      (propagated-inputs
+        (append (list ruby--lint-roller) (list ruby--rubocop) (list ruby--rubocop-ast)))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "rubocop-performance" version))
+          (sha256 (base32 "1h9flnqk2f3llwf8g0mk0fvzzznfj7hsil3qg88m803pi9b06zbg"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--rubocop-rails
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--rubocop-rails")
+      (version "2.31.0")
+      (propagated-inputs
+        (append
+          (list ruby--activesupport)
+          (list ruby--lint-roller)
+          (list ruby--rack)
+          (list ruby--rubocop)
+          (list ruby--rubocop-ast)))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "rubocop-rails" version))
+          (sha256 (base32 "1gajdiwcd1apsyg8k6vimsx9wkv169y9qm2hzih3x719fl86wivr"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--rubocop-rails-omakase
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--rubocop-rails-omakase")
+      (version "1.1.0")
+      (propagated-inputs
+        (append (list ruby--rubocop) (list ruby--rubocop-performance) (list ruby--rubocop-rails)))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "rubocop-rails-omakase" version))
+          (sha256 (base32 "178h17q6wfsxk8gzqk1ca6dw25cwmwc2dgdb34lxwljqxv43mxra"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--rubocop-rspec
     (gem
       (transformers gem-transformers)
@@ -1139,6 +1195,32 @@
           (method url-fetch)
           (uri (rubygems-uri "simplecov_json_formatter" version))
           (sha256 (base32 "0a5l0733hj7sk51j81ykfmlk2vd5vaijlq9d5fn165yyx3xii52j"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--sprockets
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--sprockets")
+      (version "4.2.2")
+      (propagated-inputs
+        (append (list ruby--concurrent-ruby) (list ruby--logger) (list ruby--rack)))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "sprockets" version))
+          (sha256 (base32 "1car3fpzhn1l06x2zmanz2l4bj346mv3jcgpcd3p1262y54ml7kn"))))
+      (arguments (list #:ruby ruby #:tests? #f))))
+  (define ruby--sprockets-rails
+    (gem
+      (transformers gem-transformers)
+      (name "ruby--sprockets-rails")
+      (version "3.5.2")
+      (propagated-inputs
+        (append (list ruby--actionpack) (list ruby--activesupport) (list ruby--sprockets)))
+      (source
+        (origin
+          (method url-fetch)
+          (uri (rubygems-uri "sprockets-rails" version))
+          (sha256 (base32 "17hiqkdpcjyyhlm997mgdcr45v35j5802m5a979i5jgqx5n8xs59"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (define ruby--sqlite3
     (gem
@@ -1282,7 +1364,12 @@
       (arguments (list #:ruby ruby #:tests? #f))))
   (append
     (if (member 'default groups)
-      (append (append (list ruby--activerecord) (list ruby--parslet)))
+      (append
+        (append (list ruby--activerecord) (list ruby--parslet) (list ruby--rails))
+        (list ruby--puma)
+        (list ruby--sqlite3)
+        (list ruby--sprockets-rails)
+        (list ruby--rubocop-rails-omakase))
       (list))
     (if (member 'test groups)
       (append
@@ -1291,7 +1378,6 @@
         (list ruby--rubocop-rspec)
         (list ruby--rspec)
         (list ruby--rails)
-        (list ruby--sqlite3)
         (list ruby--pg)
         (list ruby--properb)
         (list ruby--simplecov))

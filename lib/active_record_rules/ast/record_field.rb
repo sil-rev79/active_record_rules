@@ -62,7 +62,7 @@ module ActiveRecordRules
         tracker.add(@name)
       end
 
-      def deconstruct = [@name]
+      def deconstruct = [ @name ]
 
       def unparse = @name
     end
