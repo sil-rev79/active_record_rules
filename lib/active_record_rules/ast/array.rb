@@ -15,10 +15,11 @@ module ActiveRecordRules
       def define_expression(query_definer)
         expr = @expression.to_query(query_definer)
         lambda do |bindings|
+          expr_str = expr.call(bindings)
           if ActiveRecordRules.dialect == :sqlite
-            "json_group_array(#{expr.call(bindings)} order by 1)"
+            "json_group_array(#{expr_str} order by #{expr_str})"
           elsif ActiveRecordRules.dialect == :postgres
-            "json_agg(#{expr.call(bindings)} order by 1)"
+            "json_agg(#{expr_str} order by #{expr_str})"
           else
             raise "Unknown dialect: #{ActiveRecordRules.dialect}"
           end
