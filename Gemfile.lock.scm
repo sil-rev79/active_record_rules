@@ -13,12 +13,12 @@
       (name "ruby--actioncable")
       (version "7.2.2.1")
       (propagated-inputs
-        (list
-          ruby--actionpack
-          ruby--activesupport
-          ruby--nio4r
-          ruby--websocket-driver
-          ruby--zeitwerk))
+        (append
+          (list ruby--actionpack)
+          (list ruby--activesupport)
+          (list ruby--nio4r)
+          (list ruby--websocket-driver)
+          (list ruby--zeitwerk)))
       (source
         (origin
           (method url-fetch)
@@ -31,13 +31,13 @@
       (name "ruby--actionmailbox")
       (version "7.2.2.1")
       (propagated-inputs
-        (list
-          ruby--actionpack
-          ruby--activejob
-          ruby--activerecord
-          ruby--activestorage
-          ruby--activesupport
-          ruby--mail))
+        (append
+          (list ruby--actionpack)
+          (list ruby--activejob)
+          (list ruby--activerecord)
+          (list ruby--activestorage)
+          (list ruby--activesupport)
+          (list ruby--mail)))
       (source
         (origin
           (method url-fetch)
@@ -50,13 +50,13 @@
       (name "ruby--actionmailer")
       (version "7.2.2.1")
       (propagated-inputs
-        (list
-          ruby--actionpack
-          ruby--actionview
-          ruby--activejob
-          ruby--activesupport
-          ruby--mail
-          ruby--rails-dom-testing))
+        (append
+          (list ruby--actionpack)
+          (list ruby--actionview)
+          (list ruby--activejob)
+          (list ruby--activesupport)
+          (list ruby--mail)
+          (list ruby--rails-dom-testing)))
       (source
         (origin
           (method url-fetch)
@@ -69,17 +69,17 @@
       (name "ruby--actionpack")
       (version "7.2.2.1")
       (propagated-inputs
-        (list
-          ruby--actionview
-          ruby--activesupport
-          ruby--nokogiri
-          ruby--racc
-          ruby--rack
-          ruby--rack-session
-          ruby--rack-test
-          ruby--rails-dom-testing
-          ruby--rails-html-sanitizer
-          ruby--useragent))
+        (append
+          (list ruby--actionview)
+          (list ruby--activesupport)
+          (list ruby--nokogiri)
+          (list ruby--racc)
+          (list ruby--rack)
+          (list ruby--rack-session)
+          (list ruby--rack-test)
+          (list ruby--rails-dom-testing)
+          (list ruby--rails-html-sanitizer)
+          (list ruby--useragent)))
       (source
         (origin
           (method url-fetch)
@@ -92,13 +92,13 @@
       (name "ruby--actiontext")
       (version "7.2.2.1")
       (propagated-inputs
-        (list
-          ruby--actionpack
-          ruby--activerecord
-          ruby--activestorage
-          ruby--activesupport
-          ruby--globalid
-          ruby--nokogiri))
+        (append
+          (list ruby--actionpack)
+          (list ruby--activerecord)
+          (list ruby--activestorage)
+          (list ruby--activesupport)
+          (list ruby--globalid)
+          (list ruby--nokogiri)))
       (source
         (origin
           (method url-fetch)
@@ -111,12 +111,12 @@
       (name "ruby--actionview")
       (version "7.2.2.1")
       (propagated-inputs
-        (list
-          ruby--activesupport
-          ruby--builder
-          ruby--erubi
-          ruby--rails-dom-testing
-          ruby--rails-html-sanitizer))
+        (append
+          (list ruby--activesupport)
+          (list ruby--builder)
+          (list ruby--erubi)
+          (list ruby--rails-dom-testing)
+          (list ruby--rails-html-sanitizer)))
       (source
         (origin
           (method url-fetch)
@@ -128,7 +128,7 @@
       (transformers gem-transformers)
       (name "ruby--activejob")
       (version "7.2.2.1")
-      (propagated-inputs (list ruby--activesupport ruby--globalid))
+      (propagated-inputs (append (list ruby--activesupport) (list ruby--globalid)))
       (source
         (origin
           (method url-fetch)
@@ -140,7 +140,7 @@
       (transformers gem-transformers)
       (name "ruby--activemodel")
       (version "7.2.2.1")
-      (propagated-inputs (list ruby--activesupport))
+      (propagated-inputs (append (list ruby--activesupport)))
       (source
         (origin
           (method url-fetch)
@@ -152,7 +152,8 @@
       (transformers gem-transformers)
       (name "ruby--activerecord")
       (version "7.2.2.1")
-      (propagated-inputs (list ruby--activemodel ruby--activesupport ruby--timeout))
+      (propagated-inputs
+        (append (list ruby--activemodel) (list ruby--activesupport) (list ruby--timeout)))
       (source
         (origin
           (method url-fetch)
@@ -165,7 +166,12 @@
       (name "ruby--activestorage")
       (version "7.2.2.1")
       (propagated-inputs
-        (list ruby--actionpack ruby--activejob ruby--activerecord ruby--activesupport ruby--marcel))
+        (append
+          (list ruby--actionpack)
+          (list ruby--activejob)
+          (list ruby--activerecord)
+          (list ruby--activesupport)
+          (list ruby--marcel)))
       (source
         (origin
           (method url-fetch)
@@ -178,18 +184,18 @@
       (name "ruby--activesupport")
       (version "7.2.2.1")
       (propagated-inputs
-        (list
-          ruby--base64
-          ruby--benchmark
-          ruby--bigdecimal
-          ruby--concurrent-ruby
-          ruby--connection-pool
-          ruby--drb
-          ruby--i18n
-          ruby--logger
-          ruby--minitest
-          ruby--securerandom
-          ruby--tzinfo))
+        (append
+          (list ruby--base64)
+          (list ruby--benchmark)
+          (list ruby--bigdecimal)
+          (list ruby--concurrent-ruby)
+          (list ruby--connection-pool)
+          (list ruby--drb)
+          (list ruby--i18n)
+          (list ruby--logger)
+          (list ruby--minitest)
+          (list ruby--securerandom)
+          (list ruby--tzinfo)))
       (source
         (origin
           (method url-fetch)
@@ -201,7 +207,7 @@
       (transformers gem-transformers)
       (name "ruby--ast")
       (version "2.4.3")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -213,7 +219,7 @@
       (transformers gem-transformers)
       (name "ruby--base64")
       (version "0.2.0")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -225,7 +231,7 @@
       (transformers gem-transformers)
       (name "ruby--benchmark")
       (version "0.4.0")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -237,7 +243,7 @@
       (transformers gem-transformers)
       (name "ruby--bigdecimal")
       (version "3.1.9")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -249,7 +255,7 @@
       (transformers gem-transformers)
       (name "ruby--builder")
       (version "3.3.0")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -261,7 +267,7 @@
       (transformers gem-transformers)
       (name "ruby--concurrent-ruby")
       (version "1.3.5")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -273,7 +279,7 @@
       (transformers gem-transformers)
       (name "ruby--connection_pool")
       (version "2.5.0")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -285,7 +291,7 @@
       (transformers gem-transformers)
       (name "ruby--crass")
       (version "1.0.6")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -297,7 +303,7 @@
       (transformers gem-transformers)
       (name "ruby--date")
       (version "3.4.1")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -309,7 +315,7 @@
       (transformers gem-transformers)
       (name "ruby--diff-lcs")
       (version "1.6.1")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -321,7 +327,7 @@
       (transformers gem-transformers)
       (name "ruby--docile")
       (version "1.4.1")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -333,7 +339,7 @@
       (transformers gem-transformers)
       (name "ruby--drb")
       (version "2.2.1")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -345,7 +351,7 @@
       (transformers gem-transformers)
       (name "ruby--erubi")
       (version "1.13.1")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -357,7 +363,7 @@
       (transformers gem-transformers)
       (name "ruby--globalid")
       (version "1.2.1")
-      (propagated-inputs (list ruby--activesupport))
+      (propagated-inputs (append (list ruby--activesupport)))
       (source
         (origin
           (method url-fetch)
@@ -369,7 +375,7 @@
       (transformers gem-transformers)
       (name "ruby--i18n")
       (version "1.14.7")
-      (propagated-inputs (list ruby--concurrent-ruby))
+      (propagated-inputs (append (list ruby--concurrent-ruby)))
       (source
         (origin
           (method url-fetch)
@@ -381,7 +387,7 @@
       (transformers gem-transformers)
       (name "ruby--io-console")
       (version "0.8.0")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -393,7 +399,7 @@
       (transformers gem-transformers)
       (name "ruby--irb")
       (version "1.15.1")
-      (propagated-inputs (list ruby--pp ruby--rdoc ruby--reline))
+      (propagated-inputs (append (list ruby--pp) (list ruby--rdoc) (list ruby--reline)))
       (source
         (origin
           (method url-fetch)
@@ -405,7 +411,7 @@
       (transformers gem-transformers)
       (name "ruby--json")
       (version "2.10.2")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -417,7 +423,7 @@
       (transformers gem-transformers)
       (name "ruby--language_server-protocol")
       (version "3.17.0.4")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -429,7 +435,7 @@
       (transformers gem-transformers)
       (name "ruby--lint_roller")
       (version "1.1.0")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -441,7 +447,7 @@
       (transformers gem-transformers)
       (name "ruby--logger")
       (version "1.7.0")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -453,7 +459,7 @@
       (transformers gem-transformers)
       (name "ruby--loofah")
       (version "2.24.0")
-      (propagated-inputs (list ruby--crass ruby--nokogiri))
+      (propagated-inputs (append (list ruby--crass) (list ruby--nokogiri)))
       (source
         (origin
           (method url-fetch)
@@ -465,7 +471,12 @@
       (transformers gem-transformers)
       (name "ruby--mail")
       (version "2.8.1")
-      (propagated-inputs (list ruby--mini-mime ruby--net-imap ruby--net-pop ruby--net-smtp))
+      (propagated-inputs
+        (append
+          (list ruby--mini-mime)
+          (list ruby--net-imap)
+          (list ruby--net-pop)
+          (list ruby--net-smtp)))
       (source
         (origin
           (method url-fetch)
@@ -477,7 +488,7 @@
       (transformers gem-transformers)
       (name "ruby--marcel")
       (version "1.0.4")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -489,7 +500,7 @@
       (transformers gem-transformers)
       (name "ruby--mini_mime")
       (version "1.1.5")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -501,7 +512,7 @@
       (transformers gem-transformers)
       (name "ruby--minitest")
       (version "5.25.5")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -513,7 +524,7 @@
       (transformers gem-transformers)
       (name "ruby--net-imap")
       (version "0.5.6")
-      (propagated-inputs (list ruby--date ruby--net-protocol))
+      (propagated-inputs (append (list ruby--date) (list ruby--net-protocol)))
       (source
         (origin
           (method url-fetch)
@@ -525,7 +536,7 @@
       (transformers gem-transformers)
       (name "ruby--net-pop")
       (version "0.1.2")
-      (propagated-inputs (list ruby--net-protocol))
+      (propagated-inputs (append (list ruby--net-protocol)))
       (source
         (origin
           (method url-fetch)
@@ -537,7 +548,7 @@
       (transformers gem-transformers)
       (name "ruby--net-protocol")
       (version "0.2.2")
-      (propagated-inputs (list ruby--timeout))
+      (propagated-inputs (append (list ruby--timeout)))
       (source
         (origin
           (method url-fetch)
@@ -549,7 +560,7 @@
       (transformers gem-transformers)
       (name "ruby--net-smtp")
       (version "0.5.1")
-      (propagated-inputs (list ruby--net-protocol))
+      (propagated-inputs (append (list ruby--net-protocol)))
       (source
         (origin
           (method url-fetch)
@@ -561,7 +572,7 @@
       (transformers gem-transformers)
       (name "ruby--nio4r")
       (version "2.7.4")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -575,7 +586,7 @@
       (version "1.18.6")
       (propagated-inputs
         (or
-          (match (%current-system) ("x86_64-linux" (list ruby--racc)))
+          (match (%current-system) ("x86_64-linux" (append (list ruby--racc))))
           (error "No supported system found for ~a@~a" "ruby--nokogiri" "1.18.6")))
       (source
         (or
@@ -593,7 +604,7 @@
       (transformers gem-transformers)
       (name "ruby--parallel")
       (version "1.26.3")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -605,7 +616,7 @@
       (transformers gem-transformers)
       (name "ruby--parser")
       (version "3.3.7.4")
-      (propagated-inputs (list ruby--ast ruby--racc))
+      (propagated-inputs (append (list ruby--ast) (list ruby--racc)))
       (source
         (origin
           (method url-fetch)
@@ -617,7 +628,7 @@
       (transformers gem-transformers)
       (name "ruby--parslet")
       (version "2.0.0")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -629,7 +640,7 @@
       (transformers gem-transformers)
       (name "ruby--pg")
       (version "1.5.9")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -641,7 +652,7 @@
       (transformers gem-transformers)
       (name "ruby--pp")
       (version "0.6.2")
-      (propagated-inputs (list ruby--prettyprint))
+      (propagated-inputs (append (list ruby--prettyprint)))
       (source
         (origin
           (method url-fetch)
@@ -653,7 +664,7 @@
       (transformers gem-transformers)
       (name "ruby--prettyprint")
       (version "0.2.0")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -665,7 +676,7 @@
       (transformers gem-transformers)
       (name "ruby--prism")
       (version "1.4.0")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -677,7 +688,7 @@
       (transformers gem-transformers)
       (name "ruby--properb")
       (version "0.0.1")
-      (propagated-inputs (list ruby--rspec))
+      (propagated-inputs (append (list ruby--rspec)))
       (source
         (origin
           (method git-fetch)
@@ -719,7 +730,7 @@
       (transformers gem-transformers)
       (name "ruby--psych")
       (version "5.2.3")
-      (propagated-inputs (list ruby--date ruby--stringio))
+      (propagated-inputs (append (list ruby--date) (list ruby--stringio)))
       (source
         (origin
           (method url-fetch)
@@ -731,7 +742,7 @@
       (transformers gem-transformers)
       (name "ruby--racc")
       (version "1.8.1")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -743,7 +754,7 @@
       (transformers gem-transformers)
       (name "ruby--rack")
       (version "3.1.12")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -755,7 +766,7 @@
       (transformers gem-transformers)
       (name "ruby--rack-session")
       (version "2.1.0")
-      (propagated-inputs (list ruby--base64 ruby--rack))
+      (propagated-inputs (append (list ruby--base64) (list ruby--rack)))
       (source
         (origin
           (method url-fetch)
@@ -767,7 +778,7 @@
       (transformers gem-transformers)
       (name "ruby--rack-test")
       (version "2.2.0")
-      (propagated-inputs (list ruby--rack))
+      (propagated-inputs (append (list ruby--rack)))
       (source
         (origin
           (method url-fetch)
@@ -779,7 +790,7 @@
       (transformers gem-transformers)
       (name "ruby--rackup")
       (version "2.2.1")
-      (propagated-inputs (list ruby--rack))
+      (propagated-inputs (append (list ruby--rack)))
       (source
         (origin
           (method url-fetch)
@@ -792,19 +803,19 @@
       (name "ruby--rails")
       (version "7.2.2.1")
       (propagated-inputs
-        (list
-          ruby--actioncable
-          ruby--actionmailbox
-          ruby--actionmailer
-          ruby--actionpack
-          ruby--actiontext
-          ruby--actionview
-          ruby--activejob
-          ruby--activemodel
-          ruby--activerecord
-          ruby--activestorage
-          ruby--activesupport
-          ruby--railties))
+        (append
+          (list ruby--actioncable)
+          (list ruby--actionmailbox)
+          (list ruby--actionmailer)
+          (list ruby--actionpack)
+          (list ruby--actiontext)
+          (list ruby--actionview)
+          (list ruby--activejob)
+          (list ruby--activemodel)
+          (list ruby--activerecord)
+          (list ruby--activestorage)
+          (list ruby--activesupport)
+          (list ruby--railties)))
       (source
         (origin
           (method url-fetch)
@@ -816,7 +827,8 @@
       (transformers gem-transformers)
       (name "ruby--rails-dom-testing")
       (version "2.2.0")
-      (propagated-inputs (list ruby--activesupport ruby--minitest ruby--nokogiri))
+      (propagated-inputs
+        (append (list ruby--activesupport) (list ruby--minitest) (list ruby--nokogiri)))
       (source
         (origin
           (method url-fetch)
@@ -828,7 +840,7 @@
       (transformers gem-transformers)
       (name "ruby--rails-html-sanitizer")
       (version "1.6.2")
-      (propagated-inputs (list ruby--loofah ruby--nokogiri))
+      (propagated-inputs (append (list ruby--loofah) (list ruby--nokogiri)))
       (source
         (origin
           (method url-fetch)
@@ -841,14 +853,14 @@
       (name "ruby--railties")
       (version "7.2.2.1")
       (propagated-inputs
-        (list
-          ruby--actionpack
-          ruby--activesupport
-          ruby--irb
-          ruby--rackup
-          ruby--rake
-          ruby--thor
-          ruby--zeitwerk))
+        (append
+          (list ruby--actionpack)
+          (list ruby--activesupport)
+          (list ruby--irb)
+          (list ruby--rackup)
+          (list ruby--rake)
+          (list ruby--thor)
+          (list ruby--zeitwerk)))
       (source
         (origin
           (method url-fetch)
@@ -860,7 +872,7 @@
       (transformers gem-transformers)
       (name "ruby--rainbow")
       (version "3.1.1")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -872,7 +884,7 @@
       (transformers gem-transformers)
       (name "ruby--rake")
       (version "13.2.1")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -884,7 +896,7 @@
       (transformers gem-transformers)
       (name "ruby--rdoc")
       (version "6.13.1")
-      (propagated-inputs (list ruby--psych))
+      (propagated-inputs (append (list ruby--psych)))
       (source
         (origin
           (method url-fetch)
@@ -896,7 +908,7 @@
       (transformers gem-transformers)
       (name "ruby--regexp_parser")
       (version "2.10.0")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -908,7 +920,7 @@
       (transformers gem-transformers)
       (name "ruby--reline")
       (version "0.6.0")
-      (propagated-inputs (list ruby--io-console))
+      (propagated-inputs (append (list ruby--io-console)))
       (source
         (origin
           (method url-fetch)
@@ -920,7 +932,8 @@
       (transformers gem-transformers)
       (name "ruby--rspec")
       (version "3.13.0")
-      (propagated-inputs (list ruby--rspec-core ruby--rspec-expectations ruby--rspec-mocks))
+      (propagated-inputs
+        (append (list ruby--rspec-core) (list ruby--rspec-expectations) (list ruby--rspec-mocks)))
       (source
         (origin
           (method url-fetch)
@@ -932,7 +945,7 @@
       (transformers gem-transformers)
       (name "ruby--rspec-core")
       (version "3.13.3")
-      (propagated-inputs (list ruby--rspec-support))
+      (propagated-inputs (append (list ruby--rspec-support)))
       (source
         (origin
           (method url-fetch)
@@ -944,7 +957,7 @@
       (transformers gem-transformers)
       (name "ruby--rspec-expectations")
       (version "3.13.3")
-      (propagated-inputs (list ruby--diff-lcs ruby--rspec-support))
+      (propagated-inputs (append (list ruby--diff-lcs) (list ruby--rspec-support)))
       (source
         (origin
           (method url-fetch)
@@ -956,7 +969,7 @@
       (transformers gem-transformers)
       (name "ruby--rspec-mocks")
       (version "3.13.2")
-      (propagated-inputs (list ruby--diff-lcs ruby--rspec-support))
+      (propagated-inputs (append (list ruby--diff-lcs) (list ruby--rspec-support)))
       (source
         (origin
           (method url-fetch)
@@ -968,7 +981,7 @@
       (transformers gem-transformers)
       (name "ruby--rspec-support")
       (version "3.13.2")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -981,17 +994,17 @@
       (name "ruby--rubocop")
       (version "1.75.1")
       (propagated-inputs
-        (list
-          ruby--json
-          ruby--language-server-protocol
-          ruby--lint-roller
-          ruby--parallel
-          ruby--parser
-          ruby--rainbow
-          ruby--regexp-parser
-          ruby--rubocop-ast
-          ruby--ruby-progressbar
-          ruby--unicode-display-width))
+        (append
+          (list ruby--json)
+          (list ruby--language-server-protocol)
+          (list ruby--lint-roller)
+          (list ruby--parallel)
+          (list ruby--parser)
+          (list ruby--rainbow)
+          (list ruby--regexp-parser)
+          (list ruby--rubocop-ast)
+          (list ruby--ruby-progressbar)
+          (list ruby--unicode-display-width)))
       (source
         (origin
           (method url-fetch)
@@ -1003,7 +1016,7 @@
       (transformers gem-transformers)
       (name "ruby--rubocop-ast")
       (version "1.43.0")
-      (propagated-inputs (list ruby--parser ruby--prism))
+      (propagated-inputs (append (list ruby--parser) (list ruby--prism)))
       (source
         (origin
           (method url-fetch)
@@ -1015,7 +1028,7 @@
       (transformers gem-transformers)
       (name "ruby--rubocop-capybara")
       (version "2.22.1")
-      (propagated-inputs (list ruby--lint-roller ruby--rubocop))
+      (propagated-inputs (append (list ruby--lint-roller) (list ruby--rubocop)))
       (source
         (origin
           (method url-fetch)
@@ -1027,7 +1040,7 @@
       (transformers gem-transformers)
       (name "ruby--rubocop-factory_bot")
       (version "2.27.1")
-      (propagated-inputs (list ruby--lint-roller ruby--rubocop))
+      (propagated-inputs (append (list ruby--lint-roller) (list ruby--rubocop)))
       (source
         (origin
           (method url-fetch)
@@ -1040,11 +1053,11 @@
       (name "ruby--rubocop-rspec")
       (version "2.31.0")
       (propagated-inputs
-        (list
-          ruby--rubocop
-          ruby--rubocop-capybara
-          ruby--rubocop-factory-bot
-          ruby--rubocop-rspec-rails))
+        (append
+          (list ruby--rubocop)
+          (list ruby--rubocop-capybara)
+          (list ruby--rubocop-factory-bot)
+          (list ruby--rubocop-rspec-rails)))
       (source
         (origin
           (method url-fetch)
@@ -1056,7 +1069,7 @@
       (transformers gem-transformers)
       (name "ruby--rubocop-rspec_rails")
       (version "2.29.1")
-      (propagated-inputs (list ruby--rubocop))
+      (propagated-inputs (append (list ruby--rubocop)))
       (source
         (origin
           (method url-fetch)
@@ -1068,7 +1081,7 @@
       (transformers gem-transformers)
       (name "ruby--ruby-progressbar")
       (version "1.13.0")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -1080,7 +1093,7 @@
       (transformers gem-transformers)
       (name "ruby--securerandom")
       (version "0.4.1")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -1092,7 +1105,11 @@
       (transformers gem-transformers)
       (name "ruby--simplecov")
       (version "0.22.0")
-      (propagated-inputs (list ruby--docile ruby--simplecov-html ruby--simplecov-json-formatter))
+      (propagated-inputs
+        (append
+          (list ruby--docile)
+          (list ruby--simplecov-html)
+          (list ruby--simplecov-json-formatter)))
       (source
         (origin
           (method url-fetch)
@@ -1104,7 +1121,7 @@
       (transformers gem-transformers)
       (name "ruby--simplecov-html")
       (version "0.13.1")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -1116,7 +1133,7 @@
       (transformers gem-transformers)
       (name "ruby--simplecov_json_formatter")
       (version "0.1.4")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -1130,7 +1147,7 @@
       (version "2.6.0")
       (propagated-inputs
         (or
-          (match (%current-system) ("x86_64-linux" (list)))
+          (match (%current-system) ("x86_64-linux" (append)))
           (error "No supported system found for ~a@~a" "ruby--sqlite3" "2.6.0")))
       (source
         (or
@@ -1148,7 +1165,7 @@
       (transformers gem-transformers)
       (name "ruby--stringio")
       (version "3.1.6")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -1160,7 +1177,7 @@
       (transformers gem-transformers)
       (name "ruby--thor")
       (version "1.3.2")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -1172,7 +1189,7 @@
       (transformers gem-transformers)
       (name "ruby--timeout")
       (version "0.4.3")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -1184,7 +1201,7 @@
       (transformers gem-transformers)
       (name "ruby--tzinfo")
       (version "2.0.6")
-      (propagated-inputs (list ruby--concurrent-ruby))
+      (propagated-inputs (append (list ruby--concurrent-ruby)))
       (source
         (origin
           (method url-fetch)
@@ -1196,7 +1213,7 @@
       (transformers gem-transformers)
       (name "ruby--unicode-display_width")
       (version "3.1.4")
-      (propagated-inputs (list ruby--unicode-emoji))
+      (propagated-inputs (append (list ruby--unicode-emoji)))
       (source
         (origin
           (method url-fetch)
@@ -1208,7 +1225,7 @@
       (transformers gem-transformers)
       (name "ruby--unicode-emoji")
       (version "4.0.4")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -1220,7 +1237,7 @@
       (transformers gem-transformers)
       (name "ruby--useragent")
       (version "0.16.11")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -1232,7 +1249,7 @@
       (transformers gem-transformers)
       (name "ruby--websocket-driver")
       (version "0.7.7")
-      (propagated-inputs (list ruby--base64 ruby--websocket-extensions))
+      (propagated-inputs (append (list ruby--base64) (list ruby--websocket-extensions)))
       (source
         (origin
           (method url-fetch)
@@ -1244,7 +1261,7 @@
       (transformers gem-transformers)
       (name "ruby--websocket-extensions")
       (version "0.1.5")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -1256,7 +1273,7 @@
       (transformers gem-transformers)
       (name "ruby--zeitwerk")
       (version "2.6.18")
-      (propagated-inputs (list))
+      (propagated-inputs (append))
       (source
         (origin
           (method url-fetch)
@@ -1264,17 +1281,18 @@
           (sha256 (base32 "10cpfdswql21vildiin0q7drg5zfzf2sahnk9hv3nyzzjqwj2bdx"))))
       (arguments (list #:ruby ruby #:tests? #f))))
   (append
-    (list ruby--activerecord ruby--parslet)
-    (if (member 'default groups) (list) (list))
+    (if (member 'default groups)
+      (append (append (list ruby--activerecord) (list ruby--parslet)))
+      (list))
     (if (member 'test groups)
-      (list
-        ruby--rake
-        ruby--rubocop
-        ruby--rubocop-rspec
-        ruby--rspec
-        ruby--rails
-        ruby--sqlite3
-        ruby--pg
-        ruby--properb
-        ruby--simplecov)
+      (append
+        (list ruby--rake)
+        (list ruby--rubocop)
+        (list ruby--rubocop-rspec)
+        (list ruby--rspec)
+        (list ruby--rails)
+        (list ruby--sqlite3)
+        (list ruby--pg)
+        (list ruby--properb)
+        (list ruby--simplecov))
       (list))))
