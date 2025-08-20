@@ -26,7 +26,7 @@ group "test" do
 
   gem "rspec", "~> 3"
 
-  gem "rails", "~> 7"
+  gem "rails", "~> 7.2"
 
   gem "pg"
 

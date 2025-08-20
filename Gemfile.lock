@@ -1,6 +1,6 @@
 GIT
   remote: https://git.sr.ht/~czan/properb
-  revision: 48613358a0d352c05383eaa0fcf101b523822ef7
+  revision: c29dcc0a1ab132cef82e2676050f5dd76a555168
   specs:
     properb (0.0.1)
       rspec (~> 3)
@@ -11,7 +11,7 @@ PATH
     active_record_rules (0.0.1)
       activerecord (>= 7)
       parslet (>= 2)
-      rails (>= 7)
+      rails (>= 7.2)
 
 GEM
   remote: https://rubygems.org/
@@ -291,7 +291,7 @@ DEPENDENCIES
   pg
   properb!
   puma
-  rails (~> 7)
+  rails (~> 7.2)
   rake (~> 13.0)
   rspec (~> 3)
   rubocop (~> 1.48)

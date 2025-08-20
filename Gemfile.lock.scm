@@ -695,8 +695,8 @@
           (uri
             (git-reference
               (url "https://git.sr.ht/~czan/properb")
-              (commit "48613358a0d352c05383eaa0fcf101b523822ef7")))
-          (sha256 (base32 "13phh8kahi593rl9mxiha38n8pf9qr0im8h15gzgvgb6z1bsg5fw"))))
+              (commit "c29dcc0a1ab132cef82e2676050f5dd76a555168")))
+          (sha256 (base32 "0jrzblszklndnsia9x78mp3g6qx48bbkdjjar80cziblj29rm4l2"))))
       (native-search-paths
         (list
           (search-path-specification
@@ -716,15 +716,15 @@
              (add-after 'install 'install-git-sources
                (lambda* (#:key outputs #:allow-other-keys)
                  (let ((base (string-append (assoc-ref outputs "out") "/lib/ruby/vendor_ruby")))
-                   (mkdir-p (string-append base "/bundler/gems/properb-48613358a0d3"))
+                   (mkdir-p (string-append base "/bundler/gems/properb-c29dcc0a1ab1"))
                    (copy-recursively
                      (string-append base "/gems/properb-0.0.1")
-                     (string-append base "/bundler/gems/properb-48613358a0d3"))
+                     (string-append base "/bundler/gems/properb-c29dcc0a1ab1"))
                    (copy-file
                      (string-append base "/specifications/properb-0.0.1.gemspec")
                      (string-append
                        base
-                       "/bundler/gems/properb-48613358a0d3/properb-0.0.1.gemspec"))))))))))
+                       "/bundler/gems/properb-c29dcc0a1ab1/properb-0.0.1.gemspec"))))))))))
   (define ruby--psych
     (gem
       (transformers gem-transformers)
