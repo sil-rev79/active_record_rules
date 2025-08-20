@@ -52,14 +52,22 @@ module ActiveRecordRules
       end
 
       rule(:comparison) do
-        (str("=") |
-         str("!=") |
-         str("<=") |
-         str("<") |
-         str(">=") |
-         str(">") |
-         str("in") |
-         (str("not") >> whitespace >> str("in")))
+        base_comparisons = (str("=") |
+                            str("!=") |
+                            str("<=") |
+                            str("<") |
+                            str(">=") |
+                            str(">") |
+                            str("in") |
+                            (str("not") >> whitespace >> str("in")))
+        case ActiveRecordRules.dialect
+        in :postgres
+          base_comparisons |
+            str("~*") |
+            str("~")
+        in :sqlite
+          base_comparisons
+        end
       end
 
       # ===========
