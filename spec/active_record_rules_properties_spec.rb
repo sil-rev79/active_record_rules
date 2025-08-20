@@ -308,4 +308,72 @@ RSpec.describe ActiveRecordRules do
       end
     end
   end
+
+  describe "tracking operations" do # rubocop:disable RSpec/EmptyExampleGroup
+    generate(
+      timing: one_of("after_save", "after_commit", "after_request", "later"),
+      operations: recursive do |gen|
+        array(
+          one_of(
+            tuple(:update, int(0..10), int(0..10)),
+            tuple(:transaction, gen),
+            tuple(:request, gen)
+          )
+        )
+      end.map { [ [ :transaction, _1 ] ] }
+    )
+
+    def run_operations(operations)
+      operations.each do |operation|
+        case operation
+        in [:update, id, value]
+          Record.find_or_initialize_by(id: id).update!(value: value)
+        in [:transaction, sub_operations]
+          ActiveRecord::Base.transaction do
+            run_operations(sub_operations)
+          end
+        in [:request, sub_operations]
+          ActiveRecordRules.wrap_request do
+            run_operations(sub_operations)
+          end
+        end
+      end
+    end
+
+    define_record "Record" do |t|
+      t.integer :value
+    end
+
+    before do
+      t = timing # bind a local variable, so we can access it in the definition block
+      described_class.define_rule("Keep track of updates") do
+        send(t, <<~MATCH)
+          Record(<id>, <value>)
+        MATCH
+        on_match do
+          TestHelper.matches[id] = value
+        end
+      end
+
+      TestHelper.matches = {}
+      described_class.logger = nil # to speed these tests up, we turn off the logging entirely
+    end
+
+    it_always "matches the underlying data", num_tests: 1000 do
+      run_operations(operations)
+      expect(TestHelper.matches).to eq(Record.all.pluck(:id, :value).to_h)
+    end
+
+    context 'with a known example' do
+      let(:timing) { 'after_commit' }
+
+      it 'works properly with two nested transactions' do
+        run_operations(
+          [ [ :update, 0, 0 ],
+           [ :transaction, [ [ :update, 0, 0 ], [ :update, 0, 1 ] ] ] ]
+        )
+        expect(TestHelper.matches).to eq(Record.all.pluck(:id, :value).to_h)
+      end
+    end
+  end
 end
