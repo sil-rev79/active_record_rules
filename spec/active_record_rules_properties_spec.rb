@@ -320,7 +320,7 @@ RSpec.describe ActiveRecordRules do
             tuple(:request, gen)
           )
         )
-      end.map { [ [ :transaction, _1 ] ] }
+      end
     )
 
     def run_operations(operations)
