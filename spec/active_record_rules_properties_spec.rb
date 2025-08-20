@@ -323,18 +323,18 @@ RSpec.describe ActiveRecordRules do
       end
     )
 
-    def run_operations(operations)
+    def run_operations(operations, records = {})
       operations.each do |operation|
         case operation
         in [:update, id, value]
-          Record.find_or_initialize_by(id: id).update!(value: value)
+          (records[id] || Record.find_or_initialize_by(id: id)).update!(value: value)
         in [:transaction, sub_operations]
           ActiveRecord::Base.transaction do
-            run_operations(sub_operations)
+            run_operations(sub_operations, records)
           end
         in [:request, sub_operations]
           ActiveRecordRules.wrap_request do
-            run_operations(sub_operations)
+            run_operations(sub_operations, records)
           end
         end
       end
@@ -359,8 +359,13 @@ RSpec.describe ActiveRecordRules do
       described_class.logger = nil # to speed these tests up, we turn off the logging entirely
     end
 
-    it_always "matches the underlying data", num_tests: 1000 do
+    it_always "matches the underlying data with new instances", num_tests: 1000 do
       run_operations(operations)
+      expect(TestHelper.matches).to eq(Record.all.pluck(:id, :value).to_h)
+    end
+
+    it_always "matches the underlying data with the same instances", num_tests: 1000 do
+      run_operations(operations, (0..10).map { Record.new(id: _1) })
       expect(TestHelper.matches).to eq(Record.all.pluck(:id, :value).to_h)
     end
 
