@@ -93,11 +93,11 @@ module ActiveRecordRules
 
             paths = []
             while (item, path = candidates.shift)
-              next unless done.add?(item)
-
               if target_tables.include?(item.table)
                 paths << path
               else
+                next unless done.add?(item)
+
                 @edges[item.table].each do |table_field, local_edges|
                   local_edges.each do |edge|
                     candidates << [ edge, [ [ edge, table_field ] ] + path ]
@@ -114,13 +114,13 @@ module ActiveRecordRules
             # happen often!
             return Set.new([ :all ]) if paths.empty?
 
-            selections = {}
-            tables = Hash.new { _1[_2] = [] }
-            wheres = []
-
             paths.each do |full_path|
               first, = full_path.first
               last, dead_last = full_path.last
+
+              selections = {}
+              tables = Hash.new { _1[_2] = [] }
+              wheres = []
 
               if first == last && klass.primary_key.is_a?(String) && first.field_name == klass.primary_key
                 # A single-segment path connecting to "id" doesn't
@@ -145,70 +145,70 @@ module ActiveRecordRules
                 wheres << lambda { |attributes|
                   value = ActiveRecord::Base.connection.quote(attributes[dead_last.field_name])
                   gen_eq(last.field, QueryDefiner::SqlExpr.new(
-                                       id_cast(value, klass),
-                                       attributes[dead_last.field_name].nil?
-                                     ))
+                           id_cast(value, klass),
+                           attributes[dead_last.field_name].nil?
+                         ))
                 }
               end
-            end
 
-            [ previous, current ].each do |attributes|
-              next if attributes.nil?
+              [ previous, current ].each do |attributes|
+                next if attributes.nil?
 
-              selections_sql = selections.map do |name, maker|
-                "#{maker.call(attributes)} as #{name}"
-              end.uniq.join(",\n       ")
+                selections_sql = selections.map do |name, maker|
+                  "#{maker.call(attributes)} as #{name}"
+                end.uniq.join(",\n       ")
 
-              tables_sql = tables.sort_by { _2.length }.map do |name, ons|
-                ons = ons.map do |clause|
+                tables_sql = tables.sort_by { _2.length }.map do |name, ons|
+                  ons = ons.map do |clause|
+                    if clause.end_with?(" is true")
+                      # In the context of a joins on clause, the "is
+                      # true" is unnecessary, because NULL is
+                      # interpreted as false. However, leaving the "is
+                      # true" there prevents Postgres from using
+                      # indexes, so stripping it off is *really* useful.
+                      clause[0...-" is true".size]
+                    else
+                      clause
+                    end
+                  end
+                  if ons.empty?
+                    " cross join #{@internal_table_names[name]} as #{name}"
+                  else
+                    [
+                      " inner join #{@internal_table_names[name]} as #{name}",
+                      "         on #{ons.uniq.join("\n     and ")}"
+                    ].join("\n")
+                  end
+                end.uniq.join("\n")
+                unless tables_sql.empty? || tables_sql.start_with?(" cross join ")
+                  raise "Invalid query generated: do all of the joins have 'on' conditions somehow?"
+                end
+
+                tables_sql = tables_sql[(" cross join ".size)..]
+
+                wheres_sql = wheres.map do |maker|
+                  clause = maker.call(attributes)
                   if clause.end_with?(" is true")
-                    # In the context of a joins on clause, the "is
-                    # true" is unnecessary, because NULL is
-                    # interpreted as false. However, leaving the "is
-                    # true" there prevents Postgres from using
-                    # indexes, so stripping it off is *really* useful.
+                    # In the context of a where clause, the "is true" is
+                    # unnecessary, because NULL is interpreted as
+                    # false. However, leaving the "is true" there
+                    # prevents Postgres from using indexes, so stripping
+                    # it off is *really* useful.
                     clause[0...-" is true".size]
                   else
                     clause
                   end
-                end
-                if ons.empty?
-                  " cross join #{@internal_table_names[name]} as #{name}"
-                else
+                end.uniq.join("\n   and ")
+
+                pending_activations << Rule::PendingActivation.new(
+                  selections.keys.map { @external_table_names[_1] },
                   [
-                    " inner join #{@internal_table_names[name]} as #{name}",
-                    "         on #{ons.uniq.join("\n     and ")}"
-                  ].join("\n")
-                end
-              end.uniq.join("\n")
-              unless tables_sql.empty? || tables_sql.start_with?(" cross join ")
-                raise "Invalid query generated: do all of the joins have 'on' conditions somehow?"
+                    "select #{selections_sql}",
+                    ("  from #{tables_sql}" unless tables.empty?),
+                    (" where #{wheres_sql}" unless wheres.empty?)
+                  ].compact.join("\n")
+                )
               end
-
-              tables_sql = tables_sql[(" cross join ".size)..]
-
-              wheres_sql = wheres.map do |maker|
-                clause = maker.call(attributes)
-                if clause.end_with?(" is true")
-                  # In the context of a where clause, the "is true" is
-                  # unnecessary, because NULL is interpreted as
-                  # false. However, leaving the "is true" there
-                  # prevents Postgres from using indexes, so stripping
-                  # it off is *really* useful.
-                  clause[0...-" is true".size]
-                else
-                  clause
-                end
-              end.uniq.join("\n   and ")
-
-              pending_activations << Rule::PendingActivation.new(
-                selections.keys.map { @external_table_names[_1] },
-                [
-                  "select #{selections_sql}",
-                  ("  from #{tables_sql}" unless tables.empty?),
-                  (" where #{wheres_sql}" unless wheres.empty?)
-                ].compact.join("\n")
-              )
             end
           end
         end
