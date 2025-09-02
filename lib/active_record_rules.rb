@@ -301,7 +301,7 @@ module ActiveRecordRules
       return if failures.empty?
       raise failures.first if failures.size == 1
 
-      raise "Error running pending executions: #{failed} of #{total} failed"
+      raise "Error running pending executions: #{failures} of #{total} failed"
     end
 
     def run_pending_execution(id)
