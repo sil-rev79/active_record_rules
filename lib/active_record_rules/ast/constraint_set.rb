@@ -82,7 +82,6 @@ module ActiveRecordRules
             # Once we have that, we construct a SQL query based on the
             # paths we've found. If we find no paths, then we have to
             # invalidate *all* matches.
-            target_tables = Set.new(@target_tables)
             candidates = []
             done = Set.new([ table ])
             @edges[table].each do |table_field, local_edges|
@@ -93,10 +92,10 @@ module ActiveRecordRules
 
             paths = []
             while (item, path = candidates.shift)
-              if target_tables.include?(item.table)
+              if @target_tables.include?(item.table)
                 paths << path
               else
-                next unless done.add?(item)
+                next unless done.add?(item.table)
 
                 @edges[item.table].each do |table_field, local_edges|
                   local_edges.each do |edge|
@@ -378,11 +377,11 @@ module ActiveRecordRules
           end
         end
 
-        @edges = Hash.new { _1[_2] = {} } # table => { field => [TableField ...] }
+        @edges = Hash.new { _1[_2] = Hash.new { |h, k| h[k] = [] } } # table => { field => [TableField ...] }
         binding_maps.each do |binding_map|
           binding_map.each_value do |table_fields|
             table_fields.each do |table_field|
-              @edges[table_field.table][table_field] = table_fields.reject { _1 == table_field }
+              @edges[table_field.table][table_field] += table_fields.reject { _1 == table_field }
             end
           end
         end
