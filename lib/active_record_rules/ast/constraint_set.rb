@@ -58,157 +58,87 @@ module ActiveRecordRules
                    @constraints.any? { _1.relevant_change?(klass, previous, current) }
         return Set.new unless relevant
 
-        pending_activations = Set.new
-
         populate_table_edges!
 
-        @start_tables[klass.table_name].each do |table|
-          if @target_tables.include?(table)
-            # No need to find a path if the record we're changing is
-            # one of our ground ids. Nice and easy.
+        pending_activations = Set.new
+
+        @source_vertices[klass.table_name].each do |table|
+          @graphs.each_with_index do |graph, i|
+            paths = graph.find_paths([ table ], @sink_vertices)
+
             [ previous, current ].each do |attributes|
               next unless attributes
 
-              value = ActiveRecord::Base.connection.quote(attributes["id"])
-              pending_activations << Rule::PendingActivation.new([ table ], "select #{id_cast(value, klass)} as #{table}")
-            end
-          else
-            # If we're not immediately in the right place, then we
-            # need to find a path to where we're going. We do a
-            # breadth first search until we have either (a) found a
-            # path to *all* target tables, or (b) run out of paths to
-            # explore.
-            #
-            # Once we have that, we construct a SQL query based on the
-            # paths we've found. If we find no paths, then we have to
-            # invalidate *all* matches.
-            candidates = []
-            done = Set.new([ table ])
-            @edges[table].each do |table_field, local_edges|
-              local_edges.each do |edge|
-                candidates << [ edge, [ [ edge, table_field ] ] ]
-              end
-            end
-
-            paths = []
-            while (item, path = candidates.shift)
-              if @target_tables.include?(item.table)
-                paths << path
-              else
-                next unless done.add?(item.table)
-
-                @edges[item.table].each do |table_field, local_edges|
-                  local_edges.each do |edge|
-                    candidates << [ edge, [ [ edge, table_field ] ] + path ]
-                  end
-                end
-              end
-            end
-
-            # If we do a search and we fail to find a path, then we just
-            # have to invalidate everything. Note that this *returns*
-            # which breaks out of this entire loop.
-            #
-            # This is relatively expensive, so hopefully it doesn't
-            # happen often!
-            return Set.new([ :all ]) if paths.empty?
-
-            paths.each do |full_path|
-              first, = full_path.first
-              last, dead_last = full_path.last
-
-              selections = {}
-              tables = Hash.new { _1[_2] = [] }
+              selections = Hash.new { _1[_2] = [] }
+              sqls = []
+              froms = []
               wheres = []
+              paths.each do |path|
+                case path
+                in [{ table_name:, table_alias: }]
+                  # If the path has no edges, then we can just return
+                  # our id directly, because we know what we're
+                  # looking at.
+                  value = ActiveRecord::Base.connection.quote(attributes["id"])
+                  selections[table_alias] << id_cast(value, klass)
+                  nil
 
-              if first == last && klass.primary_key.is_a?(String) && first.field_name == klass.primary_key
-                # A single-segment path connecting to "id" doesn't
-                # really need to hit a table at all, we can just return
-                # the values we already know about.
-                selections[first.table] = lambda { |attributes|
-                  id_cast(
-                    ActiveRecord::Base.connection.quote(
-                      attributes[dead_last.field_name]
-                    ),
-                    klass
-                  )
-                }
-              else
-                selections[first.table] = ->(_) { "#{first.table}.id" }
+                in [_, [[_, field_name, _], [target_table_alias, "id", _]], _] unless attributes[field_name].nil?
+                  # If the path has a single edge, we can avoid making
+                  # any joins and just look up the id directly. This
+                  # ends up being important for deletion, because we
+                  # might not have a join record that we can use any
+                  # more.
+                  value = ActiveRecord::Base.connection.quote(attributes[field_name])
+                  selections[target_table_alias] << id_cast(value, klass)
 
-                tables[first.table] ||= []
-                full_path[...-1].each do |from, to|
-                  tables[to.table] << gen_eq(from.field, to.field)
-                end
-
-                wheres << lambda { |attributes|
-                  value = ActiveRecord::Base.connection.quote(attributes[dead_last.field_name])
-                  gen_eq(last.field, QueryDefiner::SqlExpr.new(
-                           id_cast(value, klass),
-                           attributes[dead_last.field_name].nil?
-                         ))
-                }
-              end
-
-              [ previous, current ].each do |attributes|
-                next if attributes.nil?
-
-                selections_sql = selections.map do |name, maker|
-                  "#{maker.call(attributes)} as #{name}"
-                end.uniq.join(",\n       ")
-
-                tables_sql = tables.sort_by { _2.length }.map do |name, ons|
-                  ons = ons.map do |clause|
-                    if clause.end_with?(" is true")
-                      # In the context of a joins on clause, the "is
-                      # true" is unnecessary, because NULL is
-                      # interpreted as false. However, leaving the "is
-                      # true" there prevents Postgres from using
-                      # indexes, so stripping it off is *really* useful.
-                      clause[0...-" is true".size]
-                    else
-                      clause
+                in [{ table_name:, table_alias: }, *tail, last_table]
+                  # If the path has more than one edge, then we have
+                  # to write a query to do all the joins that we want
+                  # to make.
+                  selections[last_table[:table_alias]] << "#{last_table[:table_alias]}.id"
+                  froms << [
+                    "#{table_name} as #{table_alias}",
+                    *tail.in_groups_of(2).map do |join_sql, table|
+                      table ||= last_table # We stripped this off in the match, so this uses it on the last iteration here
+                      case join_sql
+                      in [[_, _, left_expr], [_, _, right_expr]]
+                        "#{table[:table_name]} as #{table[:table_alias]} on #{gen_eq(left_expr, right_expr)}"
+                      end
                     end
-                  end
-                  if ons.empty?
-                    " cross join #{@internal_table_names[name]} as #{name}"
+                  ].join(" inner join ")
+                  if attributes["id"].nil?
+                    wheres << "#{table_alias}.id is null"
                   else
-                    [
-                      " inner join #{@internal_table_names[name]} as #{name}",
-                      "         on #{ons.uniq.join("\n     and ")}"
-                    ].join("\n")
+                    value = ActiveRecord::Base.connection.quote(attributes["id"])
+                    wheres << "#{table_alias}.id = #{id_cast(value, klass)}"
                   end
-                end.uniq.join("\n")
-                unless tables_sql.empty? || tables_sql.start_with?(" cross join ")
-                  raise "Invalid query generated: do all of the joins have 'on' conditions somehow?"
                 end
+              end.compact
 
-                tables_sql = tables_sql[(" cross join ".size)..]
+              next if selections.empty?
 
-                wheres_sql = wheres.map do |maker|
-                  clause = maker.call(attributes)
-                  if clause.end_with?(" is true")
-                    # In the context of a where clause, the "is true" is
-                    # unnecessary, because NULL is interpreted as
-                    # false. However, leaving the "is true" there
-                    # prevents Postgres from using indexes, so stripping
-                    # it off is *really* useful.
-                    clause[0...-" is true".size]
-                  else
-                    clause
-                  end
-                end.uniq.join("\n   and ")
+              selections_sql = selections.map { "#{_2.first} as #{_1}" }.join(", ")
+              froms_sql = froms.join(" cross join ")
+              wheres_sql = wheres.reduce { "#{_1} and #{_2}" }
 
-                pending_activations << Rule::PendingActivation.new(
-                  selections.keys.map { @external_table_names[_1] },
-                  [
-                    "select distinct #{selections_sql}",
-                    ("  from #{tables_sql}" unless tables.empty?),
-                    (" where #{wheres_sql}" unless wheres.empty?)
-                  ].compact.join("\n")
-                )
-              end
+              pending_activations << Rule::PendingActivation.new(
+                selections.keys, [
+                  "select distinct #{selections_sql}",
+                  (" from #{froms_sql}" unless froms.empty?),
+                  (" where #{wheres_sql}" unless wheres.empty?)
+                ].compact.join
+              )
             end
+          end
+
+          if pending_activations.empty?
+            # If we can't work out any relationship between the input
+            # and the tables we need, then we have invalidate all
+            # matches for this rule (which is expensive!)
+            Set.new([ :all ])
+          else
+            pending_activations
           end
         end
 
@@ -279,110 +209,105 @@ module ActiveRecordRules
         SQL
       end
 
-      class BindingMap
-        def initialize(parent)
-          @parent = parent
-          @values = Hash.new { _1[_2] = [] }
-        end
-
-        def [](key)
-          if @parent
-            @values[key] + @parent[key]
-          else
-            @values[key]
-          end
-        end
-
-        def add(key, value)
-          @values[key] << value
-        end
-
-        def each_value(&block)
-          if @parent
-            @values.each do |key, value|
-              block.call(value + @parent[key])
-            end
-          else
-            @values.each_value(&block)
-          end
-        end
-      end
-
       def populate_table_edges!
-        return if @edges
+        # return if @graphs
 
         populate_query_parts!
 
-        binding_maps = []
+        @graphs = Set.new
+        @source_vertices = Hash.new { _1[_2] = [] }
+        @sink_vertices = Set.new
 
-        table_bindings = BindingMap.new(nil)
-        binding_maps << table_bindings
-        to_do = constraints.dup.map { [ _1, true, table_bindings ] }
         table_index = 0
-        @target_tables = []
-        @start_tables = Hash.new { _1[_2] = [] }
-        @internal_table_names = {}
-        @external_table_names = {}
-        i = 0
-        while (constraint, top_level, bindings = to_do.shift)
+
+        top_graph = Graph.new
+        @graphs << top_graph
+        top_bindings = Hash.new { _1[_2] = [] }
+        to_do = constraints.map { [ _1, top_graph, top_bindings ] }
+
+        while (constraint, graph, bindings = to_do.shift)
           case constraint
           in Aggregate(aggregated_constraints)
-            subbindings = BindingMap.new(bindings)
-            binding_maps << subbindings
-            to_do += aggregated_constraints.map { [ _1, false, subbindings ] }
+            subgraph = Graph.new(graph)
+            @graphs << subgraph
+            subbindings = bindings.deep_dup
+            to_do += aggregated_constraints.map { [ _1, subgraph, subbindings ] }
           in Any(existential_constraints)
-            subbindings = BindingMap.new(bindings)
-            binding_maps << subbindings
-            to_do += existential_constraints.map { [ _1, false, subbindings ] }
+            subgraph = Graph.new(graph)
+            @graphs << subgraph
+            subbindings = bindings.deep_dup
+            to_do += existential_constraints.map { [ _1, subgraph, subbindings ] }
           in Negation(negated_constraints)
-            subbindings = BindingMap.new(bindings)
-            binding_maps << subbindings
-            to_do += negated_constraints.map { [ _1, false, subbindings ] }
+            subgraph = Graph.new(graph)
+            @graphs << subgraph
+            subbindings = bindings.deep_dup
+            to_do += negated_constraints.map { [ _1, subgraph, subbindings ] }
           in RecordMatcher(match_klass, clauses)
-            table_name = "#{match_klass.table_name}_#{table_index += 1}"
-            @internal_table_names[table_name] = match_klass.table_name
-            @external_table_names[table_name] = @table_names[i]
-            i += 1
+            table_alias = @table_names[table_index]
+            if table_alias
+              table_index += 1
+            else
+              table_alias = "#{match_klass.table_name}_#{table_index += 1}"
+            end
+            graph.add_vertex(table_alias, {
+                               table_name: match_klass.table_name,
+                               table_alias: table_alias
+                             })
 
-            @target_tables << table_name if top_level
-            @start_tables[match_klass.table_name] << table_name
+            @sink_vertices << table_alias if graph == top_graph
+            @source_vertices[match_klass.table_name] << table_alias
 
             clauses.each do |clause|
               case clause
               in BinaryOperatorExpression(Variable(lhs), "=", RecordField(rhs))
-                expr = QueryDefiner::SqlExpr.new(
-                  "#{table_name}.#{rhs}",
-                  match_klass.columns_hash[rhs].null
-                )
-                bindings.add(lhs, TableField.new(table_name, expr, rhs))
+                rhs_item = [ table_alias,
+                            rhs,
+                            QueryDefiner::SqlExpr.new(
+                              "#{table_alias}.#{rhs}",
+                              match_klass.columns_hash[rhs].null
+                            ) ]
+                bindings[lhs].each do |lhs_item|
+                  lhs_alias, = lhs_item
+                  graph.add_edge(table_alias, lhs_alias, [ lhs_item, rhs_item ])
+                  graph.add_edge(lhs_alias, table_alias, [ rhs_item, lhs_item ])
+                end
+                bindings[lhs] << rhs_item
               in BinaryOperatorExpression(RecordField(lhs), "=", Variable(rhs))
-                expr = QueryDefiner::SqlExpr.new(
-                  "#{table_name}.#{lhs}",
-                  match_klass.columns_hash[lhs].null
-                )
-                bindings.add(rhs, TableField.new(table_name, expr, lhs))
+                lhs_item = [ table_alias,
+                            lhs,
+                            QueryDefiner::SqlExpr.new(
+                              "#{table_alias}.#{lhs}",
+                              match_klass.columns_hash[lhs].null
+                            ) ]
+                bindings[rhs].each do |rhs_item|
+                  rhs_alias, = rhs_item
+                  graph.add_edge(table_alias, rhs_alias, [ lhs_item, rhs_item ])
+                  graph.add_edge(rhs_alias, table_alias, [ rhs_item, lhs_item ])
+                end
+                bindings[rhs] << lhs_item
               else
                 # Recurse into the LHS and RHS to find other relevant tables.
-                to_do << [ lhs, false, bindings ]
-                to_do << [ rhs, false, bindings ]
+                to_do << clause
               end
             end
+          in BinaryOperatorExpression(Variable(lhs), "=", Variable(rhs))
+            bindings[lhs].each do |lhs_item|
+              lhs_alias, = lhs_item
+              bindings[rhs].each do |rhs_item|
+                rhs_alias, = rhs_item
+                graph.add_edge(lhs_alias, rhs_alias, [ lhs_item, rhs_item ])
+                graph.add_edge(rhs_alias, lhs_alias, [ lhs_item, rhs_item ])
+              end
+            end
+            bindings[lhs] = bindings[lhs] + bindings[rhs]
+            bindings[rhs] = bindings[lhs]
           in BinaryOperatorExpression(lhs, _, rhs)
             # Recurse into the LHS and RHS to find other relevant tables.
-            to_do << [ lhs, false, bindings ]
-            to_do << [ rhs, false, bindings ]
+            to_do << [ lhs, graph, bindings ]
+            to_do << [ rhs, graph, bindings ]
           else
             # we're not handling anything else
             nil
-          end
-        end
-
-        @edges = Hash.new { _1[_2] = Hash.new { |h, k| h[k] = [] } } # table => { field => [TableField ...] }
-        binding_maps.each do |binding_map|
-          binding_map.each_value do |table_fields|
-            table_fields.each do |table_field|
-              @edges[table_field.table][table_field] += table_fields.reject { _1 == table_field }
-            end
           end
         end
       end

@@ -3,6 +3,7 @@
 require "active_record"
 require "active_record_rules/definer"
 require "active_record_rules/engine"
+require "active_record_rules/graph"
 require "active_record_rules/hooks"
 require "active_record_rules/jobs"
 require "active_record_rules/parse"
