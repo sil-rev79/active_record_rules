@@ -202,7 +202,7 @@ module ActiveRecordRules
                 pending_activations << Rule::PendingActivation.new(
                   selections.keys.map { @external_table_names[_1] },
                   [
-                    "select #{selections_sql}",
+                    "select distinct #{selections_sql}",
                     ("  from #{tables_sql}" unless tables.empty?),
                     (" where #{wheres_sql}" unless wheres.empty?)
                   ].compact.join("\n")
