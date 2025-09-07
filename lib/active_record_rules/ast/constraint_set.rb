@@ -210,7 +210,7 @@ module ActiveRecordRules
       end
 
       def populate_table_edges!
-        # return if @graphs
+        return if @graphs
 
         populate_query_parts!
 
