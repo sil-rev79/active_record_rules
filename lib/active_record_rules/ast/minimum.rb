@@ -24,7 +24,7 @@ module ActiveRecordRules
       end
 
       def unparse
-        "minimum(#{expression.unparse}) { #{@constraints.map(&:unparse).join("; ")} }"
+        "minimum(#{expression.unparse}) { #{@constraints.map { "\n" + _1.unparse }.indent(2)} }"
       end
     end
   end

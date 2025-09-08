@@ -33,9 +33,9 @@ module ActiveRecordRules
 
       def unparse
         if expression
-          "count(#{expression.unparse}) { #{@constraints.map(&:unparse).join("; ")} }"
+          "count(#{expression.unparse}) { #{@constraints.map { "\n" + _1.unparse }.indent(2)} }"
         else
-          "count { #{@constraints.map(&:unparse).join("; ")} }"
+          "count { #{@constraints.map { "\n" + _1.unparse }.indent(2)} }"
         end
       end
     end

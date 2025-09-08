@@ -59,25 +59,6 @@ module ActiveRecordRules
       rule(line: simple(:line)) do
         line
       end
-
-      rule(
-        timing: simple(:timing),
-        name: simple(:name),
-        constraints: sequence(:constraints),
-        on_match: subtree(:on_match),
-        on_update: subtree(:on_update),
-        on_unmatch: subtree(:on_unmatch)
-      ) do
-        Definition.new(
-          timing.line_and_column,
-          timing.to_s,
-          name.to_s.strip,
-          constraints,
-          on_match&.join("\n"),
-          on_update&.join("\n"),
-          on_unmatch&.join("\n")
-        )
-      end
     end
   end
 end

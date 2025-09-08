@@ -75,18 +75,16 @@ module ActiveRecordRules
       names = @bindings.keys
       names &= interesting_binding_names if interesting_binding_names
 
-      bindings = names.map { "#{resolved_bindings[_1].sql.split("\n").join("\n        ")} as #{_1}" }.join(",\n       ")
+      bindings = names.map { "#{resolved_bindings[_1].sql} as #{_1}" }.join(", ")
 
       left_joins = []
       tables = @tables.map do |name, real_name|
         "#{real_name} as #{name}"
-      end.compact.join("\n cross join ")
+      end.compact.join(" cross join ")
       tables += left_joins.map do |name, definition, on_condition|
         on = on_condition.call(name, resolved_bindings)
         on = "true" if on.empty?
-        "\n  left join #{definition.call(resolved_bindings).split("\n").join("\n             ")}" \
-          "\n         as #{name}" \
-          "\n         on #{on.split("\n").join("\n     ")}"
+        " left join #{definition.call(resolved_bindings)} as #{name} on #{on}"
       end.join
 
       conditions = [
@@ -114,18 +112,18 @@ module ActiveRecordRules
             gen_eq(first, other)
           end
         end
-      ].join("\n   and ")
+      ].join(" and ")
 
-      if tables.first == "\n"
+      if tables.first == " "
         raise "Invalid query: cannot emit query without a positive table reference. " \
               "Do you have a `not { not { ... } }' in your query?"
       end
 
       [
         "select #{bindings}",
-        "  from #{tables}",
-        (" where #{conditions.split("\n").join("\n       ")}" unless conditions.empty?)
-      ].compact.join("\n")
+        "from #{tables}",
+        ("where #{conditions}" unless conditions.empty?)
+      ].compact.join(" ")
     end
 
     SqlExpr = Struct.new(:sql, :nullable?) do

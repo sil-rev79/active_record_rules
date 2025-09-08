@@ -140,9 +140,9 @@ module ActiveRecordRules
               pending_activations << Rule::PendingActivation.new(
                 selections.keys, [
                   "select distinct #{selections_sql}",
-                  (" from #{froms_sql}" unless froms.empty?),
-                  (" where #{wheres_sql}" unless wheres.empty?)
-                ].compact.join
+                  ("from #{froms_sql}" unless froms.empty?),
+                  ("where #{wheres_sql}" unless wheres.empty?)
+                ].compact.join(" ")
               )
             end
           end
@@ -215,11 +215,11 @@ module ActiveRecordRules
 
         @table_names = query_definer.tables.keys.to_a
         @id_names, @other_names = query_definer.bindings.keys.partition { _1.start_with?("__id_") }
-        @query_sql = <<~SQL
+        @query_sql = <<~SQL.squish!
           select #{json_sql(@id_names)} as ids,
                  #{json_sql(@other_names)} as arguments
             from (
-              #{query_definer.to_sql.split("\n").join("\n    ")}
+              #{query_definer.to_sql}
             ) as q
         SQL
       end

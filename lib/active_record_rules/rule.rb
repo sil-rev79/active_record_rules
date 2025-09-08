@@ -54,7 +54,7 @@ module ActiveRecordRules
           "(match_id.record_id = __ids.#{term} and match_id.name = #{ActiveRecord::Base.connection.quote(term)})"
         end
 
-        <<~SQL
+        <<~SQL.squish!
           select match.* from (
             with __ids as (#{condition.condition_sql})
             select distinct match.* from #{RuleMatch.table_name} match
@@ -238,7 +238,7 @@ module ActiveRecordRules
                      coalesce(match.queued_since, current_timestamp),
                      record.arguments
                 from (
-                  #{constraints.to_query_sql.split("\n").join("\n      ")}
+                  #{constraints.to_query_sql}
                    where #{plain_sql}
                 ) as record
                 full outer join (

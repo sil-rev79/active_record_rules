@@ -22,7 +22,7 @@ module ActiveRecordRules
       def final_result(self_expression) = QueryDefiner::SqlExpr.new("coalesce(#{self_expression}, 0)", false)
 
       def unparse
-        "sum(#{expression.unparse}) { #{@constraints.map(&:unparse).join("; ")} }"
+        "sum(#{expression.unparse}) { #{@constraints.map { "\n" + _1.unparse }.indent(2)} }"
       end
     end
   end

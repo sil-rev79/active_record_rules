@@ -24,7 +24,7 @@ module ActiveRecordRules
       end
 
       def unparse
-        "maximum(#{expression.unparse}) { #{@constraints.map(&:unparse).join("; ")} }"
+        "maximum(#{expression.unparse}) { #{@constraints.map { "\n" + _1.unparse }.indent(2)} }"
       end
     end
   end

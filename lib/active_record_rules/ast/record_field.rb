@@ -32,7 +32,7 @@ module ActiveRecordRules
                   clauses = defn.map do |value, key|
                     "when #{definer.table_name}.#{@name} = #{key} then #{ActiveRecord::Base.connection.quote(value)}"
                   end
-                  "case #{clauses.join("\n     ")}\nend"
+                  "case #{clauses.join(" ")}\nend"
                 else
                   raise "Don't know what to return for enum #{definer.table_class}##{@name}: " \
                         "add :i or :s to cast to int/string (at #{@location.join(":")})"

@@ -42,7 +42,7 @@ module ActiveRecordRules
 
         lambda do |bindings|
           sql = query_definer.to_sql(bindings, [ value_name ])
-          QueryDefiner::SqlExpr.new("not exists (#{sql.split("\n").join("\n            ")})", false)
+          QueryDefiner::SqlExpr.new("not exists (#{sql})", false)
         end
       end
 
@@ -54,7 +54,7 @@ module ActiveRecordRules
         @constraints.each { _1.record_relevant_attributes(tracker) }
       end
 
-      def unparse = "not { #{@constraints.map(&:unparse).join("; ")} }"
+      def unparse = "not { #{@constraints.map { "\n" + _1.unparse }.indent(2)} }"
       def deconstruct = [ constraints ]
     end
   end
