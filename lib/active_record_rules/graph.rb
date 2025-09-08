@@ -3,7 +3,9 @@ module ActiveRecordRules
     def initialize(parent = nil)
       @parent = parent
       @vertices = {}
-      @edges = Hash.new { _1[_2] = {} }
+      @edges = Hash.new do |hash, key|
+        hash[key] = Hash.new { _1[_2] = Set.new }
+      end
     end
 
     def vertex(key)
@@ -31,9 +33,7 @@ module ActiveRecordRules
     end
 
     def add_edge(left, right, value = [ left, right ])
-      raise "Duplicate edge: #{left} -> #{right}" if edge?(left, right)
-
-      @edges[left][right] = value
+      @edges[left][right] << value
     end
 
     # Find all paths starting from sources and going to sinks.
@@ -53,7 +53,9 @@ module ActiveRecordRules
         if sinks.include?(key)
           paths << path
         elsif seen.add?(key)
-          to_do += edges(key).map { [ _1, path + [ _2, vertex(_1) ] ] }
+          to_do += edges(key).flat_map do |right, edges|
+            edges.map { [ right, path + [ _1, vertex(right) ] ] }
+          end
         end
       end
 

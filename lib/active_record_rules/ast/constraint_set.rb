@@ -70,9 +70,8 @@ module ActiveRecordRules
               next unless attributes
 
               selections = Hash.new { _1[_2] = [] }
-              sqls = []
-              froms = []
-              wheres = []
+              froms = Set.new
+              wheres = Set.new
               paths.each do |path|
                 case path
                 in [{ table_name:, table_alias: }]
@@ -81,40 +80,56 @@ module ActiveRecordRules
                   # looking at.
                   value = ActiveRecord::Base.connection.quote(attributes["id"])
                   selections[table_alias] << id_cast(value, klass)
-                  nil
 
                 in [_, [[_, field_name, _], [target_table_alias, "id", _]], _] unless attributes[field_name].nil?
-                  # If the path has a single edge, we can avoid making
-                  # any joins and just look up the id directly. This
-                  # ends up being important for deletion, because we
-                  # might not have a join record that we can use any
-                  # more.
+                  # If the path has a single edge joining onto the id
+                  # of another table, we can avoid making any joins
+                  # and just look up the id directly. This ends up
+                  # being important for deletion, because we might not
+                  # have a join record that we can use any more.
                   value = ActiveRecord::Base.connection.quote(attributes[field_name])
                   selections[target_table_alias] << id_cast(value, klass)
 
-                in [{ table_name:, table_alias: }, *tail, last_table]
+                in [_, [[_, base_field_name, _], [join_alias, join_field, join_nullable]], *tail, last_table]
                   # If the path has more than one edge, then we have
-                  # to write a query to do all the joins that we want
-                  # to make.
-                  selections[last_table[:table_alias]] << "#{last_table[:table_alias]}.id"
-                  froms << [
-                    "#{table_name} as #{table_alias}",
-                    *tail.in_groups_of(2).map do |join_sql, table|
-                      table ||= last_table # We stripped this off in the match, so this uses it on the last iteration here
-                      case join_sql
-                      in [[_, _, left_expr], [_, _, right_expr]]
-                        "#{table[:table_name]} as #{table[:table_alias]} on #{gen_eq(left_expr, right_expr)}"
-                      end
+                  # to write a query that pulls in all the tables we
+                  # need. We combine all the tables with CROSS JOINs,
+                  # and write a single WHERE clause to filter them.
+                  # We're relying on the database engine to optimise
+                  # this sensibly.
+
+                  # First we write a WHERE clause from our attribute
+                  # to the next table. We handle this specially to
+                  # avoid having to query for our own table.
+                  our_sql = ActiveRecord::Base.connection.quote(attributes[base_field_name])
+                  wheres << gen_eq(
+                    QueryDefiner::SqlExpr.new(our_sql, attributes[base_field_name].nil?),
+                    QueryDefiner::SqlExpr.new("#{join_alias}.#{join_field}", join_nullable)
+                  ).delete_suffix(" is true")
+
+                  # Then we iterate through the path, adding tables
+                  # and conditions as we get to them
+                  tail.each do |item|
+                    case item
+                    in { table_name:, table_alias: }
+                      froms << "#{table_name} as #{table_alias}"
+                    in [[left_alias, left_name, left_nullable], [right_alias, right_name, right_nullable]]
+                      lhs = QueryDefiner::SqlExpr.new("#{left_alias}.#{left_name}", left_nullable)
+                      rhs = QueryDefiner::SqlExpr.new("#{right_alias}.#{right_name}", right_nullable)
+                      # The "is true" is redundant for our conditions
+                      # (where NULL is treated as false), but leaving
+                      # it here causes Postgres to not use indexes.
+                      # Strip it off for performance.
+                      wheres << gen_eq(lhs, rhs).delete_suffix(" is true")
                     end
-                  ].join(" inner join ")
-                  if attributes["id"].nil?
-                    wheres << "#{table_alias}.id is null"
-                  else
-                    value = ActiveRecord::Base.connection.quote(attributes["id"])
-                    wheres << "#{table_alias}.id = #{id_cast(value, klass)}"
                   end
+
+                  # Then we add the table for our last join, and
+                  # select its id.
+                  froms << "#{last_table[:table_name]} as #{last_table[:table_alias]}"
+                  selections[last_table[:table_alias]] << "#{last_table[:table_alias]}.id"
                 end
-              end.compact
+              end
 
               next if selections.empty?
 
@@ -261,11 +276,8 @@ module ActiveRecordRules
               case clause
               in BinaryOperatorExpression(Variable(lhs), "=", RecordField(rhs))
                 rhs_item = [ table_alias,
-                            rhs,
-                            QueryDefiner::SqlExpr.new(
-                              "#{table_alias}.#{rhs}",
-                              match_klass.columns_hash[rhs].null
-                            ) ]
+                             rhs,
+                             match_klass.columns_hash[rhs].null ]
                 bindings[lhs].each do |lhs_item|
                   lhs_alias, = lhs_item
                   graph.add_edge(table_alias, lhs_alias, [ lhs_item, rhs_item ])
@@ -274,11 +286,8 @@ module ActiveRecordRules
                 bindings[lhs] << rhs_item
               in BinaryOperatorExpression(RecordField(lhs), "=", Variable(rhs))
                 lhs_item = [ table_alias,
-                            lhs,
-                            QueryDefiner::SqlExpr.new(
-                              "#{table_alias}.#{lhs}",
-                              match_klass.columns_hash[lhs].null
-                            ) ]
+                             lhs,
+                             match_klass.columns_hash[lhs].null ]
                 bindings[rhs].each do |rhs_item|
                   rhs_alias, = rhs_item
                   graph.add_edge(table_alias, rhs_alias, [ lhs_item, rhs_item ])
