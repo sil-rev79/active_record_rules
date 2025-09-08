@@ -146,18 +146,16 @@ module ActiveRecordRules
               )
             end
           end
-
-          if pending_activations.empty?
-            # If we can't work out any relationship between the input
-            # and the tables we need, then we have invalidate all
-            # matches for this rule (which is expensive!)
-            Set.new([ :all ])
-          else
-            pending_activations
-          end
         end
 
-        pending_activations
+        if pending_activations.empty?
+          # If we can't work out any relationship between the input
+          # and the tables we need, then we have invalidate all
+          # matches for this rule (which is expensive!)
+          Set.new([ :all ])
+        else
+          pending_activations
+        end
       end
 
       def bound_names
