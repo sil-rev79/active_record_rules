@@ -392,6 +392,64 @@ module ActiveRecordRules
       ActiveRecordRules::RuleMatch.where.not(failed_since: nil)
     end
 
+    # Recover and re-execute matches which have been stranded by a
+    # failure of the job runner:
+    #
+    #  - "later" execution jobs which were lost before they ran,
+    #    leaving queued_since set with nothing to drive it; and
+    #
+    #  - executions which died mid-run without even marking the match
+    #    as failed (e.g. the whole process was killed), leaving
+    #    running_since set so that nothing can claim the match again.
+    #
+    # Rules must be named explicitly: re-executing a stale match runs
+    # real rule code, which may not be desirable for every rule (for
+    # example, rules with external side effects). Pass :all to sweep
+    # every loaded rule.
+    #
+    # Recovering a stuck match moves it back to the queued state
+    # before re-driving it. If the execution is in fact still running
+    # (choose stuck_for generously to make this unlikely), this is
+    # safe: it degrades to the same "queued during execution" case as
+    # a concurrent activation, and the match is re-executed rather
+    # than corrupted.
+    #
+    # @param rules [Array, Object, :all]
+    #   The rules to sweep, as Rule objects, names or ids, or :all
+    # @param queued_for [ActiveSupport::Duration]
+    #   Only matches queued for longer than this are re-driven
+    # @param stuck_for [ActiveSupport::Duration]
+    #   Only matches running for longer than this are recovered
+    # @return [Array<String>] the ids of the matches which were re-driven
+    def sweep_stranded_matches(rules:, queued_for: 10.minutes, stuck_for: 10.minutes)
+      rule_ids =
+        if rules == :all
+          @loaded_rules.keys
+        else
+          Array(rules).map do |rule|
+            found = find_rule(rule)
+            raise ArgumentError, "Cannot find loaded rule: #{rule.inspect}" unless found
+
+            found.id
+          end
+        end
+      return [] if rule_ids.empty?
+
+      quoted_rule_ids = rule_ids.map { ActiveRecord::Base.connection.quote(_1) }
+      recovered = ActiveRecord::Base.connection.execute(<<~SQL.squish!).pluck("id")
+        update #{RuleMatch.table_name}
+           set running_since = null,
+               queued_since = coalesce(queued_since, current_timestamp)
+         where rule_id in (#{quoted_rule_ids.join(", ")})
+           and running_since <= #{ActiveRecord::Base.connection.quote(Time.now - stuck_for)}
+         returning id
+      SQL
+
+      ids = (queued_matches(queued_for).where(rule_id: rule_ids).pluck(:id) + recovered).uniq
+      run_pending_executions(ids)
+      ids
+    end
+
     # Returns all matches from the database where their rule is no
     # longer defined in the system. This is most useful to proceed
     # into a call to #delete_all, but you may wish to inspect the
