@@ -115,6 +115,20 @@ RSpec.describe ActiveRecordRules do
       expect(TestHelper.matches).to be_empty
     end
 
+    # A failed unmatch leaves BOTH failed_since and running_since set
+    # (unlike a failed match, which clears running_since). Recovery
+    # must not mistake it for a crashed execution: it has failed, and
+    # failures need human attention.
+    it "does not recover matches which failed mid-unmatch" do # rubocop:disable RSpec/MultipleExpectations
+      strand_running_match! { Person.create!(name: "John") }
+      ActiveRecordRules::RuleMatch.update_all(failed_since: Time.now)
+
+      described_class.sweep_stranded_matches(rules: "greet people")
+
+      expect(TestHelper.matches).to be_empty
+      expect(ActiveRecordRules::RuleMatch.sole.running_since).not_to be_nil
+    end
+
     it "raises for a rule which is not loaded" do
       expect do
         described_class.sweep_stranded_matches(rules: "no such rule")

@@ -442,6 +442,7 @@ module ActiveRecordRules
                queued_since = coalesce(queued_since, current_timestamp)
          where rule_id in (#{quoted_rule_ids.join(", ")})
            and running_since <= #{ActiveRecord::Base.connection.quote(Time.now - stuck_for)}
+           and failed_since is null
          returning id
       SQL
 
